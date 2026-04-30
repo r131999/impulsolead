@@ -1,0 +1,20 @@
+FROM node:20-alpine
+
+WORKDIR /app
+
+# openssl é exigido pelo Prisma no Alpine
+RUN apk add --no-cache openssl
+
+COPY server/package*.json ./
+# instala todas as deps (incluindo prisma CLI, devDep necessário para generate)
+RUN npm ci
+
+COPY server/prisma ./prisma
+COPY server/src ./src
+COPY server/entrypoint.sh ./entrypoint.sh
+
+RUN npx prisma generate && chmod +x entrypoint.sh
+
+EXPOSE 3002
+
+CMD ["sh", "entrypoint.sh"]

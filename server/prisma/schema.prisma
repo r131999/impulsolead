@@ -1,0 +1,114 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Imobiliaria {
+  id            String   @id @default(uuid())
+  nome          String
+  email         String   @unique
+  telefone      String?
+  logoUrl       String?
+  plano         String   @default("trial")
+  trialExpiraEm DateTime?
+  apiKey        String   @unique
+  criadoEm      DateTime @default(now())
+  atualizadoEm  DateTime @updatedAt
+
+  usuarios     Usuario[]
+  corretores   Corretor[]
+  leads        Lead[]
+  configAgente ConfigAgente?
+}
+
+model Usuario {
+  id           String   @id @default(uuid())
+  nome         String
+  email        String   @unique
+  senhaHash    String
+  role         String   @default("gestor")
+  ativo        Boolean  @default(true)
+  criadoEm    DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  imobiliariaId String
+  imobiliaria   Imobiliaria @relation(fields: [imobiliariaId], references: [id])
+}
+
+model Corretor {
+  id            String   @id @default(uuid())
+  nome          String
+  email         String?
+  telefone      String
+  whatsapp      String
+  ativo         Boolean  @default(true)
+  disponivel    Boolean  @default(true)
+  posicaoFila   Int      @default(0)
+  leadsRecebidos Int     @default(0)
+  criadoEm     DateTime @default(now())
+  atualizadoEm  DateTime @updatedAt
+
+  imobiliariaId String
+  imobiliaria   Imobiliaria @relation(fields: [imobiliariaId], references: [id])
+
+  leads Lead[]
+}
+
+model Lead {
+  id           String  @id @default(uuid())
+  nome         String
+  telefone     String
+  whatsappJid  String
+
+  primeiroImovel String?
+  tipoRenda      String?
+  rendaMensal    String?
+  restricaoCpf   String?
+  valorEntrada   String?
+  urgencia       String?
+  regiao         String?
+  faixaValor     String?
+
+  status      String  @default("novo")
+  motivoPerda String?
+  observacoes String?
+
+  corretorId String?
+  corretor   Corretor?   @relation(fields: [corretorId], references: [id])
+
+  imobiliariaId String
+  imobiliaria   Imobiliaria @relation(fields: [imobiliariaId], references: [id])
+
+  historico HistoricoLead[]
+
+  criadoEm    DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+}
+
+model HistoricoLead {
+  id       String   @id @default(uuid())
+  acao     String
+  detalhes String?
+  criadoEm DateTime @default(now())
+
+  leadId String
+  lead   Lead   @relation(fields: [leadId], references: [id])
+}
+
+model ConfigAgente {
+  id                 String  @id @default(uuid())
+  mensagemBoasVindas String  @default("Olá! Tudo bem? Aqui é a Lia, assistente virtual. Que bom que você entrou em contato! Como posso te chamar?")
+  perguntas          Json
+  nomeAgente         String  @default("Lia")
+  tomAgente          String  @default("profissional mas leve")
+  ativo              Boolean @default(true)
+  criadoEm          DateTime @default(now())
+  atualizadoEm      DateTime @updatedAt
+
+  imobiliariaId String      @unique
+  imobiliaria   Imobiliaria @relation(fields: [imobiliariaId], references: [id])
+}

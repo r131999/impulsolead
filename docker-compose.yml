@@ -1,0 +1,57 @@
+version: "3.8"
+
+# Copie .env.example para .env e preencha antes de rodar.
+# Suba com: docker compose up -d --build
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: impulso_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: impulso
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d impulso"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile.server
+    container_name: impulso_server
+    restart: unless-stopped
+    ports:
+      - "3002:3002"
+    environment:
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD}@impulso_postgres:5432/impulso
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRES_IN: 7d
+      PORT: 3002
+      NODE_ENV: production
+      CLIENT_URL: ${CLIENT_URL:-http://localhost}
+      NOTIFICACAO_WEBHOOK_URL: ${NOTIFICACAO_WEBHOOK_URL:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  client:
+    build:
+      context: .
+      dockerfile: Dockerfile.client
+    container_name: impulso_client
+    restart: unless-stopped
+    environment:
+      BACKEND_URL: http://impulso_server:3002
+    ports:
+      - "80:80"
+    depends_on:
+      - server
+
+volumes:
+  postgres_data:
