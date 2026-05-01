@@ -24,37 +24,38 @@ export default function Layout() {
   const fecharSidebar = () => setSidebarAberta(false)
 
   return (
-    <div className="flex h-screen bg-gray-50 overflow-hidden">
-      {/* Overlay escuro no mobile quando sidebar aberta */}
+    <div className="app-shell">
+      {/* Backdrop — só renderiza quando aberta; clique fora fecha */}
       {sidebarAberta && (
         <div
-          className="fixed inset-0 bg-black/50 z-20 md:hidden"
           onClick={fecharSidebar}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.5)',
+            zIndex: 999,
+          }}
         />
       )}
 
       {/* Sidebar */}
-      <aside
-        className={`fixed inset-y-0 left-0 z-30 w-64 bg-indigo-900 flex flex-col flex-shrink-0
-          transition-transform duration-300 ease-in-out
-          ${sidebarAberta ? 'translate-x-0' : '-translate-x-full'}
-          md:relative md:w-56 md:translate-x-0`}
-      >
+      <aside className={`app-sidebar${sidebarAberta ? ' sidebar-open' : ''}`}>
         <div className="px-5 py-4 border-b border-indigo-800 flex items-center justify-between">
           <div className="min-w-0">
             <h1 className="text-white font-bold text-lg tracking-tight">ImpulsoLead</h1>
             <p className="text-indigo-300 text-xs mt-0.5 truncate">{usuario?.imobiliaria?.nome}</p>
           </div>
+          {/* Botão fechar — CSS esconde no desktop, mostra só no mobile */}
           <button
-            className="md:hidden text-indigo-300 hover:text-white p-1 flex-shrink-0 ml-2"
             onClick={fecharSidebar}
+            className="btn-hamburger sidebar-close-btn ml-2 flex-shrink-0"
             aria-label="Fechar menu"
           >
-            <XIcon className="w-5 h-5" />
+            <XIcon style={{ width: 20, height: 20 }} />
           </button>
         </div>
 
-        <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
+        <nav className="flex-1 p-3 overflow-y-auto" style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
           {navItems.map(({ to, label, icon: Icon }) => (
             <NavLink
               key={to}
@@ -85,21 +86,21 @@ export default function Layout() {
         </div>
       </aside>
 
-      {/* Conteúdo principal */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+      {/* Área principal */}
+      <div className="app-main">
         {/* Barra superior mobile com botão hambúrguer */}
-        <header className="md:hidden flex items-center gap-3 px-4 py-3 bg-indigo-900 flex-shrink-0 shadow-md">
+        <header className="app-topbar">
           <button
             onClick={() => setSidebarAberta(true)}
-            className="text-white p-1"
+            className="btn-hamburger"
             aria-label="Abrir menu"
           >
-            <HamburgerIcon className="w-6 h-6" />
+            <HamburgerIcon style={{ width: 24, height: 24 }} />
           </button>
-          <h1 className="text-white font-bold text-base">ImpulsoLead</h1>
+          <span className="app-topbar-title">ImpulsoLead</span>
         </header>
 
-        <main className="flex-1 overflow-auto">
+        <main className="app-content">
           <Outlet />
         </main>
       </div>
@@ -107,17 +108,17 @@ export default function Layout() {
   )
 }
 
-function HamburgerIcon({ className }) {
+function HamburgerIcon({ style }) {
   return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <svg style={style} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
     </svg>
   )
 }
 
-function XIcon({ className }) {
+function XIcon({ style }) {
   return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <svg style={style} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
     </svg>
   )

@@ -31,3 +31,106 @@
     @apply block text-sm font-medium text-gray-700 mb-1;
   }
 }
+
+/* ─── Layout responsivo ────────────────────────────────────────────────── */
+
+/* Botão X dentro da sidebar: escondido no desktop */
+.sidebar-close-btn {
+  display: none;
+}
+
+/* Desktop: sidebar sempre visível como coluna fixa */
+.app-shell {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+  background: #f9fafb;
+}
+
+.app-sidebar {
+  width: 224px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  background: #1e1b4b;
+}
+
+.app-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.app-topbar {
+  display: none;
+}
+
+.app-content {
+  flex: 1;
+  overflow: auto;
+}
+
+/* Mobile: abaixo de 768px */
+@media (max-width: 767px) {
+  /* Sidebar escondida por padrão */
+  .app-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 260px;
+    z-index: 1000;
+    display: none;
+    flex-direction: column;
+  }
+
+  /* Sidebar aberta via JS */
+  .app-sidebar.sidebar-open {
+    display: flex;
+  }
+
+  /* Conteúdo ocupa tela toda */
+  .app-main {
+    width: 100%;
+  }
+
+  /* Barra superior com hambúrguer */
+  .app-topbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    background: #1e1b4b;
+    flex-shrink: 0;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+  }
+
+  .app-topbar-title {
+    color: #fff;
+    font-weight: 700;
+    font-size: 1rem;
+  }
+
+  .btn-hamburger {
+    color: #fff;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+  }
+
+  .btn-hamburger:hover {
+    background: rgba(255,255,255,0.1);
+  }
+
+  /* Botão X fica visível dentro da sidebar no mobile */
+  .sidebar-close-btn {
+    display: flex;
+  }
+}
