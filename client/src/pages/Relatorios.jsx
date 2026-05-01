@@ -30,26 +30,26 @@ export default function Relatorios() {
   }, [periodo])
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
+    <div className="p-4 md:p-6 max-w-7xl mx-auto">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Relatórios</h1>
+          <h1 className="text-xl md:text-2xl font-bold text-gray-900">Relatórios</h1>
           {dados && (
-            <p className="text-gray-500 text-sm mt-0.5">
+            <p className="text-gray-500 text-xs md:text-sm mt-0.5">
               Desde {new Intl.DateTimeFormat('pt-BR').format(new Date(dados.dataInicio))}
             </p>
           )}
         </div>
-        <div className="flex gap-1 bg-gray-100 p-1 rounded-lg">
+        <div className="flex gap-1 bg-gray-100 p-1 rounded-lg self-start sm:self-auto">
           {[7, 30, 90].map((p) => (
             <button
               key={p}
               onClick={() => setPeriodo(p)}
-              className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
                 periodo === p ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'
               }`}
             >
-              {p} dias
+              {p}d
             </button>
           ))}
         </div>

@@ -80,16 +80,16 @@ export default function Corretores() {
   }
 
   return (
-    <div className="p-6 max-w-5xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
+    <div className="p-4 md:p-6 max-w-5xl mx-auto">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Corretores</h1>
-          <p className="text-gray-500 text-sm mt-0.5">
+          <h1 className="text-xl md:text-2xl font-bold text-gray-900">Corretores</h1>
+          <p className="text-gray-500 text-xs md:text-sm mt-0.5">
             {corretores.filter((c) => c.ativo).length} ativos ·{' '}
             {corretores.filter((c) => c.ativo && c.disponivel).length} disponíveis
           </p>
         </div>
-        <button onClick={abrirCriar} className="btn-primary">+ Novo corretor</button>
+        <button onClick={abrirCriar} className="btn-primary self-start sm:self-auto">+ Novo corretor</button>
       </div>
 
       {/* Abas */}
@@ -109,22 +109,24 @@ export default function Corretores() {
 
       {aba === 'lista' && (
         <div className="card p-0 overflow-hidden">
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto">
+          <table className="w-full text-sm min-w-[480px]">
             <thead className="bg-gray-50 border-b border-gray-100">
               <tr>
-                {['Nome', 'Telefone', 'WhatsApp', 'Status', 'Leads recebidos', ''].map((h) => (
-                  <th key={h} className="text-left px-4 py-3 text-gray-500 font-medium text-xs uppercase tracking-wide">
-                    {h}
-                  </th>
-                ))}
+                <th className="text-left px-4 py-3 text-gray-500 font-medium text-xs uppercase tracking-wide">Nome</th>
+                <th className="text-left px-4 py-3 text-gray-500 font-medium text-xs uppercase tracking-wide hidden sm:table-cell">Telefone</th>
+                <th className="text-left px-4 py-3 text-gray-500 font-medium text-xs uppercase tracking-wide hidden md:table-cell">WhatsApp</th>
+                <th className="text-left px-4 py-3 text-gray-500 font-medium text-xs uppercase tracking-wide">Status</th>
+                <th className="text-left px-4 py-3 text-gray-500 font-medium text-xs uppercase tracking-wide hidden sm:table-cell">Leads recebidos</th>
+                <th className="text-left px-4 py-3 text-gray-500 font-medium text-xs uppercase tracking-wide"></th>
               </tr>
             </thead>
             <tbody>
               {corretores.map((c) => (
                 <tr key={c.id} className={`border-b border-gray-50 ${!c.ativo ? 'opacity-50' : ''}`}>
                   <td className="px-4 py-3 font-medium text-gray-900">{c.nome}</td>
-                  <td className="px-4 py-3 text-gray-600">{c.telefone}</td>
-                  <td className="px-4 py-3 text-gray-600">{c.whatsapp}</td>
+                  <td className="px-4 py-3 text-gray-600 hidden sm:table-cell">{c.telefone}</td>
+                  <td className="px-4 py-3 text-gray-600 hidden md:table-cell">{c.whatsapp}</td>
                   <td className="px-4 py-3">
                     {c.ativo ? (
                       <button
@@ -139,7 +141,7 @@ export default function Corretores() {
                       <span className="badge bg-red-100 text-red-600">Inativo</span>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-gray-600">{c.leadsRecebidos}</td>
+                  <td className="px-4 py-3 text-gray-600 hidden sm:table-cell">{c.leadsRecebidos}</td>
                   <td className="px-4 py-3">
                     <div className="flex gap-3">
                       <button
@@ -162,6 +164,7 @@ export default function Corretores() {
               ))}
             </tbody>
           </table>
+          </div>
           {corretores.length === 0 && (
             <p className="text-center text-gray-500 py-12 text-sm">Nenhum corretor cadastrado.</p>
           )}
@@ -173,7 +176,8 @@ export default function Corretores() {
           <div className="px-5 py-3 bg-indigo-50 border-b border-indigo-100 text-sm text-indigo-700">
             Próximo lead será atribuído ao corretor na posição 1
           </div>
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto">
+          <table className="w-full text-sm min-w-[360px]">
             <thead className="bg-gray-50 border-b border-gray-100">
               <tr>
                 {['Posição', 'Corretor', 'Disponível', 'Leads recebidos'].map((h) => (
@@ -207,23 +211,24 @@ export default function Corretores() {
           {fila.length === 0 && (
             <p className="text-center text-gray-500 py-12 text-sm">Nenhum corretor ativo na fila.</p>
           )}
+          </div>
         </div>
       )}
 
       {/* Modal form */}
       {modal === 'form' && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+        <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
+          <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-xl w-full sm:max-w-md max-h-[92vh] flex flex-col">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0">
               <h2 className="font-bold text-gray-900">{editando ? 'Editar corretor' : 'Novo corretor'}</h2>
               <button onClick={() => setModal(null)} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
             </div>
-            <form onSubmit={salvar} className="px-6 py-5 space-y-3">
+            <form onSubmit={salvar} className="px-5 py-5 space-y-3 overflow-y-auto">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Nome *</label>
                 <input className="input" value={form.nome} onChange={set('nome')} required />
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Telefone *</label>
                   <input className="input" value={form.telefone} onChange={set('telefone')} required />

@@ -111,24 +111,24 @@ export default function Leads() {
   }
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
+    <div className="p-4 md:p-6 max-w-7xl mx-auto">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Leads</h1>
-          <p className="text-gray-500 text-sm mt-0.5">{total} leads encontrados</p>
+          <h1 className="text-xl md:text-2xl font-bold text-gray-900">Leads</h1>
+          <p className="text-gray-500 text-xs md:text-sm mt-0.5">{total} leads encontrados</p>
         </div>
-        <button onClick={abrirCriar} className="btn-primary">+ Novo lead</button>
+        <button onClick={abrirCriar} className="btn-primary self-start sm:self-auto">+ Novo lead</button>
       </div>
 
       {/* Filtros */}
-      <div className="flex gap-3 mb-4">
+      <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 mb-4">
         <input
-          className="input max-w-xs"
+          className="input sm:max-w-xs"
           placeholder="Buscar por nome ou telefone..."
           value={filtros.busca}
           onChange={setFiltro('busca')}
         />
-        <select className="input max-w-[180px]" value={filtros.status} onChange={setFiltro('status')}>
+        <select className="input sm:max-w-[180px]" value={filtros.status} onChange={setFiltro('status')}>
           <option value="">Todos os status</option>
           {STATUS_LIST.map((s) => (
             <option key={s} value={s}>{s}</option>
@@ -146,38 +146,41 @@ export default function Leads() {
           <p className="text-center text-gray-500 py-16 text-sm">Nenhum lead encontrado.</p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full text-sm min-w-[600px]">
               <thead className="bg-gray-50 border-b border-gray-100">
                 <tr>
-                  {['Nome', 'Telefone', 'Status', 'Corretor', 'Urgência', 'Região', 'Criado em', ''].map((h) => (
-                    <th key={h} className="text-left px-4 py-3 text-gray-500 font-medium text-xs uppercase tracking-wide">
-                      {h}
-                    </th>
-                  ))}
+                  <th className="text-left px-4 py-3 text-gray-500 font-medium text-xs uppercase tracking-wide">Nome</th>
+                  <th className="text-left px-4 py-3 text-gray-500 font-medium text-xs uppercase tracking-wide hidden sm:table-cell">Telefone</th>
+                  <th className="text-left px-4 py-3 text-gray-500 font-medium text-xs uppercase tracking-wide">Status</th>
+                  <th className="text-left px-4 py-3 text-gray-500 font-medium text-xs uppercase tracking-wide hidden md:table-cell">Corretor</th>
+                  <th className="text-left px-4 py-3 text-gray-500 font-medium text-xs uppercase tracking-wide hidden lg:table-cell">Urgência</th>
+                  <th className="text-left px-4 py-3 text-gray-500 font-medium text-xs uppercase tracking-wide hidden lg:table-cell">Região</th>
+                  <th className="text-left px-4 py-3 text-gray-500 font-medium text-xs uppercase tracking-wide hidden sm:table-cell">Criado em</th>
+                  <th className="text-left px-4 py-3 text-gray-500 font-medium text-xs uppercase tracking-wide"></th>
                 </tr>
               </thead>
               <tbody>
                 {leads.map((lead) => (
                   <tr key={lead.id} className="border-b border-gray-50 hover:bg-gray-50">
                     <td className="px-4 py-3 font-medium text-gray-900">
-                      <button onClick={() => abrirDetalhe(lead)} className="hover:text-indigo-600">
+                      <button onClick={() => abrirDetalhe(lead)} className="hover:text-indigo-600 text-left">
                         {lead.nome}
                       </button>
                     </td>
-                    <td className="px-4 py-3 text-gray-600">{lead.telefone}</td>
+                    <td className="px-4 py-3 text-gray-600 hidden sm:table-cell">{lead.telefone}</td>
                     <td className="px-4 py-3">
                       <span className={`badge ${STATUS_BADGE[lead.status] || 'bg-gray-100 text-gray-700'}`}>
                         {lead.status}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-gray-600">{lead.corretor?.nome || '—'}</td>
-                    <td className="px-4 py-3 text-gray-600">{lead.urgencia || '—'}</td>
-                    <td className="px-4 py-3 text-gray-600">{lead.regiao || '—'}</td>
-                    <td className="px-4 py-3 text-gray-500">
+                    <td className="px-4 py-3 text-gray-600 hidden md:table-cell">{lead.corretor?.nome || '—'}</td>
+                    <td className="px-4 py-3 text-gray-600 hidden lg:table-cell">{lead.urgencia || '—'}</td>
+                    <td className="px-4 py-3 text-gray-600 hidden lg:table-cell">{lead.regiao || '—'}</td>
+                    <td className="px-4 py-3 text-gray-500 hidden sm:table-cell">
                       {new Intl.DateTimeFormat('pt-BR').format(new Date(lead.criadoEm))}
                     </td>
                     <td className="px-4 py-3">
-                      <div className="flex gap-2">
+                      <div className="flex flex-col gap-1 sm:flex-row sm:gap-2">
                         <button
                           onClick={() => abrirStatus(lead)}
                           className="text-xs text-indigo-600 hover:text-indigo-700 font-medium"
@@ -229,7 +232,7 @@ export default function Leads() {
       {modal === 'criar' && (
         <Modal titulo="Novo lead" onClose={() => setModal(null)}>
           <form onSubmit={salvarLead} className="space-y-3">
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="label">Nome *</label>
                 <input className="input" value={form.nome} onChange={set('nome')} required />
@@ -329,7 +332,7 @@ export default function Leads() {
       {/* Modal detalhe */}
       {modal === 'detalhe' && leadSelecionado && (
         <Modal titulo={leadSelecionado.nome} onClose={() => setModal(null)} large>
-          <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm mb-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-sm mb-4">
             <Campo label="Telefone" valor={leadSelecionado.telefone} />
             <Campo label="Status" valor={leadSelecionado.status} />
             <Campo label="Corretor" valor={leadSelecionado.corretor?.nome} />
@@ -375,13 +378,13 @@ export default function Leads() {
 
 function Modal({ titulo, onClose, children, large }) {
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className={`bg-white rounded-2xl shadow-xl w-full ${large ? 'max-w-2xl' : 'max-w-md'}`}>
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-          <h2 className="font-bold text-gray-900">{titulo}</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
+    <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
+      <div className={`bg-white w-full rounded-t-2xl sm:rounded-2xl shadow-xl ${large ? 'sm:max-w-2xl' : 'sm:max-w-md'} max-h-[92vh] flex flex-col`}>
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0">
+          <h2 className="font-bold text-gray-900 truncate pr-4">{titulo}</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none flex-shrink-0">×</button>
         </div>
-        <div className="px-6 py-5">{children}</div>
+        <div className="px-5 py-5 overflow-y-auto">{children}</div>
       </div>
     </div>
   )

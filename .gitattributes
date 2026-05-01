@@ -1,0 +1,24 @@
+# Força LF em todos os arquivos de texto por padrão
+* text=auto eol=lf
+
+# Shell scripts sempre LF — nunca CRLF
+*.sh text eol=lf
+
+# Configs que rodam em Linux
+nginx.conf.template text eol=lf
+Dockerfile* text eol=lf
+docker-compose.yml text eol=lf
+.env.example text eol=lf
+
+# Código-fonte — LF
+*.js text eol=lf
+*.jsx text eol=lf
+*.ts text eol=lf
+*.tsx text eol=lf
+*.json text eol=lf
+*.css text eol=lf
+*.html text eol=lf
+*.prisma text eol=lf
+*.sql text eol=lf
+*.toml text eol=lf
+*.md text eol=lf

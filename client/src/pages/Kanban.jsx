@@ -102,21 +102,21 @@ export default function Kanban() {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="px-6 py-4 border-b border-gray-200 bg-white flex items-center justify-between flex-shrink-0">
+      <div className="px-4 py-3 md:px-6 md:py-4 border-b border-gray-200 bg-white flex items-center justify-between flex-shrink-0">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">Kanban</h1>
-          <p className="text-gray-500 text-sm">{totalLeads} leads</p>
+          <h1 className="text-lg md:text-xl font-bold text-gray-900">Kanban</h1>
+          <p className="text-gray-500 text-xs md:text-sm">{totalLeads} leads</p>
         </div>
         <button onClick={carregar} className="btn-secondary text-xs">
           Atualizar
         </button>
       </div>
 
-      <div className="flex-1 overflow-x-auto p-4">
+      <div className="flex-1 overflow-x-auto p-3 md:p-4">
         <DragDropContext onDragEnd={onDragEnd}>
-          <div className="flex gap-3 h-full" style={{ minWidth: `${COLUNAS.length * 240}px` }}>
+          <div className="flex gap-3 h-full" style={{ minWidth: `${COLUNAS.length * 220}px` }}>
             {COLUNAS.map((col) => (
-              <div key={col.id} className="flex flex-col w-56 flex-shrink-0">
+              <div key={col.id} className="flex flex-col w-52 md:w-56 flex-shrink-0">
                 <div className="flex items-center gap-2 mb-2 px-1">
                   <span className={`w-2 h-2 rounded-full ${col.cor}`} />
                   <span className="text-sm font-semibold text-gray-700">{col.label}</span>

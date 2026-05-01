@@ -85,18 +85,18 @@ export default function Dashboard() {
   ]
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
+    <div className="p-4 md:p-6 max-w-7xl mx-auto">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-          <p className="text-gray-500 text-sm mt-0.5">{formatarData(new Date())}</p>
+          <h1 className="text-xl md:text-2xl font-bold text-gray-900">Dashboard</h1>
+          <p className="text-gray-500 text-xs md:text-sm mt-0.5">{formatarData(new Date())}</p>
         </div>
-        <button onClick={() => navigate('/kanban')} className="btn-primary">
+        <button onClick={() => navigate('/kanban')} className="btn-primary self-start sm:self-auto">
           Abrir Kanban
         </button>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-6">
         {metricas.map((m) => (
           <MetricCard key={m.titulo} {...m} />
         ))}
@@ -116,30 +116,30 @@ export default function Dashboard() {
         {ultimosLeads.length === 0 ? (
           <p className="text-gray-500 text-sm py-8 text-center">Nenhum lead ainda.</p>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+          <div className="overflow-x-auto -mx-5">
+            <table className="w-full text-sm min-w-[540px]">
               <thead>
                 <tr className="border-b border-gray-100">
-                  <th className="text-left py-2 text-gray-500 font-medium">Nome</th>
+                  <th className="text-left py-2 px-5 text-gray-500 font-medium">Nome</th>
                   <th className="text-left py-2 text-gray-500 font-medium">Status</th>
-                  <th className="text-left py-2 text-gray-500 font-medium">Corretor</th>
-                  <th className="text-left py-2 text-gray-500 font-medium">Urgência</th>
-                  <th className="text-left py-2 text-gray-500 font-medium">Região</th>
+                  <th className="text-left py-2 text-gray-500 font-medium hidden sm:table-cell">Corretor</th>
+                  <th className="text-left py-2 text-gray-500 font-medium hidden md:table-cell">Urgência</th>
+                  <th className="text-left py-2 text-gray-500 font-medium hidden md:table-cell">Região</th>
                   <th className="text-left py-2 text-gray-500 font-medium">Criado em</th>
                 </tr>
               </thead>
               <tbody>
                 {ultimosLeads.map((lead) => (
                   <tr key={lead.id} className="border-b border-gray-50 hover:bg-gray-50">
-                    <td className="py-2.5 font-medium">{lead.nome}</td>
+                    <td className="py-2.5 px-5 font-medium">{lead.nome}</td>
                     <td className="py-2.5">
                       <span className={`badge ${STATUS_BADGE[lead.status] || 'bg-gray-100 text-gray-700'}`}>
                         {lead.status}
                       </span>
                     </td>
-                    <td className="py-2.5 text-gray-600">{lead.corretor?.nome || '—'}</td>
-                    <td className="py-2.5 text-gray-600">{lead.urgencia || '—'}</td>
-                    <td className="py-2.5 text-gray-600">{lead.regiao || '—'}</td>
+                    <td className="py-2.5 text-gray-600 hidden sm:table-cell">{lead.corretor?.nome || '—'}</td>
+                    <td className="py-2.5 text-gray-600 hidden md:table-cell">{lead.urgencia || '—'}</td>
+                    <td className="py-2.5 text-gray-600 hidden md:table-cell">{lead.regiao || '—'}</td>
                     <td className="py-2.5 text-gray-500">{formatarDataCurta(lead.criadoEm)}</td>
                   </tr>
                 ))}

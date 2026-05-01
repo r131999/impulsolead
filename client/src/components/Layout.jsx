@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
@@ -13,18 +14,44 @@ const navItems = [
 export default function Layout() {
   const { usuario, logout } = useAuth()
   const navigate = useNavigate()
+  const [sidebarAberta, setSidebarAberta] = useState(false)
 
   const handleLogout = () => {
     logout()
     navigate('/login')
   }
 
+  const fecharSidebar = () => setSidebarAberta(false)
+
   return (
     <div className="flex h-screen bg-gray-50 overflow-hidden">
-      <aside className="w-56 bg-indigo-900 flex flex-col flex-shrink-0">
-        <div className="px-5 py-4 border-b border-indigo-800">
-          <h1 className="text-white font-bold text-lg tracking-tight">ImpulsoLead</h1>
-          <p className="text-indigo-300 text-xs mt-0.5 truncate">{usuario?.imobiliaria?.nome}</p>
+      {/* Overlay escuro no mobile quando sidebar aberta */}
+      {sidebarAberta && (
+        <div
+          className="fixed inset-0 bg-black/50 z-20 md:hidden"
+          onClick={fecharSidebar}
+        />
+      )}
+
+      {/* Sidebar */}
+      <aside
+        className={`fixed inset-y-0 left-0 z-30 w-64 bg-indigo-900 flex flex-col flex-shrink-0
+          transition-transform duration-300 ease-in-out
+          ${sidebarAberta ? 'translate-x-0' : '-translate-x-full'}
+          md:relative md:w-56 md:translate-x-0`}
+      >
+        <div className="px-5 py-4 border-b border-indigo-800 flex items-center justify-between">
+          <div className="min-w-0">
+            <h1 className="text-white font-bold text-lg tracking-tight">ImpulsoLead</h1>
+            <p className="text-indigo-300 text-xs mt-0.5 truncate">{usuario?.imobiliaria?.nome}</p>
+          </div>
+          <button
+            className="md:hidden text-indigo-300 hover:text-white p-1 flex-shrink-0 ml-2"
+            onClick={fecharSidebar}
+            aria-label="Fechar menu"
+          >
+            <XIcon className="w-5 h-5" />
+          </button>
         </div>
 
         <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
@@ -32,8 +59,9 @@ export default function Layout() {
             <NavLink
               key={to}
               to={to}
+              onClick={fecharSidebar}
               className={({ isActive }) =>
-                `flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                `flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                   isActive
                     ? 'bg-indigo-700 text-white'
                     : 'text-indigo-200 hover:bg-indigo-800 hover:text-white'
@@ -57,10 +85,41 @@ export default function Layout() {
         </div>
       </aside>
 
-      <main className="flex-1 overflow-auto">
-        <Outlet />
-      </main>
+      {/* Conteúdo principal */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {/* Barra superior mobile com botão hambúrguer */}
+        <header className="md:hidden flex items-center gap-3 px-4 py-3 bg-indigo-900 flex-shrink-0 shadow-md">
+          <button
+            onClick={() => setSidebarAberta(true)}
+            className="text-white p-1"
+            aria-label="Abrir menu"
+          >
+            <HamburgerIcon className="w-6 h-6" />
+          </button>
+          <h1 className="text-white font-bold text-base">ImpulsoLead</h1>
+        </header>
+
+        <main className="flex-1 overflow-auto">
+          <Outlet />
+        </main>
+      </div>
     </div>
+  )
+}
+
+function HamburgerIcon({ className }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+    </svg>
+  )
+}
+
+function XIcon({ className }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+    </svg>
   )
 }
 
