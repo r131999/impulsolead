@@ -4,63 +4,65 @@ import { useAuth } from '../context/AuthContext'
 
 const navItems = [
   { to: '/dashboard', label: 'Dashboard', icon: ChartIcon },
-  { to: '/kanban', label: 'Kanban', icon: KanbanIcon },
-  { to: '/leads', label: 'Leads', icon: UsersIcon },
-  { to: '/corretores', label: 'Corretores', icon: HomeIcon },
-  { to: '/relatorios', label: 'Relatórios', icon: BarChartIcon },
-  { to: '/config', label: 'Agente IA', icon: BotIcon },
+  { to: '/kanban',    label: 'Kanban',    icon: KanbanIcon },
+  { to: '/leads',     label: 'Leads',     icon: UsersIcon },
+  { to: '/corretores',label: 'Corretores',icon: HomeIcon },
+  { to: '/relatorios',label: 'Relatórios',icon: BarChartIcon },
+  { to: '/config',    label: 'Agente IA', icon: BotIcon },
 ]
 
 export default function Layout() {
   const { usuario, logout } = useAuth()
   const navigate = useNavigate()
-  const [sidebarAberta, setSidebarAberta] = useState(false)
+  const [aberta, setAberta] = useState(false)
 
-  const handleLogout = () => {
-    logout()
-    navigate('/login')
-  }
-
-  const fecharSidebar = () => setSidebarAberta(false)
+  const fechar = () => setAberta(false)
 
   return (
     <div className="app-shell">
-      {/* Backdrop — só renderiza quando aberta; clique fora fecha */}
-      {sidebarAberta && (
-        <div
-          onClick={fecharSidebar}
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0,0,0,0.5)',
-            zIndex: 999,
-          }}
-        />
+
+      {/*
+        ── Hambúrguer ──────────────────────────────────────────
+        position:fixed via CSS (.hamburger-btn).
+        display:none no desktop, display:flex no mobile.
+        JavaScript só controla o estado aberta/fechada.
+      */}
+      <button
+        className="hamburger-btn"
+        onClick={() => setAberta(v => !v)}
+        aria-label={aberta ? 'Fechar menu' : 'Abrir menu'}
+      >
+        {aberta ? '✕' : '☰'}
+      </button>
+
+      {/*
+        ── Overlay ─────────────────────────────────────────────
+        Renderizado pelo React quando aberta.
+        CSS (.sidebar-overlay) garante display:none no desktop.
+      */}
+      {aberta && (
+        <div className="sidebar-overlay" onClick={fechar} />
       )}
 
-      {/* Sidebar */}
-      <aside className={`app-sidebar${sidebarAberta ? ' sidebar-open' : ''}`}>
-        <div className="px-5 py-4 border-b border-indigo-800 flex items-center justify-between">
-          <div className="min-w-0">
-            <h1 className="text-white font-bold text-lg tracking-tight">ImpulsoLead</h1>
-            <p className="text-indigo-300 text-xs mt-0.5 truncate">{usuario?.imobiliaria?.nome}</p>
-          </div>
-          {/* Botão fechar — CSS esconde no desktop, mostra só no mobile */}
-          <button
-            onClick={fecharSidebar}
-            className="btn-hamburger sidebar-close-btn ml-2 flex-shrink-0"
-            aria-label="Fechar menu"
-          >
-            <XIcon style={{ width: 20, height: 20 }} />
-          </button>
+      {/*
+        ── Sidebar / Drawer ────────────────────────────────────
+        Desktop : coluna estática 224px no fluxo flex.
+        Mobile  : position:fixed, transform controla slide-in/out.
+                  "sidebar-open" muda transform para translateX(0).
+      */}
+      <aside className={`app-sidebar${aberta ? ' sidebar-open' : ''}`}>
+
+        <div className="px-5 py-4 border-b border-indigo-800">
+          <h1 className="text-white font-bold text-lg tracking-tight">ImpulsoLead</h1>
+          <p className="text-indigo-300 text-xs mt-0.5 truncate">{usuario?.imobiliaria?.nome}</p>
         </div>
 
-        <nav className="flex-1 p-3 overflow-y-auto" style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
           {navItems.map(({ to, label, icon: Icon }) => (
             <NavLink
               key={to}
               to={to}
-              onClick={fecharSidebar}
+              onClick={fechar}
               className={({ isActive }) =>
                 `flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                   isActive
@@ -78,51 +80,30 @@ export default function Layout() {
         <div className="p-3 border-t border-indigo-800">
           <div className="px-3 py-1.5 text-indigo-300 text-xs truncate">{usuario?.nome}</div>
           <button
-            onClick={handleLogout}
+            onClick={() => { logout(); navigate('/login') }}
             className="w-full text-left px-3 py-2 text-indigo-300 hover:text-white text-sm rounded-lg hover:bg-indigo-800 transition-colors"
           >
             Sair
           </button>
         </div>
+
       </aside>
 
-      {/* Área principal */}
+      {/*
+        ── Conteúdo principal ──────────────────────────────────
+        Desktop : flex:1, scroll interno.
+        Mobile  : width:100% (sidebar fora do fluxo), padding-top
+                  para não esconder conteúdo atrás do hambúrguer.
+      */}
       <div className="app-main">
-        {/* Barra superior mobile com botão hambúrguer */}
-        <header className="app-topbar">
-          <button
-            onClick={() => setSidebarAberta(true)}
-            className="btn-hamburger"
-            aria-label="Abrir menu"
-          >
-            <HamburgerIcon style={{ width: 24, height: 24 }} />
-          </button>
-          <span className="app-topbar-title">ImpulsoLead</span>
-        </header>
-
-        <main className="app-content">
-          <Outlet />
-        </main>
+        <Outlet />
       </div>
+
     </div>
   )
 }
 
-function HamburgerIcon({ style }) {
-  return (
-    <svg style={style} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
-    </svg>
-  )
-}
-
-function XIcon({ style }) {
-  return (
-    <svg style={style} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-    </svg>
-  )
-}
+/* ── Ícones ─────────────────────────────────────────────────────── */
 
 function ChartIcon({ className }) {
   return (
