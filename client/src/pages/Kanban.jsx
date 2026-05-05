@@ -1,21 +1,27 @@
 import { useEffect, useState, useCallback } from 'react'
-import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd'
 import * as leadsApi from '../api/leads'
 
 const COLUNAS = [
-  { id: 'novo',        label: 'Novo',        cor: 'bg-blue-500',   dot: '#3B82F6' },
-  { id: 'qualificado', label: 'Qualificado', cor: 'bg-purple-500', dot: '#8B5CF6' },
-  { id: 'atendimento', label: 'Atendimento', cor: 'bg-yellow-500', dot: '#F59E0B' },
-  { id: 'visita',      label: 'Visita',      cor: 'bg-orange-500', dot: '#f97316' },
-  { id: 'proposta',    label: 'Proposta',    cor: 'bg-indigo-500', dot: '#6366f1' },
-  { id: 'fechado',     label: 'Fechado',     cor: 'bg-green-500',  dot: '#10B981' },
-  { id: 'perdido',     label: 'Perdido',     cor: 'bg-red-400',    dot: '#EF4444' },
+  { id: 'novo',        label: 'Novo',        dot: '#3B82F6' },
+  { id: 'qualificado', label: 'Qualificado', dot: '#8B5CF6' },
+  { id: 'atendimento', label: 'Atendimento', dot: '#F59E0B' },
+  { id: 'visita',      label: 'Visita',      dot: '#f97316' },
+  { id: 'proposta',    label: 'Proposta',    dot: '#6366f1' },
+  { id: 'fechado',     label: 'Fechado',     dot: '#10B981' },
+  { id: 'perdido',     label: 'Perdido',     dot: '#EF4444' },
 ]
+
+const SEQUENCIA = ['novo', 'qualificado', 'atendimento', 'visita', 'proposta', 'fechado']
 
 const URGENCIA_COR = {
   alta: '#EF4444',
   media: '#F59E0B',
   baixa: '#10B981',
+}
+
+function proximoStatus(status) {
+  const idx = SEQUENCIA.indexOf(status)
+  return idx >= 0 && idx < SEQUENCIA.length - 1 ? SEQUENCIA[idx + 1] : null
 }
 
 function agrupar(leads) {
@@ -30,8 +36,8 @@ function agrupar(leads) {
 export default function Kanban() {
   const [grupos, setGrupos] = useState(() => agrupar([]))
   const [loading, setLoading] = useState(true)
-  const [novoLeadStatus, setNovoLeadStatus] = useState(null)
-  const [modal, setModal] = useState(null)
+  const [modal, setModal] = useState(null) // { leadId, statusAtual }
+  const [atualizando, setAtualizando] = useState(null) // leadId em progresso
 
   const carregar = useCallback(() => {
     leadsApi
@@ -42,51 +48,31 @@ export default function Kanban() {
 
   useEffect(() => { carregar() }, [carregar])
 
-  const onDragEnd = async (result) => {
-    const { draggableId, source, destination } = result
-    if (!destination || destination.droppableId === source.droppableId) return
-
-    const novoStatus = destination.droppableId
-    const leadId = draggableId
-
-    setGrupos((prev) => {
-      const next = { ...prev }
-      const lead = prev[source.droppableId].find((l) => l.id === leadId)
-      if (!lead) return prev
-      next[source.droppableId] = prev[source.droppableId].filter((l) => l.id !== leadId)
-      next[destination.droppableId] = [
-        ...prev[destination.droppableId].slice(0, destination.index),
-        { ...lead, status: novoStatus },
-        ...prev[destination.droppableId].slice(destination.index),
-      ]
-      return next
-    })
-
-    if (novoStatus === 'perdido') {
-      setModal({ leadId, statusAnterior: source.droppableId })
-      return
-    }
-
+  const avancar = async (lead) => {
+    const proximo = proximoStatus(lead.status)
+    if (!proximo) return
+    setAtualizando(lead.id)
     try {
-      await leadsApi.mudarStatus(leadId, { status: novoStatus })
-    } catch {
+      await leadsApi.mudarStatus(lead.id, { status: proximo })
       carregar()
+    } finally {
+      setAtualizando(null)
     }
+  }
+
+  const abrirPerda = (lead) => {
+    setModal({ leadId: lead.id, statusAtual: lead.status })
   }
 
   const confirmarPerda = async (motivoPerda) => {
+    setAtualizando(modal.leadId)
     try {
       await leadsApi.mudarStatus(modal.leadId, { status: 'perdido', motivoPerda })
-    } catch {
       carregar()
     } finally {
       setModal(null)
+      setAtualizando(null)
     }
-  }
-
-  const cancelarPerda = () => {
-    carregar()
-    setModal(null)
   }
 
   if (loading) {
@@ -115,82 +101,120 @@ export default function Kanban() {
       </div>
 
       <div className="flex-1 overflow-x-auto p-3 md:p-4">
-        <DragDropContext onDragEnd={onDragEnd}>
-          <div className="flex gap-3 h-full" style={{ minWidth: `${COLUNAS.length * 220}px` }}>
-            {COLUNAS.map((col) => (
-              <div key={col.id} className="flex flex-col w-52 md:w-56 flex-shrink-0">
-                <div className="flex items-center gap-2 mb-2 px-1">
-                  <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: col.dot }} />
-                  <span className="text-sm font-semibold" style={{ color: '#F1F5F9' }}>{col.label}</span>
-                  <span
-                    className="ml-auto text-xs rounded-full px-2 py-0.5"
-                    style={{ color: '#64748B', backgroundColor: '#1E293B' }}
-                  >
-                    {grupos[col.id].length}
-                  </span>
-                </div>
-
-                <Droppable droppableId={col.id}>
-                  {(provided, snapshot) => (
-                    <div
-                      ref={provided.innerRef}
-                      {...provided.droppableProps}
-                      className="flex-1 rounded-xl p-2 space-y-2 overflow-y-auto transition-colors"
-                      style={{
-                        minHeight: 80,
-                        backgroundColor: snapshot.isDraggingOver ? '#1a2332' : '#0B1120',
-                        boxShadow: snapshot.isDraggingOver ? `inset 0 0 0 2px rgba(59,130,246,0.3)` : 'none',
-                      }}
-                    >
-                      {grupos[col.id].map((lead, index) => (
-                        <Draggable key={lead.id} draggableId={lead.id} index={index}>
-                          {(prov, snap) => (
-                            <div
-                              ref={prov.innerRef}
-                              {...prov.draggableProps}
-                              {...prov.dragHandleProps}
-                              className="rounded-lg p-3 cursor-grab select-none transition-shadow"
-                              style={{
-                                backgroundColor: '#111827',
-                                border: snap.isDragging ? '1px solid #3B82F6' : '1px solid #1E293B',
-                                boxShadow: snap.isDragging ? '0 8px 24px rgba(0,0,0,0.5)' : '0 1px 3px rgba(0,0,0,0.3)',
-                              }}
-                            >
-                              <p className="text-sm font-semibold truncate" style={{ color: '#F1F5F9' }}>{lead.nome}</p>
-                              <p className="text-xs mt-0.5" style={{ color: '#64748B' }}>{lead.telefone}</p>
-                              {lead.corretor && (
-                                <p className="text-xs mt-1 truncate" style={{ color: '#60A5FA' }}>
-                                  👤 {lead.corretor.nome}
-                                </p>
-                              )}
-                              <div className="flex gap-2 mt-2 flex-wrap">
-                                {lead.urgencia && (
-                                  <span
-                                    className="text-xs font-medium"
-                                    style={{ color: URGENCIA_COR[lead.urgencia] || '#94A3B8' }}
-                                  >
-                                    ● {lead.urgencia}
-                                  </span>
-                                )}
-                                {lead.regiao && (
-                                  <span className="text-xs truncate" style={{ color: '#64748B' }}>{lead.regiao}</span>
-                                )}
-                              </div>
-                            </div>
-                          )}
-                        </Draggable>
-                      ))}
-                      {provided.placeholder}
-                    </div>
-                  )}
-                </Droppable>
+        <div className="flex gap-3 h-full" style={{ minWidth: `${COLUNAS.length * 220}px` }}>
+          {COLUNAS.map((col) => (
+            <div key={col.id} className="flex flex-col w-52 md:w-56 flex-shrink-0">
+              <div className="flex items-center gap-2 mb-2 px-1">
+                <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: col.dot }} />
+                <span className="text-sm font-semibold" style={{ color: '#F1F5F9' }}>{col.label}</span>
+                <span
+                  className="ml-auto text-xs rounded-full px-2 py-0.5"
+                  style={{ color: '#64748B', backgroundColor: '#1E293B' }}
+                >
+                  {grupos[col.id].length}
+                </span>
               </div>
-            ))}
-          </div>
-        </DragDropContext>
+
+              <div
+                className="flex-1 rounded-xl p-2 space-y-2 overflow-y-auto"
+                style={{ minHeight: 80, backgroundColor: '#0B1120' }}
+              >
+                {grupos[col.id].map((lead) => (
+                  <LeadCard
+                    key={lead.id}
+                    lead={lead}
+                    atualizando={atualizando === lead.id}
+                    onAvancar={() => avancar(lead)}
+                    onPerdido={() => abrirPerda(lead)}
+                  />
+                ))}
+                {grupos[col.id].length === 0 && (
+                  <div
+                    className="flex items-center justify-center h-16 rounded-lg text-xs"
+                    style={{ color: '#64748B', border: '1px dashed #1E293B' }}
+                  >
+                    vazio
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
 
-      {modal && <ModalPerda onConfirm={confirmarPerda} onCancel={cancelarPerda} />}
+      {modal && (
+        <ModalPerda
+          onConfirm={confirmarPerda}
+          onCancel={() => setModal(null)}
+        />
+      )}
+    </div>
+  )
+}
+
+function LeadCard({ lead, atualizando, onAvancar, onPerdido }) {
+  const proximo = proximoStatus(lead.status)
+  const podeAvancar = !!proximo
+  const podePerdido = lead.status !== 'fechado' && lead.status !== 'perdido'
+
+  return (
+    <div
+      className="rounded-lg p-3 transition-shadow"
+      style={{
+        backgroundColor: '#111827',
+        border: '1px solid #1E293B',
+        boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+        opacity: atualizando ? 0.6 : 1,
+      }}
+    >
+      <p className="text-sm font-semibold truncate" style={{ color: '#F1F5F9' }}>{lead.nome}</p>
+      <p className="text-xs mt-0.5" style={{ color: '#64748B' }}>{lead.telefone}</p>
+      {lead.corretor && (
+        <p className="text-xs mt-1 truncate" style={{ color: '#60A5FA' }}>
+          👤 {lead.corretor.nome}
+        </p>
+      )}
+      {(lead.urgencia || lead.regiao) && (
+        <div className="flex gap-2 mt-1.5 flex-wrap">
+          {lead.urgencia && (
+            <span className="text-xs font-medium" style={{ color: URGENCIA_COR[lead.urgencia] || '#94A3B8' }}>
+              ● {lead.urgencia}
+            </span>
+          )}
+          {lead.regiao && (
+            <span className="text-xs truncate" style={{ color: '#64748B' }}>{lead.regiao}</span>
+          )}
+        </div>
+      )}
+
+      {(podeAvancar || podePerdido) && (
+        <div className="flex gap-1.5 mt-2.5 pt-2" style={{ borderTop: '1px solid #1E293B' }}>
+          {podeAvancar && (
+            <button
+              onClick={onAvancar}
+              disabled={atualizando}
+              className="flex-1 text-xs font-medium py-1 rounded-md transition-colors disabled:opacity-50"
+              style={{ backgroundColor: 'rgba(99,102,241,0.15)', color: '#818cf8' }}
+              onMouseEnter={(e) => { if (!atualizando) e.currentTarget.style.backgroundColor = 'rgba(99,102,241,0.25)' }}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'rgba(99,102,241,0.15)'}
+            >
+              → Avançar
+            </button>
+          )}
+          {podePerdido && (
+            <button
+              onClick={onPerdido}
+              disabled={atualizando}
+              className="text-xs font-medium px-2 py-1 rounded-md transition-colors disabled:opacity-50"
+              style={{ backgroundColor: 'rgba(239,68,68,0.12)', color: '#EF4444' }}
+              onMouseEnter={(e) => { if (!atualizando) e.currentTarget.style.backgroundColor = 'rgba(239,68,68,0.22)' }}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'rgba(239,68,68,0.12)'}
+            >
+              Perdido
+            </button>
+          )}
+        </div>
+      )}
     </div>
   )
 }
