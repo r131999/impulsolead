@@ -6,16 +6,25 @@ import {
 import { getRelatorios } from '../api/relatorios'
 
 const CORES_FUNIL = {
-  novo: '#3b82f6',
+  novo:        '#3b82f6',
   qualificado: '#8b5cf6',
   atendimento: '#f59e0b',
-  visita: '#f97316',
-  proposta: '#6366f1',
-  fechado: '#22c55e',
-  perdido: '#ef4444',
+  visita:      '#f97316',
+  proposta:    '#6366f1',
+  fechado:     '#10B981',
+  perdido:     '#ef4444',
 }
 
-const CORES_PIE = ['#6366f1', '#f59e0b', '#ef4444', '#22c55e', '#8b5cf6', '#f97316']
+const CORES_PIE = ['#6366f1', '#f59e0b', '#ef4444', '#10B981', '#8b5cf6', '#f97316']
+
+const TOOLTIP_STYLE = {
+  backgroundColor: '#111827',
+  border: '1px solid #1E293B',
+  borderRadius: '8px',
+  color: '#F1F5F9',
+}
+
+const LABEL_STYLE = { color: '#94A3B8' }
 
 export default function Relatorios() {
   const [dados, setDados] = useState(null)
@@ -33,21 +42,24 @@ export default function Relatorios() {
     <div className="p-4 md:p-6 max-w-7xl mx-auto">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
         <div>
-          <h1 className="text-xl md:text-2xl font-bold text-gray-900">Relatórios</h1>
+          <h1 className="text-xl md:text-2xl font-bold" style={{ color: '#F1F5F9' }}>Relatórios</h1>
           {dados && (
-            <p className="text-gray-500 text-xs md:text-sm mt-0.5">
+            <p className="text-xs md:text-sm mt-0.5" style={{ color: '#94A3B8' }}>
               Desde {new Intl.DateTimeFormat('pt-BR').format(new Date(dados.dataInicio))}
             </p>
           )}
         </div>
-        <div className="flex gap-1 bg-gray-100 p-1 rounded-lg self-start sm:self-auto">
+        <div className="flex gap-1 p-1 rounded-lg self-start sm:self-auto" style={{ backgroundColor: '#0B1120' }}>
           {[7, 30, 90].map((p) => (
             <button
               key={p}
               onClick={() => setPeriodo(p)}
-              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                periodo === p ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'
-              }`}
+              className="px-3 py-1.5 rounded-md text-sm font-medium transition-colors"
+              style={
+                periodo === p
+                  ? { backgroundColor: '#1a2332', color: '#F1F5F9', boxShadow: '0 1px 3px rgba(0,0,0,0.4)' }
+                  : { color: '#64748B' }
+              }
             >
               {p}d
             </button>
@@ -57,49 +69,41 @@ export default function Relatorios() {
 
       {loading ? (
         <div className="flex items-center justify-center py-32">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600" />
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-500" />
         </div>
       ) : (
         <div className="space-y-6">
           {/* Cards de resumo */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <ResumoCard
-              titulo="Total de leads"
-              valor={dados.resumo.total}
-              sub={variacao(dados.resumo.variacaoTotal)}
-              cor="indigo"
-            />
-            <ResumoCard
-              titulo="Leads fechados"
-              valor={dados.resumo.fechados}
-              cor="green"
-            />
-            <ResumoCard
-              titulo="Taxa de conversão"
-              valor={`${dados.resumo.taxaConversao}%`}
-              cor="purple"
-            />
-            <ResumoCard
-              titulo="Tempo médio resposta"
-              valor={formatarTempo(dados.resumo.tempoMedioResposta)}
-              cor="blue"
-            />
+            <ResumoCard titulo="Total de leads" valor={dados.resumo.total} sub={variacao(dados.resumo.variacaoTotal)} cor="indigo" />
+            <ResumoCard titulo="Leads fechados" valor={dados.resumo.fechados} cor="green" />
+            <ResumoCard titulo="Taxa de conversão" valor={`${dados.resumo.taxaConversao}%`} cor="purple" />
+            <ResumoCard titulo="Tempo médio resposta" valor={formatarTempo(dados.resumo.tempoMedioResposta)} cor="blue" />
           </div>
 
           {/* Gráfico de linha: leads por dia */}
           <div className="card">
-            <h2 className="font-semibold text-gray-900 mb-4">Leads por dia</h2>
+            <h2 className="font-semibold mb-4" style={{ color: '#F1F5F9' }}>Leads por dia</h2>
             <ResponsiveContainer width="100%" height={220}>
               <LineChart data={dados.leadsPorDia} margin={{ top: 4, right: 16, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                <CartesianGrid strokeDasharray="3 3" stroke="#1E293B" />
                 <XAxis
                   dataKey="data"
                   tickFormatter={(v) => new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit' }).format(new Date(v))}
-                  tick={{ fontSize: 11 }}
+                  tick={{ fontSize: 11, fill: '#64748B' }}
                   interval="preserveStartEnd"
+                  axisLine={{ stroke: '#1E293B' }}
+                  tickLine={{ stroke: '#1E293B' }}
                 />
-                <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+                <YAxis
+                  tick={{ fontSize: 11, fill: '#64748B' }}
+                  allowDecimals={false}
+                  axisLine={{ stroke: '#1E293B' }}
+                  tickLine={{ stroke: '#1E293B' }}
+                />
                 <Tooltip
+                  contentStyle={TOOLTIP_STYLE}
+                  labelStyle={LABEL_STYLE}
                   labelFormatter={(v) => new Intl.DateTimeFormat('pt-BR').format(new Date(v))}
                   formatter={(v) => [v, 'Leads']}
                 />
@@ -109,7 +113,7 @@ export default function Relatorios() {
                   stroke="#6366f1"
                   strokeWidth={2}
                   dot={false}
-                  activeDot={{ r: 4 }}
+                  activeDot={{ r: 4, fill: '#818cf8' }}
                 />
               </LineChart>
             </ResponsiveContainer>
@@ -118,17 +122,25 @@ export default function Relatorios() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Funil de conversão */}
             <div className="card">
-              <h2 className="font-semibold text-gray-900 mb-4">Funil de conversão</h2>
+              <h2 className="font-semibold mb-4" style={{ color: '#F1F5F9' }}>Funil de conversão</h2>
               <ResponsiveContainer width="100%" height={240}>
-                <BarChart
-                  data={dados.funil}
-                  layout="vertical"
-                  margin={{ top: 0, right: 16, left: 60, bottom: 0 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f0f0f0" />
-                  <XAxis type="number" tick={{ fontSize: 11 }} allowDecimals={false} />
-                  <YAxis type="category" dataKey="status" tick={{ fontSize: 12 }} />
-                  <Tooltip formatter={(v) => [v, 'Leads']} />
+                <BarChart data={dados.funil} layout="vertical" margin={{ top: 0, right: 16, left: 60, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#1E293B" />
+                  <XAxis
+                    type="number"
+                    tick={{ fontSize: 11, fill: '#64748B' }}
+                    allowDecimals={false}
+                    axisLine={{ stroke: '#1E293B' }}
+                    tickLine={{ stroke: '#1E293B' }}
+                  />
+                  <YAxis
+                    type="category"
+                    dataKey="status"
+                    tick={{ fontSize: 12, fill: '#94A3B8' }}
+                    axisLine={{ stroke: '#1E293B' }}
+                    tickLine={false}
+                  />
+                  <Tooltip contentStyle={TOOLTIP_STYLE} labelStyle={LABEL_STYLE} formatter={(v) => [v, 'Leads']} />
                   <Bar dataKey="total" radius={[0, 4, 4, 0]}>
                     {dados.funil.map((entry) => (
                       <Cell key={entry.status} fill={CORES_FUNIL[entry.status] || '#94a3b8'} />
@@ -140,9 +152,9 @@ export default function Relatorios() {
 
             {/* Motivos de perda */}
             <div className="card">
-              <h2 className="font-semibold text-gray-900 mb-4">Motivos de perda</h2>
+              <h2 className="font-semibold mb-4" style={{ color: '#F1F5F9' }}>Motivos de perda</h2>
               {dados.motivosPerda.length === 0 ? (
-                <div className="flex items-center justify-center h-48 text-gray-400 text-sm">
+                <div className="flex items-center justify-center h-48 text-sm" style={{ color: '#64748B' }}>
                   Nenhum lead perdido no período
                 </div>
               ) : (
@@ -164,7 +176,7 @@ export default function Relatorios() {
                         <Cell key={i} fill={CORES_PIE[i % CORES_PIE.length]} />
                       ))}
                     </Pie>
-                    <Tooltip formatter={(v, n) => [v, n]} />
+                    <Tooltip contentStyle={TOOLTIP_STYLE} labelStyle={LABEL_STYLE} formatter={(v, n) => [v, n]} />
                   </PieChart>
                 </ResponsiveContainer>
               )}
@@ -174,28 +186,43 @@ export default function Relatorios() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Por corretor */}
             <div className="card">
-              <h2 className="font-semibold text-gray-900 mb-4">Desempenho por corretor</h2>
+              <h2 className="font-semibold mb-4" style={{ color: '#F1F5F9' }}>Desempenho por corretor</h2>
               {dados.porCorretor.length === 0 ? (
-                <p className="text-gray-400 text-sm text-center py-8">Sem dados no período</p>
+                <p className="text-sm text-center py-8" style={{ color: '#64748B' }}>Sem dados no período</p>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="border-b border-gray-100">
-                        <th className="text-left py-2 text-gray-500 font-medium text-xs">Corretor</th>
-                        <th className="text-right py-2 text-gray-500 font-medium text-xs">Leads</th>
-                        <th className="text-right py-2 text-gray-500 font-medium text-xs">Fechados</th>
-                        <th className="text-right py-2 text-gray-500 font-medium text-xs">Conv.</th>
+                      <tr style={{ borderBottom: '1px solid #1E293B' }}>
+                        <th className="text-left py-2 font-medium text-xs" style={{ color: '#64748B' }}>Corretor</th>
+                        <th className="text-right py-2 font-medium text-xs" style={{ color: '#64748B' }}>Leads</th>
+                        <th className="text-right py-2 font-medium text-xs" style={{ color: '#64748B' }}>Fechados</th>
+                        <th className="text-right py-2 font-medium text-xs" style={{ color: '#64748B' }}>Conv.</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {dados.porCorretor.map((c) => (
-                        <tr key={c.id} className="border-b border-gray-50">
-                          <td className="py-2 font-medium text-gray-800">{c.nome}</td>
-                          <td className="py-2 text-right text-gray-600">{c.totalLeads}</td>
-                          <td className="py-2 text-right text-green-600 font-medium">{c.fechados}</td>
+                      {dados.porCorretor.map((c, idx) => (
+                        <tr
+                          key={c.id}
+                          style={{
+                            borderBottom: '1px solid #1E293B',
+                            backgroundColor: idx % 2 === 1 ? 'rgba(255,255,255,0.02)' : 'transparent',
+                          }}
+                        >
+                          <td className="py-2 font-medium" style={{ color: '#F1F5F9' }}>{c.nome}</td>
+                          <td className="py-2 text-right" style={{ color: '#94A3B8' }}>{c.totalLeads}</td>
+                          <td className="py-2 text-right font-medium" style={{ color: '#10B981' }}>{c.fechados}</td>
                           <td className="py-2 text-right">
-                            <span className={`badge ${c.taxaConversao >= 50 ? 'bg-green-100 text-green-700' : c.taxaConversao >= 20 ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-600'}`}>
+                            <span
+                              className="badge"
+                              style={
+                                c.taxaConversao >= 50
+                                  ? { color: '#10B981', backgroundColor: 'rgba(16,185,129,0.15)' }
+                                  : c.taxaConversao >= 20
+                                  ? { color: '#F59E0B', backgroundColor: 'rgba(245,158,11,0.15)' }
+                                  : { color: '#EF4444', backgroundColor: 'rgba(239,68,68,0.15)' }
+                              }
+                            >
                               {c.taxaConversao}%
                             </span>
                           </td>
@@ -209,24 +236,24 @@ export default function Relatorios() {
 
             {/* Top regiões */}
             <div className="card">
-              <h2 className="font-semibold text-gray-900 mb-4">Top regiões</h2>
+              <h2 className="font-semibold mb-4" style={{ color: '#F1F5F9' }}>Top regiões</h2>
               {dados.topRegioes.length === 0 ? (
-                <p className="text-gray-400 text-sm text-center py-8">Sem dados no período</p>
+                <p className="text-sm text-center py-8" style={{ color: '#64748B' }}>Sem dados no período</p>
               ) : (
                 <div className="space-y-3">
-                  {dados.topRegioes.map((r, i) => {
+                  {dados.topRegioes.map((r) => {
                     const max = dados.topRegioes[0].total
                     const pct = Math.round((r.total / max) * 100)
                     return (
                       <div key={r.regiao}>
                         <div className="flex items-center justify-between mb-1">
-                          <span className="text-sm text-gray-700 font-medium">{r.regiao}</span>
-                          <span className="text-sm text-gray-500">{r.total} leads</span>
+                          <span className="text-sm font-medium" style={{ color: '#F1F5F9' }}>{r.regiao}</span>
+                          <span className="text-sm" style={{ color: '#94A3B8' }}>{r.total} leads</span>
                         </div>
-                        <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                        <div className="h-2 rounded-full overflow-hidden" style={{ backgroundColor: '#1E293B' }}>
                           <div
-                            className="h-full rounded-full bg-indigo-500 transition-all"
-                            style={{ width: `${pct}%` }}
+                            className="h-full rounded-full transition-all"
+                            style={{ width: `${pct}%`, backgroundColor: '#6366f1' }}
                           />
                         </div>
                       </div>
@@ -244,16 +271,17 @@ export default function Relatorios() {
 
 function ResumoCard({ titulo, valor, sub, cor }) {
   const cores = {
-    indigo: 'text-indigo-600 bg-indigo-50',
-    green: 'text-green-600 bg-green-50',
-    purple: 'text-purple-600 bg-purple-50',
-    blue: 'text-blue-600 bg-blue-50',
+    indigo: { bg: 'rgba(99,102,241,0.12)',  text: '#818cf8' },
+    green:  { bg: 'rgba(16,185,129,0.12)',  text: '#10B981' },
+    purple: { bg: 'rgba(139,92,246,0.12)',  text: '#8B5CF6' },
+    blue:   { bg: 'rgba(59,130,246,0.12)',  text: '#60A5FA' },
   }
+  const { bg, text } = cores[cor] || cores.blue
   return (
-    <div className={`rounded-xl p-4 ${cores[cor]}`}>
-      <p className="text-xs font-medium opacity-75 mb-1">{titulo}</p>
-      <p className="text-2xl font-bold">{valor}</p>
-      {sub && <p className="text-xs mt-1 opacity-75">{sub}</p>}
+    <div className="rounded-xl p-4" style={{ backgroundColor: bg }}>
+      <p className="text-xs font-medium mb-1" style={{ color: text, opacity: 0.85 }}>{titulo}</p>
+      <p className="text-2xl font-bold" style={{ color: text }}>{valor}</p>
+      {sub && <p className="text-xs mt-1" style={{ color: text, opacity: 0.75 }}>{sub}</p>}
     </div>
   )
 }

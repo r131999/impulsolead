@@ -3,13 +3,23 @@ import { getDashboard } from '../api/dashboard'
 import { useNavigate } from 'react-router-dom'
 
 const STATUS_BADGE = {
-  novo: 'bg-blue-100 text-blue-700',
-  qualificado: 'bg-purple-100 text-purple-700',
-  atendimento: 'bg-yellow-100 text-yellow-700',
-  visita: 'bg-orange-100 text-orange-700',
-  proposta: 'bg-indigo-100 text-indigo-700',
-  fechado: 'bg-green-100 text-green-700',
-  perdido: 'bg-red-100 text-red-700',
+  novo: 'text-[#60A5FA]',
+  qualificado: 'text-[#8B5CF6]',
+  atendimento: 'text-[#F59E0B]',
+  visita: 'text-orange-400',
+  proposta: 'text-indigo-400',
+  fechado: 'text-[#10B981]',
+  perdido: 'text-[#EF4444]',
+}
+
+const STATUS_BADGE_BG = {
+  novo: 'rgba(59,130,246,0.15)',
+  qualificado: 'rgba(139,92,246,0.15)',
+  atendimento: 'rgba(245,158,11,0.15)',
+  visita: 'rgba(249,115,22,0.15)',
+  proposta: 'rgba(99,102,241,0.15)',
+  fechado: 'rgba(16,185,129,0.15)',
+  perdido: 'rgba(239,68,68,0.15)',
 }
 
 export default function Dashboard() {
@@ -40,56 +50,22 @@ export default function Dashboard() {
   } = dados
 
   const metricas = [
-    {
-      titulo: 'Leads hoje',
-      valor: leadsHoje,
-      variacao: leadsHojeVariacao,
-      cor: 'indigo',
-    },
-    {
-      titulo: 'Em atendimento',
-      valor: emAtendimento,
-      cor: 'yellow',
-    },
-    {
-      titulo: 'Visitas agendadas',
-      valor: visitasAgendadas,
-      cor: 'orange',
-    },
-    {
-      titulo: 'Fechados este mês',
-      valor: fechadosMes,
-      cor: 'green',
-    },
-    {
-      titulo: 'Taxa de conversão',
-      valor: `${taxaConversao}%`,
-      variacao: taxaConversaoVariacao,
-      cor: 'purple',
-    },
-    {
-      titulo: 'Tempo médio resposta',
-      valor: formatarTempo(tempoMedioResposta),
-      cor: 'blue',
-    },
-    {
-      titulo: 'Corretores disponíveis',
-      valor: corretoresAtivos,
-      cor: 'teal',
-    },
-    {
-      titulo: 'Leads na fila',
-      valor: leadsNaFila,
-      cor: leadsNaFila > 0 ? 'red' : 'gray',
-    },
+    { titulo: 'Leads hoje', valor: leadsHoje, variacao: leadsHojeVariacao, cor: 'indigo' },
+    { titulo: 'Em atendimento', valor: emAtendimento, cor: 'yellow' },
+    { titulo: 'Visitas agendadas', valor: visitasAgendadas, cor: 'orange' },
+    { titulo: 'Fechados este mês', valor: fechadosMes, cor: 'green' },
+    { titulo: 'Taxa de conversão', valor: `${taxaConversao}%`, variacao: taxaConversaoVariacao, cor: 'purple' },
+    { titulo: 'Tempo médio resposta', valor: formatarTempo(tempoMedioResposta), cor: 'blue' },
+    { titulo: 'Corretores disponíveis', valor: corretoresAtivos, cor: 'teal' },
+    { titulo: 'Leads na fila', valor: leadsNaFila, cor: leadsNaFila > 0 ? 'red' : 'gray' },
   ]
 
   return (
     <div className="p-4 md:p-6 max-w-7xl mx-auto">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
         <div>
-          <h1 className="text-xl md:text-2xl font-bold text-gray-900">Dashboard</h1>
-          <p className="text-gray-500 text-xs md:text-sm mt-0.5">{formatarData(new Date())}</p>
+          <h1 className="text-xl md:text-2xl font-bold" style={{ color: '#F1F5F9' }}>Dashboard</h1>
+          <p className="text-xs md:text-sm mt-0.5" style={{ color: '#94A3B8' }}>{formatarData(new Date())}</p>
         </div>
         <button onClick={() => navigate('/kanban')} className="btn-primary self-start sm:self-auto">
           Abrir Kanban
@@ -104,43 +80,56 @@ export default function Dashboard() {
 
       <div className="card">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="font-semibold text-gray-900">Últimos leads</h2>
+          <h2 className="font-semibold" style={{ color: '#F1F5F9' }}>Últimos leads</h2>
           <button
             onClick={() => navigate('/leads')}
-            className="text-indigo-600 text-sm hover:text-indigo-700 font-medium"
+            className="text-sm font-medium hover:opacity-80 transition-opacity"
+            style={{ color: '#60A5FA' }}
           >
             Ver todos →
           </button>
         </div>
 
         {ultimosLeads.length === 0 ? (
-          <p className="text-gray-500 text-sm py-8 text-center">Nenhum lead ainda.</p>
+          <p className="text-sm py-8 text-center" style={{ color: '#64748B' }}>Nenhum lead ainda.</p>
         ) : (
           <div className="overflow-x-auto -mx-5">
             <table className="w-full text-sm min-w-[540px]">
               <thead>
-                <tr className="border-b border-gray-100">
-                  <th className="text-left py-2 px-5 text-gray-500 font-medium">Nome</th>
-                  <th className="text-left py-2 text-gray-500 font-medium">Status</th>
-                  <th className="text-left py-2 text-gray-500 font-medium hidden sm:table-cell">Corretor</th>
-                  <th className="text-left py-2 text-gray-500 font-medium hidden md:table-cell">Urgência</th>
-                  <th className="text-left py-2 text-gray-500 font-medium hidden md:table-cell">Região</th>
-                  <th className="text-left py-2 text-gray-500 font-medium">Criado em</th>
+                <tr style={{ borderBottom: '1px solid #1E293B' }}>
+                  <th className="text-left py-2 px-5 font-medium" style={{ color: '#64748B' }}>Nome</th>
+                  <th className="text-left py-2 font-medium" style={{ color: '#64748B' }}>Status</th>
+                  <th className="text-left py-2 font-medium hidden sm:table-cell" style={{ color: '#64748B' }}>Corretor</th>
+                  <th className="text-left py-2 font-medium hidden md:table-cell" style={{ color: '#64748B' }}>Urgência</th>
+                  <th className="text-left py-2 font-medium hidden md:table-cell" style={{ color: '#64748B' }}>Região</th>
+                  <th className="text-left py-2 font-medium" style={{ color: '#64748B' }}>Criado em</th>
                 </tr>
               </thead>
               <tbody>
-                {ultimosLeads.map((lead) => (
-                  <tr key={lead.id} className="border-b border-gray-50 hover:bg-gray-50">
-                    <td className="py-2.5 px-5 font-medium">{lead.nome}</td>
+                {ultimosLeads.map((lead, idx) => (
+                  <tr
+                    key={lead.id}
+                    className="transition-colors"
+                    style={{
+                      borderBottom: '1px solid #1E293B',
+                      backgroundColor: idx % 2 === 1 ? 'rgba(255,255,255,0.02)' : 'transparent',
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#1a2332'}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = idx % 2 === 1 ? 'rgba(255,255,255,0.02)' : 'transparent'}
+                  >
+                    <td className="py-2.5 px-5 font-medium" style={{ color: '#F1F5F9' }}>{lead.nome}</td>
                     <td className="py-2.5">
-                      <span className={`badge ${STATUS_BADGE[lead.status] || 'bg-gray-100 text-gray-700'}`}>
+                      <span
+                        className={`badge ${STATUS_BADGE[lead.status] || 'text-[#64748B]'}`}
+                        style={{ backgroundColor: STATUS_BADGE_BG[lead.status] || 'rgba(100,116,139,0.15)' }}
+                      >
                         {lead.status}
                       </span>
                     </td>
-                    <td className="py-2.5 text-gray-600 hidden sm:table-cell">{lead.corretor?.nome || '—'}</td>
-                    <td className="py-2.5 text-gray-600 hidden md:table-cell">{lead.urgencia || '—'}</td>
-                    <td className="py-2.5 text-gray-600 hidden md:table-cell">{lead.regiao || '—'}</td>
-                    <td className="py-2.5 text-gray-500">{formatarDataCurta(lead.criadoEm)}</td>
+                    <td className="py-2.5 hidden sm:table-cell" style={{ color: '#94A3B8' }}>{lead.corretor?.nome || '—'}</td>
+                    <td className="py-2.5 hidden md:table-cell" style={{ color: '#94A3B8' }}>{lead.urgencia || '—'}</td>
+                    <td className="py-2.5 hidden md:table-cell" style={{ color: '#94A3B8' }}>{lead.regiao || '—'}</td>
+                    <td className="py-2.5" style={{ color: '#64748B' }}>{formatarDataCurta(lead.criadoEm)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -154,23 +143,25 @@ export default function Dashboard() {
 
 function MetricCard({ titulo, valor, variacao, cor }) {
   const cores = {
-    indigo: 'bg-indigo-50 text-indigo-600',
-    yellow: 'bg-yellow-50 text-yellow-600',
-    orange: 'bg-orange-50 text-orange-600',
-    green: 'bg-green-50 text-green-600',
-    purple: 'bg-purple-50 text-purple-600',
-    blue: 'bg-blue-50 text-blue-600',
-    teal: 'bg-teal-50 text-teal-600',
-    red: 'bg-red-50 text-red-600',
-    gray: 'bg-gray-50 text-gray-500',
+    indigo: { bg: 'rgba(99,102,241,0.12)', text: '#818cf8' },
+    yellow: { bg: 'rgba(245,158,11,0.12)', text: '#F59E0B' },
+    orange: { bg: 'rgba(249,115,22,0.12)', text: '#fb923c' },
+    green: { bg: 'rgba(16,185,129,0.12)', text: '#10B981' },
+    purple: { bg: 'rgba(139,92,246,0.12)', text: '#8B5CF6' },
+    blue: { bg: 'rgba(59,130,246,0.12)', text: '#60A5FA' },
+    teal: { bg: 'rgba(20,184,166,0.12)', text: '#2dd4bf' },
+    red: { bg: 'rgba(239,68,68,0.12)', text: '#EF4444' },
+    gray: { bg: 'rgba(100,116,139,0.08)', text: '#64748B' },
   }
 
+  const { bg, text } = cores[cor] || cores.gray
+
   return (
-    <div className={`rounded-xl p-4 ${cores[cor] || cores.gray}`}>
-      <p className="text-xs font-medium opacity-75 mb-1">{titulo}</p>
-      <p className="text-2xl font-bold">{valor}</p>
+    <div className="rounded-xl p-4" style={{ backgroundColor: bg }}>
+      <p className="text-xs font-medium mb-1" style={{ color: text, opacity: 0.85 }}>{titulo}</p>
+      <p className="text-2xl font-bold" style={{ color: text }}>{valor}</p>
       {variacao !== undefined && (
-        <p className="text-xs mt-1 opacity-75">
+        <p className="text-xs mt-1" style={{ color: text, opacity: 0.75 }}>
           {variacao > 0 ? '+' : ''}{variacao}% vs período anterior
         </p>
       )}
@@ -181,7 +172,7 @@ function MetricCard({ titulo, valor, variacao, cor }) {
 function PageLoading() {
   return (
     <div className="flex items-center justify-center h-full">
-      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600" />
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-500" />
     </div>
   )
 }

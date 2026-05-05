@@ -3,19 +3,19 @@ import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd'
 import * as leadsApi from '../api/leads'
 
 const COLUNAS = [
-  { id: 'novo', label: 'Novo', cor: 'bg-blue-500' },
-  { id: 'qualificado', label: 'Qualificado', cor: 'bg-purple-500' },
-  { id: 'atendimento', label: 'Atendimento', cor: 'bg-yellow-500' },
-  { id: 'visita', label: 'Visita', cor: 'bg-orange-500' },
-  { id: 'proposta', label: 'Proposta', cor: 'bg-indigo-500' },
-  { id: 'fechado', label: 'Fechado', cor: 'bg-green-500' },
-  { id: 'perdido', label: 'Perdido', cor: 'bg-red-400' },
+  { id: 'novo',        label: 'Novo',        cor: 'bg-blue-500',   dot: '#3B82F6' },
+  { id: 'qualificado', label: 'Qualificado', cor: 'bg-purple-500', dot: '#8B5CF6' },
+  { id: 'atendimento', label: 'Atendimento', cor: 'bg-yellow-500', dot: '#F59E0B' },
+  { id: 'visita',      label: 'Visita',      cor: 'bg-orange-500', dot: '#f97316' },
+  { id: 'proposta',    label: 'Proposta',    cor: 'bg-indigo-500', dot: '#6366f1' },
+  { id: 'fechado',     label: 'Fechado',     cor: 'bg-green-500',  dot: '#10B981' },
+  { id: 'perdido',     label: 'Perdido',     cor: 'bg-red-400',    dot: '#EF4444' },
 ]
 
 const URGENCIA_COR = {
-  alta: 'text-red-600',
-  media: 'text-yellow-600',
-  baixa: 'text-green-600',
+  alta: '#EF4444',
+  media: '#F59E0B',
+  baixa: '#10B981',
 }
 
 function agrupar(leads) {
@@ -49,7 +49,6 @@ export default function Kanban() {
     const novoStatus = destination.droppableId
     const leadId = draggableId
 
-    // Atualização otimista
     setGrupos((prev) => {
       const next = { ...prev }
       const lead = prev[source.droppableId].find((l) => l.id === leadId)
@@ -93,7 +92,7 @@ export default function Kanban() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600" />
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-500" />
       </div>
     )
   }
@@ -102,10 +101,13 @@ export default function Kanban() {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="px-4 py-3 md:px-6 md:py-4 border-b border-gray-200 bg-white flex items-center justify-between flex-shrink-0">
+      <div
+        className="px-4 py-3 md:px-6 md:py-4 flex items-center justify-between flex-shrink-0"
+        style={{ borderBottom: '1px solid #1E293B', backgroundColor: '#111827' }}
+      >
         <div>
-          <h1 className="text-lg md:text-xl font-bold text-gray-900">Kanban</h1>
-          <p className="text-gray-500 text-xs md:text-sm">{totalLeads} leads</p>
+          <h1 className="text-lg md:text-xl font-bold" style={{ color: '#F1F5F9' }}>Kanban</h1>
+          <p className="text-xs md:text-sm" style={{ color: '#94A3B8' }}>{totalLeads} leads</p>
         </div>
         <button onClick={carregar} className="btn-secondary text-xs">
           Atualizar
@@ -118,9 +120,12 @@ export default function Kanban() {
             {COLUNAS.map((col) => (
               <div key={col.id} className="flex flex-col w-52 md:w-56 flex-shrink-0">
                 <div className="flex items-center gap-2 mb-2 px-1">
-                  <span className={`w-2 h-2 rounded-full ${col.cor}`} />
-                  <span className="text-sm font-semibold text-gray-700">{col.label}</span>
-                  <span className="ml-auto text-xs text-gray-400 bg-gray-100 rounded-full px-2 py-0.5">
+                  <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: col.dot }} />
+                  <span className="text-sm font-semibold" style={{ color: '#F1F5F9' }}>{col.label}</span>
+                  <span
+                    className="ml-auto text-xs rounded-full px-2 py-0.5"
+                    style={{ color: '#64748B', backgroundColor: '#1E293B' }}
+                  >
                     {grupos[col.id].length}
                   </span>
                 </div>
@@ -130,10 +135,12 @@ export default function Kanban() {
                     <div
                       ref={provided.innerRef}
                       {...provided.droppableProps}
-                      className={`flex-1 rounded-xl p-2 space-y-2 overflow-y-auto transition-colors ${
-                        snapshot.isDraggingOver ? 'bg-indigo-50 ring-2 ring-indigo-200' : 'bg-gray-100'
-                      }`}
-                      style={{ minHeight: 80 }}
+                      className="flex-1 rounded-xl p-2 space-y-2 overflow-y-auto transition-colors"
+                      style={{
+                        minHeight: 80,
+                        backgroundColor: snapshot.isDraggingOver ? '#1a2332' : '#0B1120',
+                        boxShadow: snapshot.isDraggingOver ? `inset 0 0 0 2px rgba(59,130,246,0.3)` : 'none',
+                      }}
                     >
                       {grupos[col.id].map((lead, index) => (
                         <Draggable key={lead.id} draggableId={lead.id} index={index}>
@@ -142,25 +149,31 @@ export default function Kanban() {
                               ref={prov.innerRef}
                               {...prov.draggableProps}
                               {...prov.dragHandleProps}
-                              className={`bg-white rounded-lg p-3 shadow-sm border border-gray-100 cursor-grab select-none ${
-                                snap.isDragging ? 'shadow-lg ring-2 ring-indigo-300' : ''
-                              }`}
+                              className="rounded-lg p-3 cursor-grab select-none transition-shadow"
+                              style={{
+                                backgroundColor: '#111827',
+                                border: snap.isDragging ? '1px solid #3B82F6' : '1px solid #1E293B',
+                                boxShadow: snap.isDragging ? '0 8px 24px rgba(0,0,0,0.5)' : '0 1px 3px rgba(0,0,0,0.3)',
+                              }}
                             >
-                              <p className="text-sm font-semibold text-gray-900 truncate">{lead.nome}</p>
-                              <p className="text-xs text-gray-500 mt-0.5">{lead.telefone}</p>
+                              <p className="text-sm font-semibold truncate" style={{ color: '#F1F5F9' }}>{lead.nome}</p>
+                              <p className="text-xs mt-0.5" style={{ color: '#64748B' }}>{lead.telefone}</p>
                               {lead.corretor && (
-                                <p className="text-xs text-indigo-600 mt-1 truncate">
+                                <p className="text-xs mt-1 truncate" style={{ color: '#60A5FA' }}>
                                   👤 {lead.corretor.nome}
                                 </p>
                               )}
                               <div className="flex gap-2 mt-2 flex-wrap">
                                 {lead.urgencia && (
-                                  <span className={`text-xs font-medium ${URGENCIA_COR[lead.urgencia] || ''}`}>
+                                  <span
+                                    className="text-xs font-medium"
+                                    style={{ color: URGENCIA_COR[lead.urgencia] || '#94A3B8' }}
+                                  >
                                     ● {lead.urgencia}
                                   </span>
                                 )}
                                 {lead.regiao && (
-                                  <span className="text-xs text-gray-400 truncate">{lead.regiao}</span>
+                                  <span className="text-xs truncate" style={{ color: '#64748B' }}>{lead.regiao}</span>
                                 )}
                               </div>
                             </div>
@@ -186,10 +199,10 @@ function ModalPerda({ onConfirm, onCancel }) {
   const [motivo, setMotivo] = useState('')
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm">
-        <h2 className="text-lg font-bold text-gray-900 mb-1">Motivo da perda</h2>
-        <p className="text-sm text-gray-500 mb-4">Informe por que este lead foi perdido.</p>
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+      <div className="rounded-2xl shadow-2xl p-6 w-full max-w-sm" style={{ backgroundColor: '#111827', border: '1px solid #1E293B' }}>
+        <h2 className="text-lg font-bold mb-1" style={{ color: '#F1F5F9' }}>Motivo da perda</h2>
+        <p className="text-sm mb-4" style={{ color: '#94A3B8' }}>Informe por que este lead foi perdido.</p>
         <textarea
           className="input resize-none"
           rows={3}
@@ -212,4 +225,3 @@ function ModalPerda({ onConfirm, onCancel }) {
     </div>
   )
 }
-

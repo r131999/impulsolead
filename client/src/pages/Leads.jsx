@@ -2,14 +2,14 @@ import { useEffect, useState, useCallback } from 'react'
 import * as leadsApi from '../api/leads'
 import * as corretoresApi from '../api/corretores'
 
-const STATUS_BADGE = {
-  novo: 'bg-blue-100 text-blue-700',
-  qualificado: 'bg-purple-100 text-purple-700',
-  atendimento: 'bg-yellow-100 text-yellow-700',
-  visita: 'bg-orange-100 text-orange-700',
-  proposta: 'bg-indigo-100 text-indigo-700',
-  fechado: 'bg-green-100 text-green-700',
-  perdido: 'bg-red-100 text-red-700',
+const STATUS_BADGE_STYLE = {
+  novo:        { color: '#60A5FA',  bg: 'rgba(59,130,246,0.15)' },
+  qualificado: { color: '#8B5CF6',  bg: 'rgba(139,92,246,0.15)' },
+  atendimento: { color: '#F59E0B',  bg: 'rgba(245,158,11,0.15)' },
+  visita:      { color: '#fb923c',  bg: 'rgba(249,115,22,0.15)' },
+  proposta:    { color: '#818cf8',  bg: 'rgba(99,102,241,0.15)' },
+  fechado:     { color: '#10B981',  bg: 'rgba(16,185,129,0.15)' },
+  perdido:     { color: '#EF4444',  bg: 'rgba(239,68,68,0.15)' },
 }
 
 const STATUS_LIST = ['novo', 'qualificado', 'atendimento', 'visita', 'proposta', 'fechado', 'perdido']
@@ -26,7 +26,7 @@ export default function Leads() {
   const [corretores, setCorretores] = useState([])
   const [loading, setLoading] = useState(true)
   const [filtros, setFiltros] = useState({ status: '', busca: '', page: 1 })
-  const [modal, setModal] = useState(null) // null | 'criar' | 'status' | 'detalhe'
+  const [modal, setModal] = useState(null)
   const [leadSelecionado, setLeadSelecionado] = useState(null)
   const [form, setForm] = useState(FORM_VAZIO)
   const [statusForm, setStatusForm] = useState({ status: '', observacao: '', motivoPerda: '' })
@@ -55,19 +55,13 @@ export default function Leads() {
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
   const setFiltro = (k) => (e) => setFiltros((f) => ({ ...f, [k]: e.target.value, page: 1 }))
 
-  const abrirCriar = () => {
-    setForm(FORM_VAZIO)
-    setErro('')
-    setModal('criar')
-  }
-
+  const abrirCriar = () => { setForm(FORM_VAZIO); setErro(''); setModal('criar') }
   const abrirStatus = (lead) => {
     setLeadSelecionado(lead)
     setStatusForm({ status: lead.status, observacao: '', motivoPerda: '' })
     setErro('')
     setModal('status')
   }
-
   const abrirDetalhe = async (lead) => {
     const res = await leadsApi.buscarPorId(lead.id)
     setLeadSelecionado(res.data.lead)
@@ -114,8 +108,8 @@ export default function Leads() {
     <div className="p-4 md:p-6 max-w-7xl mx-auto">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
         <div>
-          <h1 className="text-xl md:text-2xl font-bold text-gray-900">Leads</h1>
-          <p className="text-gray-500 text-xs md:text-sm mt-0.5">{total} leads encontrados</p>
+          <h1 className="text-xl md:text-2xl font-bold" style={{ color: '#F1F5F9' }}>Leads</h1>
+          <p className="text-xs md:text-sm mt-0.5" style={{ color: '#94A3B8' }}>{total} leads encontrados</p>
         </div>
         <button onClick={abrirCriar} className="btn-primary self-start sm:self-auto">+ Novo lead</button>
       </div>
@@ -140,63 +134,89 @@ export default function Leads() {
       <div className="card p-0 overflow-hidden">
         {loading ? (
           <div className="flex items-center justify-center py-16">
-            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-600" />
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-500" />
           </div>
         ) : leads.length === 0 ? (
-          <p className="text-center text-gray-500 py-16 text-sm">Nenhum lead encontrado.</p>
+          <p className="text-center py-16 text-sm" style={{ color: '#64748B' }}>Nenhum lead encontrado.</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm min-w-[600px]">
-              <thead className="bg-gray-50 border-b border-gray-100">
+              <thead style={{ backgroundColor: '#0B1120', borderBottom: '1px solid #1E293B' }}>
                 <tr>
-                  <th className="text-left px-4 py-3 text-gray-500 font-medium text-xs uppercase tracking-wide">Nome</th>
-                  <th className="text-left px-4 py-3 text-gray-500 font-medium text-xs uppercase tracking-wide hidden sm:table-cell">Telefone</th>
-                  <th className="text-left px-4 py-3 text-gray-500 font-medium text-xs uppercase tracking-wide">Status</th>
-                  <th className="text-left px-4 py-3 text-gray-500 font-medium text-xs uppercase tracking-wide hidden md:table-cell">Corretor</th>
-                  <th className="text-left px-4 py-3 text-gray-500 font-medium text-xs uppercase tracking-wide hidden lg:table-cell">Urgência</th>
-                  <th className="text-left px-4 py-3 text-gray-500 font-medium text-xs uppercase tracking-wide hidden lg:table-cell">Região</th>
-                  <th className="text-left px-4 py-3 text-gray-500 font-medium text-xs uppercase tracking-wide hidden sm:table-cell">Criado em</th>
-                  <th className="text-left px-4 py-3 text-gray-500 font-medium text-xs uppercase tracking-wide"></th>
+                  {['Nome', 'Telefone', 'Status', 'Corretor', 'Urgência', 'Região', 'Criado em', ''].map((h, i) => (
+                    <th
+                      key={i}
+                      className={`text-left px-4 py-3 font-medium text-xs uppercase tracking-wide ${
+                        i === 1 ? 'hidden sm:table-cell' :
+                        i === 3 ? 'hidden md:table-cell' :
+                        i === 4 || i === 5 ? 'hidden lg:table-cell' :
+                        i === 6 ? 'hidden sm:table-cell' : ''
+                      }`}
+                      style={{ color: '#64748B' }}
+                    >
+                      {h}
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
-                {leads.map((lead) => (
-                  <tr key={lead.id} className="border-b border-gray-50 hover:bg-gray-50">
-                    <td className="px-4 py-3 font-medium text-gray-900">
-                      <button onClick={() => abrirDetalhe(lead)} className="hover:text-indigo-600 text-left">
-                        {lead.nome}
-                      </button>
-                    </td>
-                    <td className="px-4 py-3 text-gray-600 hidden sm:table-cell">{lead.telefone}</td>
-                    <td className="px-4 py-3">
-                      <span className={`badge ${STATUS_BADGE[lead.status] || 'bg-gray-100 text-gray-700'}`}>
-                        {lead.status}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-gray-600 hidden md:table-cell">{lead.corretor?.nome || '—'}</td>
-                    <td className="px-4 py-3 text-gray-600 hidden lg:table-cell">{lead.urgencia || '—'}</td>
-                    <td className="px-4 py-3 text-gray-600 hidden lg:table-cell">{lead.regiao || '—'}</td>
-                    <td className="px-4 py-3 text-gray-500 hidden sm:table-cell">
-                      {new Intl.DateTimeFormat('pt-BR').format(new Date(lead.criadoEm))}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex flex-col gap-1 sm:flex-row sm:gap-2">
+                {leads.map((lead, idx) => {
+                  const badge = STATUS_BADGE_STYLE[lead.status] || { color: '#64748B', bg: 'rgba(100,116,139,0.15)' }
+                  return (
+                    <tr
+                      key={lead.id}
+                      className="transition-colors"
+                      style={{
+                        borderBottom: '1px solid #1E293B',
+                        backgroundColor: idx % 2 === 1 ? 'rgba(255,255,255,0.02)' : 'transparent',
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#1a2332'}
+                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = idx % 2 === 1 ? 'rgba(255,255,255,0.02)' : 'transparent'}
+                    >
+                      <td className="px-4 py-3 font-medium" style={{ color: '#F1F5F9' }}>
                         <button
-                          onClick={() => abrirStatus(lead)}
-                          className="text-xs text-indigo-600 hover:text-indigo-700 font-medium"
+                          onClick={() => abrirDetalhe(lead)}
+                          className="text-left hover:opacity-80 transition-opacity"
+                          style={{ color: '#F1F5F9' }}
+                          onMouseEnter={(e) => e.currentTarget.style.color = '#60A5FA'}
+                          onMouseLeave={(e) => e.currentTarget.style.color = '#F1F5F9'}
                         >
-                          Status
+                          {lead.nome}
                         </button>
-                        <button
-                          onClick={() => removerLead(lead)}
-                          className="text-xs text-red-500 hover:text-red-700 font-medium"
-                        >
-                          Remover
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                      <td className="px-4 py-3 hidden sm:table-cell" style={{ color: '#94A3B8' }}>{lead.telefone}</td>
+                      <td className="px-4 py-3">
+                        <span className="badge" style={{ color: badge.color, backgroundColor: badge.bg }}>
+                          {lead.status}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 hidden md:table-cell" style={{ color: '#94A3B8' }}>{lead.corretor?.nome || '—'}</td>
+                      <td className="px-4 py-3 hidden lg:table-cell" style={{ color: '#94A3B8' }}>{lead.urgencia || '—'}</td>
+                      <td className="px-4 py-3 hidden lg:table-cell" style={{ color: '#94A3B8' }}>{lead.regiao || '—'}</td>
+                      <td className="px-4 py-3 hidden sm:table-cell" style={{ color: '#64748B' }}>
+                        {new Intl.DateTimeFormat('pt-BR').format(new Date(lead.criadoEm))}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex flex-col gap-1 sm:flex-row sm:gap-2">
+                          <button
+                            onClick={() => abrirStatus(lead)}
+                            className="text-xs font-medium hover:opacity-80 transition-opacity"
+                            style={{ color: '#60A5FA' }}
+                          >
+                            Status
+                          </button>
+                          <button
+                            onClick={() => removerLead(lead)}
+                            className="text-xs font-medium hover:opacity-80 transition-opacity"
+                            style={{ color: '#EF4444' }}
+                          >
+                            Remover
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>
@@ -204,8 +224,8 @@ export default function Leads() {
 
         {/* Paginação */}
         {total > 30 && (
-          <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100">
-            <span className="text-xs text-gray-500">
+          <div className="flex items-center justify-between px-4 py-3" style={{ borderTop: '1px solid #1E293B' }}>
+            <span className="text-xs" style={{ color: '#64748B' }}>
               Página {filtros.page} de {Math.ceil(total / 30)}
             </span>
             <div className="flex gap-2">
@@ -272,7 +292,7 @@ export default function Leads() {
               <label className="label">Observações</label>
               <textarea className="input resize-none" rows={2} value={form.observacoes} onChange={set('observacoes')} />
             </div>
-            {erro && <p className="text-red-600 text-sm">{erro}</p>}
+            {erro && <p className="text-sm" style={{ color: '#EF4444' }}>{erro}</p>}
             <div className="flex gap-2 pt-2">
               <button type="button" onClick={() => setModal(null)} className="btn-secondary flex-1">Cancelar</button>
               <button type="submit" className="btn-primary flex-1" disabled={salvando}>
@@ -318,7 +338,7 @@ export default function Leads() {
                 onChange={(e) => setStatusForm((f) => ({ ...f, observacao: e.target.value }))}
               />
             </div>
-            {erro && <p className="text-red-600 text-sm">{erro}</p>}
+            {erro && <p className="text-sm" style={{ color: '#EF4444' }}>{erro}</p>}
             <div className="flex gap-2 pt-2">
               <button type="button" onClick={() => setModal(null)} className="btn-secondary flex-1">Cancelar</button>
               <button type="submit" className="btn-primary flex-1" disabled={salvando}>
@@ -349,20 +369,20 @@ export default function Leads() {
             )}
           </div>
           {leadSelecionado.observacoes && (
-            <div className="mb-4 p-3 bg-gray-50 rounded-lg text-sm">
-              <span className="text-gray-500 text-xs font-medium">Observações</span>
-              <p className="mt-1 text-gray-700">{leadSelecionado.observacoes}</p>
+            <div className="mb-4 p-3 rounded-lg text-sm" style={{ backgroundColor: '#0B1120', border: '1px solid #1E293B' }}>
+              <span className="text-xs font-medium" style={{ color: '#64748B' }}>Observações</span>
+              <p className="mt-1" style={{ color: '#94A3B8' }}>{leadSelecionado.observacoes}</p>
             </div>
           )}
           {leadSelecionado.historico?.length > 0 && (
             <div>
-              <p className="text-xs font-medium text-gray-500 mb-2">Histórico</p>
+              <p className="text-xs font-medium mb-2" style={{ color: '#64748B' }}>Histórico</p>
               <div className="space-y-2 max-h-48 overflow-y-auto">
                 {leadSelecionado.historico.map((h) => (
-                  <div key={h.id} className="text-xs border-l-2 border-indigo-200 pl-3">
-                    <p className="font-medium text-gray-700">{h.acao}</p>
-                    {h.detalhes && <p className="text-gray-500">{h.detalhes}</p>}
-                    <p className="text-gray-400 mt-0.5">
+                  <div key={h.id} className="text-xs pl-3" style={{ borderLeft: '2px solid rgba(59,130,246,0.4)' }}>
+                    <p className="font-medium" style={{ color: '#94A3B8' }}>{h.acao}</p>
+                    {h.detalhes && <p style={{ color: '#64748B' }}>{h.detalhes}</p>}
+                    <p className="mt-0.5" style={{ color: '#64748B' }}>
                       {new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(h.criadoEm))}
                     </p>
                   </div>
@@ -378,11 +398,20 @@ export default function Leads() {
 
 function Modal({ titulo, onClose, children, large }) {
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
-      <div className={`bg-white w-full rounded-t-2xl sm:rounded-2xl shadow-xl ${large ? 'sm:max-w-2xl' : 'sm:max-w-md'} max-h-[92vh] flex flex-col`}>
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0">
-          <h2 className="font-bold text-gray-900 truncate pr-4">{titulo}</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none flex-shrink-0">×</button>
+    <div className="fixed inset-0 bg-black/60 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
+      <div
+        className={`w-full rounded-t-2xl sm:rounded-2xl shadow-2xl ${large ? 'sm:max-w-2xl' : 'sm:max-w-md'} max-h-[92vh] flex flex-col`}
+        style={{ backgroundColor: '#111827', border: '1px solid #1E293B' }}
+      >
+        <div className="flex items-center justify-between px-5 py-4 flex-shrink-0" style={{ borderBottom: '1px solid #1E293B' }}>
+          <h2 className="font-bold truncate pr-4" style={{ color: '#F1F5F9' }}>{titulo}</h2>
+          <button
+            onClick={onClose}
+            className="text-xl leading-none flex-shrink-0 hover:opacity-80 transition-opacity"
+            style={{ color: '#64748B' }}
+          >
+            ×
+          </button>
         </div>
         <div className="px-5 py-5 overflow-y-auto">{children}</div>
       </div>
@@ -393,8 +422,8 @@ function Modal({ titulo, onClose, children, large }) {
 function Campo({ label, valor }) {
   return (
     <div>
-      <span className="text-xs text-gray-400 font-medium">{label}</span>
-      <p className="text-gray-700 mt-0.5">{valor || '—'}</p>
+      <span className="text-xs font-medium" style={{ color: '#64748B' }}>{label}</span>
+      <p className="mt-0.5" style={{ color: '#94A3B8' }}>{valor || '—'}</p>
     </div>
   )
 }

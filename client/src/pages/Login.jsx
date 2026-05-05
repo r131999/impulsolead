@@ -7,7 +7,7 @@ export default function Login() {
   const { usuario, login } = useAuth()
   const navigate = useNavigate()
 
-  const [modo, setModo] = useState('login') // 'login' | 'register'
+  const [modo, setModo] = useState('login')
   const [form, setForm] = useState({
     email: '',
     senha: '',
@@ -49,28 +49,34 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-900 to-indigo-700 flex items-center justify-center p-4">
+    <div className="min-h-screen flex items-center justify-center p-4" style={{ background: 'linear-gradient(135deg, #0B1120 0%, #1a1040 50%, #0B1120 100%)' }}>
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-white">ImpulsoLead</h1>
-          <p className="text-indigo-200 mt-1 text-sm">CRM para imobiliárias</p>
+          <p className="text-indigo-300 mt-1 text-sm">CRM para imobiliárias</p>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-xl p-8">
-          <div className="flex rounded-lg bg-gray-100 p-1 mb-6">
+        <div className="rounded-2xl shadow-2xl p-8" style={{ backgroundColor: '#111827', border: '1px solid #1E293B' }}>
+          <div className="flex rounded-lg p-1 mb-6" style={{ backgroundColor: '#0B1120' }}>
             <button
               onClick={() => setModo('login')}
-              className={`flex-1 py-1.5 text-sm font-medium rounded-md transition-colors ${
-                modo === 'login' ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'
-              }`}
+              className="flex-1 py-1.5 text-sm font-medium rounded-md transition-colors"
+              style={
+                modo === 'login'
+                  ? { backgroundColor: '#1a2332', color: '#F1F5F9', boxShadow: '0 1px 3px rgba(0,0,0,0.4)' }
+                  : { color: '#64748B' }
+              }
             >
               Entrar
             </button>
             <button
               onClick={() => setModo('register')}
-              className={`flex-1 py-1.5 text-sm font-medium rounded-md transition-colors ${
-                modo === 'register' ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'
-              }`}
+              className="flex-1 py-1.5 text-sm font-medium rounded-md transition-colors"
+              style={
+                modo === 'register'
+                  ? { backgroundColor: '#1a2332', color: '#F1F5F9', boxShadow: '0 1px 3px rgba(0,0,0,0.4)' }
+                  : { color: '#64748B' }
+              }
             >
               Criar conta
             </button>
@@ -80,9 +86,7 @@ export default function Login() {
             {modo === 'register' && (
               <>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Nome da imobiliária
-                  </label>
+                  <label className="label">Nome da imobiliária</label>
                   <input
                     className="input"
                     value={form.nomeImobiliaria}
@@ -92,7 +96,7 @@ export default function Login() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Seu nome</label>
+                  <label className="label">Seu nome</label>
                   <input
                     className="input"
                     value={form.nomeUsuario}
@@ -102,7 +106,7 @@ export default function Login() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Telefone</label>
+                  <label className="label">Telefone</label>
                   <input
                     className="input"
                     value={form.telefone}
@@ -114,7 +118,7 @@ export default function Login() {
             )}
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">E-mail</label>
+              <label className="label">E-mail</label>
               <input
                 type="email"
                 className="input"
@@ -126,7 +130,7 @@ export default function Login() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Senha</label>
+              <label className="label">Senha</label>
               <input
                 type="password"
                 className="input"
@@ -138,7 +142,7 @@ export default function Login() {
             </div>
 
             {erro && (
-              <p className="text-red-600 text-sm bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+              <p className="text-sm rounded-lg px-3 py-2" style={{ color: '#EF4444', backgroundColor: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)' }}>
                 {erro}
               </p>
             )}
@@ -149,7 +153,7 @@ export default function Login() {
           </form>
 
           {modo === 'register' && (
-            <p className="text-xs text-gray-500 text-center mt-4">
+            <p className="text-xs text-center mt-4" style={{ color: '#64748B' }}>
               7 dias grátis, sem cartão de crédito
             </p>
           )}
