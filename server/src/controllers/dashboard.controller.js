@@ -117,4 +117,59 @@ async function getDashboard(req, res) {
   });
 }
 
-module.exports = { getDashboard };
+async function getDashboardCorretor(req, res) {
+  const corretorId = req.corretorId;
+  const imobiliariaId = req.imobiliariaId;
+  const agora = new Date();
+  const mesInicio = new Date(agora.getFullYear(), agora.getMonth(), 1);
+  const hojeInicio = inicioDia(agora);
+  const hojeFim = fimDia(agora);
+
+  const [
+    leadsAtribuidos,
+    leadsHoje,
+    emAtendimento,
+    visitasAgendadas,
+    fechadosMes,
+    totalAtivos,
+    ultimosLeads,
+    corretor,
+  ] = await prisma.$transaction([
+    prisma.lead.count({ where: { imobiliariaId, corretorId } }),
+    prisma.lead.count({ where: { imobiliariaId, corretorId, criadoEm: { gte: hojeInicio, lte: hojeFim } } }),
+    prisma.lead.count({ where: { imobiliariaId, corretorId, status: 'atendimento' } }),
+    prisma.lead.count({ where: { imobiliariaId, corretorId, status: 'visita' } }),
+    prisma.lead.count({ where: { imobiliariaId, corretorId, status: 'fechado', criadoEm: { gte: mesInicio } } }),
+    prisma.lead.count({ where: { imobiliariaId, corretorId, status: { not: 'perdido' } } }),
+    prisma.lead.findMany({
+      where: { imobiliariaId, corretorId },
+      orderBy: { criadoEm: 'desc' },
+      take: 5,
+      select: { id: true, nome: true, telefone: true, status: true, regiao: true, urgencia: true, criadoEm: true },
+    }),
+    prisma.corretor.findUnique({
+      where: { id: corretorId },
+      select: { posicaoFila: true },
+    }),
+  ]);
+
+  const taxaConversaoPessoal = totalAtivos === 0 ? 0 : Math.round((fechadosMes / totalAtivos) * 100);
+
+  const corretoresAFrente = await prisma.corretor.count({
+    where: { imobiliariaId, ativo: true, disponivel: true, posicaoFila: { lt: corretor.posicaoFila } },
+  });
+  const posicaoNaFila = corretoresAFrente + 1;
+
+  res.json({
+    leadsAtribuidos,
+    leadsHoje,
+    emAtendimento,
+    visitasAgendadas,
+    fechadosMes,
+    taxaConversaoPessoal,
+    posicaoNaFila,
+    ultimosLeads,
+  });
+}
+
+module.exports = { getDashboard, getDashboardCorretor };

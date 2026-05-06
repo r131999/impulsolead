@@ -2,31 +2,30 @@ import { useState } from 'react'
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
-const navItems = [
-  { to: '/dashboard', label: 'Dashboard', icon: ChartIcon },
-  { to: '/kanban',    label: 'Kanban',    icon: KanbanIcon },
-  { to: '/leads',     label: 'Leads',     icon: UsersIcon },
-  { to: '/corretores',label: 'Corretores',icon: HomeIcon },
-  { to: '/relatorios',label: 'Relatórios',icon: BarChartIcon },
-  { to: '/config',    label: 'Agente IA', icon: BotIcon },
+const NAV_GESTOR = [
+  { to: '/dashboard',  label: 'Dashboard',    icon: ChartIcon },
+  { to: '/kanban',     label: 'Kanban',        icon: KanbanIcon },
+  { to: '/leads',      label: 'Leads',         icon: UsersIcon },
+  { to: '/corretores', label: 'Corretores',    icon: HomeIcon },
+  { to: '/relatorios', label: 'Relatórios',    icon: BarChartIcon },
+  { to: '/config',     label: 'Agente IA',     icon: BotIcon },
+]
+
+const NAV_CORRETOR = [
+  { to: '/meus-leads',    label: 'Meus Leads',     icon: KanbanIcon },
+  { to: '/meu-desempenho',label: 'Meu Desempenho', icon: ChartIcon },
 ]
 
 export default function Layout() {
-  const { usuario, logout } = useAuth()
+  const { usuario, logout, isCorretor } = useAuth()
   const navigate = useNavigate()
   const [aberta, setAberta] = useState(false)
 
   const fechar = () => setAberta(false)
+  const navItems = isCorretor ? NAV_CORRETOR : NAV_GESTOR
 
   return (
     <div className="app-shell">
-
-      {/*
-        ── Hambúrguer ──────────────────────────────────────────
-        position:fixed via CSS (.hamburger-btn).
-        display:none no desktop, display:flex no mobile.
-        JavaScript só controla o estado aberta/fechada.
-      */}
       <button
         className="hamburger-btn"
         onClick={() => setAberta(v => !v)}
@@ -35,26 +34,19 @@ export default function Layout() {
         {aberta ? '✕' : '☰'}
       </button>
 
-      {/*
-        ── Overlay ─────────────────────────────────────────────
-        Renderizado pelo React quando aberta.
-        CSS (.sidebar-overlay) garante display:none no desktop.
-      */}
       {aberta && (
         <div className="sidebar-overlay" onClick={fechar} />
       )}
 
-      {/*
-        ── Sidebar / Drawer ────────────────────────────────────
-        Desktop : coluna estática 224px no fluxo flex.
-        Mobile  : position:fixed, transform controla slide-in/out.
-                  "sidebar-open" muda transform para translateX(0).
-      */}
       <aside className={`app-sidebar${aberta ? ' sidebar-open' : ''}`}>
-
         <div className="px-5 py-4 border-b border-indigo-800">
           <h1 className="text-white font-bold text-lg tracking-tight">ImpulsoLead</h1>
           <p className="text-indigo-300 text-xs mt-0.5 truncate">{usuario?.imobiliaria?.nome}</p>
+          {isCorretor && (
+            <span className="inline-block mt-1 px-2 py-0.5 rounded text-xs font-medium" style={{ backgroundColor: 'rgba(99,102,241,0.2)', color: '#818cf8' }}>
+              Corretor
+            </span>
+          )}
         </div>
 
         <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
@@ -86,24 +78,14 @@ export default function Layout() {
             Sair
           </button>
         </div>
-
       </aside>
 
-      {/*
-        ── Conteúdo principal ──────────────────────────────────
-        Desktop : flex:1, scroll interno.
-        Mobile  : width:100% (sidebar fora do fluxo), padding-top
-                  para não esconder conteúdo atrás do hambúrguer.
-      */}
       <div className="app-main">
         <Outlet />
       </div>
-
     </div>
   )
 }
-
-/* ── Ícones ─────────────────────────────────────────────────────── */
 
 function ChartIcon({ className }) {
   return (

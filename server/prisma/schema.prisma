@@ -42,13 +42,15 @@ model Usuario {
 model Corretor {
   id            String   @id @default(uuid())
   nome          String
-  email         String?
+  email         String?  @unique
   telefone      String
   whatsapp      String
   ativo         Boolean  @default(true)
   disponivel    Boolean  @default(true)
   posicaoFila   Int      @default(0)
   leadsRecebidos Int     @default(0)
+  senhaHash     String?
+  usuarioAtivo  Boolean  @default(false)
   criadoEm     DateTime @default(now())
   atualizadoEm  DateTime @updatedAt
 

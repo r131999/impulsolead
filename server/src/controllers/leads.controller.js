@@ -13,11 +13,16 @@ async function listar(req, res) {
 
   const where = { imobiliariaId: req.imobiliariaId };
 
+  if (req.role === 'corretor') {
+    where.corretorId = req.corretorId;
+  } else {
+    if (corretorId) where.corretorId = corretorId;
+  }
+
   if (status) {
     const statusList = status.split(',').map((s) => s.trim());
     where.status = statusList.length === 1 ? statusList[0] : { in: statusList };
   }
-  if (corretorId) where.corretorId = corretorId;
   if (dataInicio || dataFim) {
     where.criadoEm = {};
     if (dataInicio) where.criadoEm.gte = new Date(dataInicio);
@@ -56,8 +61,11 @@ async function listar(req, res) {
 async function buscarPorId(req, res) {
   const { id } = req.params;
 
+  const where = { id, imobiliariaId: req.imobiliariaId };
+  if (req.role === 'corretor') where.corretorId = req.corretorId;
+
   const lead = await prisma.lead.findFirst({
-    where: { id, imobiliariaId: req.imobiliariaId },
+    where,
     include: {
       corretor: { select: { id: true, nome: true, telefone: true, whatsapp: true } },
       historico: { orderBy: { criadoEm: 'desc' } },
@@ -120,10 +128,20 @@ async function atualizar(req, res) {
   const { id } = req.params;
   const { nome, telefone, whatsappJid, corretorId, observacoes, ...qualificacao } = req.body;
 
-  const lead = await prisma.lead.findFirst({
-    where: { id, imobiliariaId: req.imobiliariaId },
-  });
+  const whereFind = { id, imobiliariaId: req.imobiliariaId };
+  if (req.role === 'corretor') whereFind.corretorId = req.corretorId;
+
+  const lead = await prisma.lead.findFirst({ where: whereFind });
   if (!lead) return res.status(404).json({ error: 'Lead não encontrado' });
+
+  if (req.role === 'corretor') {
+    const atualizado = await prisma.lead.update({
+      where: { id },
+      data: { ...(observacoes !== undefined && { observacoes }) },
+      include: { corretor: { select: { id: true, nome: true } } },
+    });
+    return res.json({ lead: atualizado });
+  }
 
   if (corretorId && corretorId !== lead.corretorId) {
     const corretor = await prisma.corretor.findFirst({
@@ -180,9 +198,10 @@ async function mudarStatus(req, res) {
     });
   }
 
-  const lead = await prisma.lead.findFirst({
-    where: { id, imobiliariaId: req.imobiliariaId },
-  });
+  const whereStatus = { id, imobiliariaId: req.imobiliariaId };
+  if (req.role === 'corretor') whereStatus.corretorId = req.corretorId;
+
+  const lead = await prisma.lead.findFirst({ where: whereStatus });
   if (!lead) return res.status(404).json({ error: 'Lead não encontrado' });
 
   if (status === lead.status) {

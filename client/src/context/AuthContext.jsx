@@ -27,13 +27,23 @@ export function AuthProvider({ children }) {
     return res.data
   }
 
+  const loginCorretor = async (email, senha) => {
+    const res = await authApi.loginCorretor(email, senha)
+    localStorage.setItem('token', res.data.token)
+    setUsuario(res.data.corretor)
+    return res.data
+  }
+
   const logout = () => {
     localStorage.removeItem('token')
     setUsuario(null)
   }
 
+  const isCorretor = usuario?.role === 'corretor'
+  const isGestor = usuario?.role === 'gestor' || usuario?.role === 'admin'
+
   return (
-    <AuthContext.Provider value={{ usuario, loading, login, logout }}>
+    <AuthContext.Provider value={{ usuario, loading, login, loginCorretor, logout, isCorretor, isGestor }}>
       {children}
     </AuthContext.Provider>
   )

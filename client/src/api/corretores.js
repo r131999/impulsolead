@@ -7,3 +7,7 @@ export const atualizar = (id, data) => api.put(`/corretores/${id}`, data)
 export const atualizarDisponibilidade = (id, disponivel) =>
   api.put(`/corretores/${id}/disponibilidade`, { disponivel })
 export const remover = (id) => api.delete(`/corretores/${id}`)
+export const ativarAcesso = (id, email, senha) =>
+  api.post(`/corretores/${id}/ativar-acesso`, { email, senha })
+export const resetarSenha = (id, novaSenha) =>
+  api.put(`/corretores/${id}/resetar-senha`, { novaSenha })

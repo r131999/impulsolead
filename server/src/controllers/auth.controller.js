@@ -146,6 +146,28 @@ async function login(req, res) {
 }
 
 async function me(req, res) {
+  if (req.role === 'corretor') {
+    const corretor = await prisma.corretor.findUnique({
+      where: { id: req.corretorId },
+      include: {
+        imobiliaria: {
+          select: { id: true, nome: true, plano: true, trialExpiraEm: true },
+        },
+      },
+    });
+
+    if (!corretor) return res.status(404).json({ error: 'Corretor não encontrado' });
+
+    return res.json({
+      id: corretor.id,
+      nome: corretor.nome,
+      email: corretor.email,
+      role: 'corretor',
+      imobiliariaId: corretor.imobiliariaId,
+      imobiliaria: corretor.imobiliaria,
+    });
+  }
+
   const usuario = await prisma.usuario.findUnique({
     where: { id: req.usuario.id },
     include: {
@@ -197,4 +219,82 @@ async function alterarSenha(req, res) {
   res.json({ message: 'Senha alterada com sucesso' });
 }
 
-module.exports = { register, login, me, alterarSenha };
+async function loginCorretor(req, res) {
+  const { email, senha } = req.body;
+
+  if (!email || !senha) {
+    return res.status(400).json({ error: 'Email e senha são obrigatórios' });
+  }
+
+  const corretor = await prisma.corretor.findFirst({
+    where: { email, ativo: true, usuarioAtivo: true },
+    include: {
+      imobiliaria: {
+        select: { id: true, nome: true, plano: true, trialExpiraEm: true },
+      },
+    },
+  });
+
+  if (!corretor || !corretor.senhaHash) {
+    return res.status(401).json({ error: 'Credenciais inválidas' });
+  }
+
+  const senhaValida = await bcrypt.compare(senha, corretor.senhaHash);
+  if (!senhaValida) {
+    return res.status(401).json({ error: 'Credenciais inválidas' });
+  }
+
+  if (
+    corretor.imobiliaria.plano === 'trial' &&
+    corretor.imobiliaria.trialExpiraEm &&
+    new Date() > new Date(corretor.imobiliaria.trialExpiraEm)
+  ) {
+    return res.status(403).json({ error: 'Período de trial expirado. Entre em contato para contratar o plano.' });
+  }
+
+  const token = jwt.sign(
+    { corretorId: corretor.id, imobiliariaId: corretor.imobiliariaId, role: 'corretor' },
+    process.env.JWT_SECRET,
+    { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+  );
+
+  res.json({
+    token,
+    corretor: {
+      id: corretor.id,
+      nome: corretor.nome,
+      email: corretor.email,
+      role: 'corretor',
+      imobiliariaId: corretor.imobiliariaId,
+    },
+  });
+}
+
+async function alterarSenhaCorretor(req, res) {
+  const { senhaAtual, novaSenha } = req.body;
+
+  if (!senhaAtual || !novaSenha) {
+    return res.status(400).json({ error: 'senhaAtual e novaSenha são obrigatórios' });
+  }
+
+  if (novaSenha.length < 6) {
+    return res.status(400).json({ error: 'A nova senha deve ter no mínimo 6 caracteres' });
+  }
+
+  const corretor = await prisma.corretor.findUnique({ where: { id: req.corretorId } });
+  if (!corretor || !corretor.senhaHash) {
+    return res.status(401).json({ error: 'Corretor não encontrado' });
+  }
+
+  const senhaValida = await bcrypt.compare(senhaAtual, corretor.senhaHash);
+  if (!senhaValida) {
+    return res.status(401).json({ error: 'Senha atual incorreta' });
+  }
+
+  const novaSenhaHash = await bcrypt.hash(novaSenha, 12);
+  await prisma.corretor.update({ where: { id: req.corretorId }, data: { senhaHash: novaSenhaHash } });
+
+  res.json({ message: 'Senha alterada com sucesso' });
+}
+
+module.exports = { register, login, me, alterarSenha, loginCorretor, alterarSenhaCorretor };

@@ -4,10 +4,11 @@ import { useAuth } from '../context/AuthContext'
 import { register as registerApi } from '../api/auth'
 
 export default function Login() {
-  const { usuario, login } = useAuth()
+  const { usuario, login, loginCorretor } = useAuth()
   const navigate = useNavigate()
 
   const [modo, setModo] = useState('login')
+  const [perfil, setPerfil] = useState('gestor')
   const [form, setForm] = useState({
     email: '',
     senha: '',
@@ -18,7 +19,9 @@ export default function Login() {
   const [erro, setErro] = useState('')
   const [loading, setLoading] = useState(false)
 
-  if (usuario) return <Navigate to="/dashboard" replace />
+  if (usuario) {
+    return <Navigate to={usuario.role === 'corretor' ? '/meus-leads' : '/dashboard'} replace />
+  }
 
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
 
@@ -28,7 +31,13 @@ export default function Login() {
     setLoading(true)
     try {
       if (modo === 'login') {
-        await login(form.email, form.senha)
+        if (perfil === 'corretor') {
+          await loginCorretor(form.email, form.senha)
+          navigate('/meus-leads')
+        } else {
+          await login(form.email, form.senha)
+          navigate('/dashboard')
+        }
       } else {
         const res = await registerApi({
           nomeImobiliaria: form.nomeImobiliaria,
@@ -39,8 +48,8 @@ export default function Login() {
         })
         localStorage.setItem('token', res.data.token)
         await login(form.email, form.senha)
+        navigate('/dashboard')
       }
-      navigate('/dashboard')
     } catch (err) {
       setErro(err.response?.data?.error || 'Erro ao autenticar')
     } finally {
@@ -57,20 +66,32 @@ export default function Login() {
         </div>
 
         <div className="rounded-2xl shadow-2xl p-8" style={{ backgroundColor: '#111827', border: '1px solid #1E293B' }}>
+          {/* Tabs gestor/corretor/registrar */}
           <div className="flex rounded-lg p-1 mb-6" style={{ backgroundColor: '#0B1120' }}>
             <button
-              onClick={() => setModo('login')}
+              onClick={() => { setModo('login'); setPerfil('gestor'); setErro('') }}
               className="flex-1 py-1.5 text-sm font-medium rounded-md transition-colors"
               style={
-                modo === 'login'
+                modo === 'login' && perfil === 'gestor'
                   ? { backgroundColor: '#1a2332', color: '#F1F5F9', boxShadow: '0 1px 3px rgba(0,0,0,0.4)' }
                   : { color: '#64748B' }
               }
             >
-              Entrar
+              Gestor
             </button>
             <button
-              onClick={() => setModo('register')}
+              onClick={() => { setModo('login'); setPerfil('corretor'); setErro('') }}
+              className="flex-1 py-1.5 text-sm font-medium rounded-md transition-colors"
+              style={
+                modo === 'login' && perfil === 'corretor'
+                  ? { backgroundColor: '#1a2332', color: '#F1F5F9', boxShadow: '0 1px 3px rgba(0,0,0,0.4)' }
+                  : { color: '#64748B' }
+              }
+            >
+              Corretor
+            </button>
+            <button
+              onClick={() => { setModo('register'); setPerfil('gestor'); setErro('') }}
               className="flex-1 py-1.5 text-sm font-medium rounded-md transition-colors"
               style={
                 modo === 'register'
@@ -81,6 +102,12 @@ export default function Login() {
               Criar conta
             </button>
           </div>
+
+          {modo === 'login' && perfil === 'corretor' && (
+            <p className="text-xs mb-4 px-3 py-2 rounded-lg" style={{ color: '#818cf8', backgroundColor: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)' }}>
+              Acesso para corretores — credenciais fornecidas pelo gestor
+            </p>
+          )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             {modo === 'register' && (
@@ -148,7 +175,13 @@ export default function Login() {
             )}
 
             <button type="submit" className="btn-primary w-full py-2.5" disabled={loading}>
-              {loading ? 'Aguarde...' : modo === 'login' ? 'Entrar' : 'Criar conta'}
+              {loading
+                ? 'Aguarde...'
+                : modo === 'register'
+                ? 'Criar conta'
+                : perfil === 'corretor'
+                ? 'Entrar como corretor'
+                : 'Entrar'}
             </button>
           </form>
 

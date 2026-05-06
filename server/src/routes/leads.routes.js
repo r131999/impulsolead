@@ -1,5 +1,5 @@
 const { Router } = require('express');
-const { authMiddleware } = require('../middleware/auth.middleware');
+const { authMiddleware, requireRole } = require('../middleware/auth.middleware');
 const {
   listar, buscarPorId, criar, atualizar, mudarStatus, remover,
 } = require('../controllers/leads.controller');
@@ -9,9 +9,9 @@ router.use(authMiddleware);
 
 router.get('/', listar);
 router.get('/:id', buscarPorId);
-router.post('/', criar);
+router.post('/', requireRole('gestor', 'admin'), criar);
 router.put('/:id', atualizar);
 router.put('/:id/status', mudarStatus);
-router.delete('/:id', remover);
+router.delete('/:id', requireRole('gestor', 'admin'), remover);
 
 module.exports = router;

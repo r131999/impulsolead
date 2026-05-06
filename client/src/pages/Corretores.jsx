@@ -2,6 +2,8 @@ import { useEffect, useState, useCallback } from 'react'
 import * as corretoresApi from '../api/corretores'
 
 const FORM_VAZIO = { nome: '', telefone: '', whatsapp: '', email: '' }
+const FORM_ACESSO_VAZIO = { email: '', senha: '' }
+const FORM_RESET_VAZIO = { novaSenha: '' }
 
 export default function Corretores() {
   const [corretores, setCorretores] = useState([])
@@ -10,6 +12,8 @@ export default function Corretores() {
   const [modal, setModal] = useState(null)
   const [editando, setEditando] = useState(null)
   const [form, setForm] = useState(FORM_VAZIO)
+  const [formAcesso, setFormAcesso] = useState(FORM_ACESSO_VAZIO)
+  const [formReset, setFormReset] = useState(FORM_RESET_VAZIO)
   const [salvando, setSalvando] = useState(false)
   const [erro, setErro] = useState('')
   const [aba, setAba] = useState('lista')
@@ -26,6 +30,8 @@ export default function Corretores() {
   useEffect(() => { carregar() }, [carregar])
 
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
+  const setAcesso = (k) => (e) => setFormAcesso((f) => ({ ...f, [k]: e.target.value }))
+  const setReset = (k) => (e) => setFormReset((f) => ({ ...f, [k]: e.target.value }))
 
   const abrirCriar = () => { setEditando(null); setForm(FORM_VAZIO); setErro(''); setModal('form') }
   const abrirEditar = (c) => {
@@ -33,6 +39,18 @@ export default function Corretores() {
     setForm({ nome: c.nome, telefone: c.telefone, whatsapp: c.whatsapp, email: c.email || '' })
     setErro('')
     setModal('form')
+  }
+  const abrirAcesso = (c) => {
+    setEditando(c)
+    setFormAcesso({ email: c.email || '', senha: '' })
+    setErro('')
+    setModal('acesso')
+  }
+  const abrirReset = (c) => {
+    setEditando(c)
+    setFormReset(FORM_RESET_VAZIO)
+    setErro('')
+    setModal('reset')
   }
 
   const salvar = async (e) => {
@@ -49,6 +67,35 @@ export default function Corretores() {
       carregar()
     } catch (err) {
       setErro(err.response?.data?.error || 'Erro ao salvar')
+    } finally {
+      setSalvando(false)
+    }
+  }
+
+  const salvarAcesso = async (e) => {
+    e.preventDefault()
+    setErro('')
+    setSalvando(true)
+    try {
+      await corretoresApi.ativarAcesso(editando.id, formAcesso.email, formAcesso.senha)
+      setModal(null)
+      carregar()
+    } catch (err) {
+      setErro(err.response?.data?.error || 'Erro ao ativar acesso')
+    } finally {
+      setSalvando(false)
+    }
+  }
+
+  const salvarReset = async (e) => {
+    e.preventDefault()
+    setErro('')
+    setSalvando(true)
+    try {
+      await corretoresApi.resetarSenha(editando.id, formReset.novaSenha)
+      setModal(null)
+    } catch (err) {
+      setErro(err.response?.data?.error || 'Erro ao resetar senha')
     } finally {
       setSalvando(false)
     }
@@ -107,14 +154,14 @@ export default function Corretores() {
       {aba === 'lista' && (
         <div className="card p-0 overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-sm min-w-[480px]">
+            <table className="w-full text-sm min-w-[600px]">
               <thead style={{ backgroundColor: '#0B1120', borderBottom: '1px solid #1E293B' }}>
                 <tr>
                   <th className="text-left px-4 py-3 font-medium text-xs uppercase tracking-wide" style={{ color: '#64748B' }}>Nome</th>
                   <th className="text-left px-4 py-3 font-medium text-xs uppercase tracking-wide hidden sm:table-cell" style={{ color: '#64748B' }}>Telefone</th>
-                  <th className="text-left px-4 py-3 font-medium text-xs uppercase tracking-wide hidden md:table-cell" style={{ color: '#64748B' }}>WhatsApp</th>
                   <th className="text-left px-4 py-3 font-medium text-xs uppercase tracking-wide" style={{ color: '#64748B' }}>Status</th>
-                  <th className="text-left px-4 py-3 font-medium text-xs uppercase tracking-wide hidden sm:table-cell" style={{ color: '#64748B' }}>Leads recebidos</th>
+                  <th className="text-left px-4 py-3 font-medium text-xs uppercase tracking-wide hidden sm:table-cell" style={{ color: '#64748B' }}>Leads</th>
+                  <th className="text-left px-4 py-3 font-medium text-xs uppercase tracking-wide" style={{ color: '#64748B' }}>Acesso</th>
                   <th className="text-left px-4 py-3 font-medium text-xs uppercase tracking-wide" style={{ color: '#64748B' }}></th>
                 </tr>
               </thead>
@@ -133,7 +180,6 @@ export default function Corretores() {
                   >
                     <td className="px-4 py-3 font-medium" style={{ color: '#F1F5F9' }}>{c.nome}</td>
                     <td className="px-4 py-3 hidden sm:table-cell" style={{ color: '#94A3B8' }}>{c.telefone}</td>
-                    <td className="px-4 py-3 hidden md:table-cell" style={{ color: '#94A3B8' }}>{c.whatsapp}</td>
                     <td className="px-4 py-3">
                       {c.ativo ? (
                         <button
@@ -155,20 +201,31 @@ export default function Corretores() {
                     </td>
                     <td className="px-4 py-3 hidden sm:table-cell" style={{ color: '#94A3B8' }}>{c.leadsRecebidos}</td>
                     <td className="px-4 py-3">
-                      <div className="flex gap-3">
+                      {c.usuarioAtivo ? (
                         <button
-                          onClick={() => abrirEditar(c)}
-                          className="text-xs font-medium hover:opacity-80 transition-opacity"
-                          style={{ color: '#60A5FA' }}
+                          onClick={() => abrirReset(c)}
+                          className="badge cursor-pointer"
+                          style={{ color: '#10B981', backgroundColor: 'rgba(16,185,129,0.15)' }}
                         >
+                          Ativo
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => abrirAcesso(c)}
+                          className="badge cursor-pointer"
+                          style={{ color: '#64748B', backgroundColor: 'rgba(100,116,139,0.15)' }}
+                        >
+                          Sem acesso
+                        </button>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex gap-3">
+                        <button onClick={() => abrirEditar(c)} className="text-xs font-medium hover:opacity-80" style={{ color: '#60A5FA' }}>
                           Editar
                         </button>
                         {c.ativo && (
-                          <button
-                            onClick={() => remover(c)}
-                            className="text-xs font-medium hover:opacity-80 transition-opacity"
-                            style={{ color: '#EF4444' }}
-                          >
+                          <button onClick={() => remover(c)} className="text-xs font-medium hover:opacity-80" style={{ color: '#EF4444' }}>
                             Remover
                           </button>
                         )}
@@ -187,10 +244,7 @@ export default function Corretores() {
 
       {aba === 'fila' && (
         <div className="card p-0 overflow-hidden">
-          <div
-            className="px-5 py-3 text-sm"
-            style={{ backgroundColor: 'rgba(99,102,241,0.1)', borderBottom: '1px solid rgba(99,102,241,0.2)', color: '#818cf8' }}
-          >
+          <div className="px-5 py-3 text-sm" style={{ backgroundColor: 'rgba(99,102,241,0.1)', borderBottom: '1px solid rgba(99,102,241,0.2)', color: '#818cf8' }}>
             Próximo lead será atribuído ao corretor na posição 1
           </div>
           <div className="overflow-x-auto">
@@ -198,9 +252,7 @@ export default function Corretores() {
               <thead style={{ backgroundColor: '#0B1120', borderBottom: '1px solid #1E293B' }}>
                 <tr>
                   {['Posição', 'Corretor', 'Disponível', 'Leads recebidos'].map((h) => (
-                    <th key={h} className="text-left px-4 py-3 font-medium text-xs uppercase tracking-wide" style={{ color: '#64748B' }}>
-                      {h}
-                    </th>
+                    <th key={h} className="text-left px-4 py-3 font-medium text-xs uppercase tracking-wide" style={{ color: '#64748B' }}>{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -220,11 +272,7 @@ export default function Corretores() {
                     <td className="px-4 py-3">
                       <span
                         className="inline-flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold"
-                        style={
-                          f.posicao === 1
-                            ? { backgroundColor: '#4f46e5', color: '#fff' }
-                            : { backgroundColor: '#1E293B', color: '#94A3B8' }
-                        }
+                        style={f.posicao === 1 ? { backgroundColor: '#4f46e5', color: '#fff' } : { backgroundColor: '#1E293B', color: '#94A3B8' }}
                       >
                         {f.posicao}
                       </span>
@@ -233,11 +281,7 @@ export default function Corretores() {
                     <td className="px-4 py-3">
                       <span
                         className="badge"
-                        style={
-                          f.disponivel
-                            ? { color: '#10B981', backgroundColor: 'rgba(16,185,129,0.15)' }
-                            : { color: '#64748B', backgroundColor: 'rgba(100,116,139,0.15)' }
-                        }
+                        style={f.disponivel ? { color: '#10B981', backgroundColor: 'rgba(16,185,129,0.15)' } : { color: '#64748B', backgroundColor: 'rgba(100,116,139,0.15)' }}
                       >
                         {f.disponivel ? 'Sim' : 'Não'}
                       </span>
@@ -254,22 +298,13 @@ export default function Corretores() {
         </div>
       )}
 
-      {/* Modal form */}
+      {/* Modal: criar/editar corretor */}
       {modal === 'form' && (
         <div className="fixed inset-0 bg-black/60 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
-          <div
-            className="rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-md max-h-[92vh] flex flex-col"
-            style={{ backgroundColor: '#111827', border: '1px solid #1E293B' }}
-          >
+          <div className="rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-md max-h-[92vh] flex flex-col" style={{ backgroundColor: '#111827', border: '1px solid #1E293B' }}>
             <div className="flex items-center justify-between px-5 py-4 flex-shrink-0" style={{ borderBottom: '1px solid #1E293B' }}>
               <h2 className="font-bold" style={{ color: '#F1F5F9' }}>{editando ? 'Editar corretor' : 'Novo corretor'}</h2>
-              <button
-                onClick={() => setModal(null)}
-                className="text-xl leading-none hover:opacity-80 transition-opacity"
-                style={{ color: '#64748B' }}
-              >
-                ×
-              </button>
+              <button onClick={() => setModal(null)} className="text-xl leading-none hover:opacity-80" style={{ color: '#64748B' }}>×</button>
             </div>
             <form onSubmit={salvar} className="px-5 py-5 space-y-3 overflow-y-auto">
               <div>
@@ -295,6 +330,89 @@ export default function Corretores() {
                 <button type="button" onClick={() => setModal(null)} className="btn-secondary flex-1">Cancelar</button>
                 <button type="submit" className="btn-primary flex-1" disabled={salvando}>
                   {salvando ? 'Salvando...' : editando ? 'Salvar' : 'Criar'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: ativar acesso */}
+      {modal === 'acesso' && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className="rounded-2xl shadow-2xl w-full max-w-sm" style={{ backgroundColor: '#111827', border: '1px solid #1E293B' }}>
+            <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid #1E293B' }}>
+              <div>
+                <h2 className="font-bold" style={{ color: '#F1F5F9' }}>Ativar acesso</h2>
+                <p className="text-xs mt-0.5" style={{ color: '#94A3B8' }}>{editando?.nome}</p>
+              </div>
+              <button onClick={() => setModal(null)} className="text-xl leading-none hover:opacity-80" style={{ color: '#64748B' }}>×</button>
+            </div>
+            <form onSubmit={salvarAcesso} className="px-5 py-5 space-y-3">
+              <div>
+                <label className="label">E-mail de acesso *</label>
+                <input
+                  type="email"
+                  className="input"
+                  value={formAcesso.email}
+                  onChange={setAcesso('email')}
+                  placeholder="corretor@email.com"
+                  required
+                />
+              </div>
+              <div>
+                <label className="label">Senha temporária *</label>
+                <input
+                  type="password"
+                  className="input"
+                  value={formAcesso.senha}
+                  onChange={setAcesso('senha')}
+                  placeholder="mínimo 6 caracteres"
+                  minLength={6}
+                  required
+                />
+              </div>
+              {erro && <p className="text-sm" style={{ color: '#EF4444' }}>{erro}</p>}
+              <div className="flex gap-2 pt-1">
+                <button type="button" onClick={() => setModal(null)} className="btn-secondary flex-1">Cancelar</button>
+                <button type="submit" className="btn-primary flex-1" disabled={salvando}>
+                  {salvando ? 'Ativando...' : 'Ativar acesso'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: resetar senha */}
+      {modal === 'reset' && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className="rounded-2xl shadow-2xl w-full max-w-sm" style={{ backgroundColor: '#111827', border: '1px solid #1E293B' }}>
+            <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid #1E293B' }}>
+              <div>
+                <h2 className="font-bold" style={{ color: '#F1F5F9' }}>Resetar senha</h2>
+                <p className="text-xs mt-0.5" style={{ color: '#94A3B8' }}>{editando?.nome}</p>
+              </div>
+              <button onClick={() => setModal(null)} className="text-xl leading-none hover:opacity-80" style={{ color: '#64748B' }}>×</button>
+            </div>
+            <form onSubmit={salvarReset} className="px-5 py-5 space-y-3">
+              <div>
+                <label className="label">Nova senha *</label>
+                <input
+                  type="password"
+                  className="input"
+                  value={formReset.novaSenha}
+                  onChange={setReset('novaSenha')}
+                  placeholder="mínimo 6 caracteres"
+                  minLength={6}
+                  required
+                />
+              </div>
+              {erro && <p className="text-sm" style={{ color: '#EF4444' }}>{erro}</p>}
+              <div className="flex gap-2 pt-1">
+                <button type="button" onClick={() => setModal(null)} className="btn-secondary flex-1">Cancelar</button>
+                <button type="submit" className="btn-primary flex-1" disabled={salvando}>
+                  {salvando ? 'Salvando...' : 'Resetar senha'}
                 </button>
               </div>
             </form>

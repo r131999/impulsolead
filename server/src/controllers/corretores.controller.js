@@ -1,3 +1,4 @@
+const bcrypt = require('bcryptjs');
 const { PrismaClient } = require('@prisma/client');
 const { reordenarFila } = require('../services/fila.service');
 
@@ -16,7 +17,7 @@ async function listar(req, res) {
     select: {
       id: true, nome: true, email: true, telefone: true, whatsapp: true,
       ativo: true, disponivel: true, posicaoFila: true, leadsRecebidos: true,
-      criadoEm: true,
+      usuarioAtivo: true, criadoEm: true,
       _count: { select: { leads: true } },
     },
   });
@@ -142,4 +143,70 @@ async function remover(req, res) {
   res.json({ message: 'Corretor removido da fila' });
 }
 
-module.exports = { listar, buscarFila, criar, atualizar, atualizarDisponibilidade, remover };
+async function ativarAcesso(req, res) {
+  const { id } = req.params;
+  const { email, senha } = req.body;
+
+  if (!email || !senha) {
+    return res.status(400).json({ error: 'Campos obrigatórios: email, senha' });
+  }
+
+  if (senha.length < 6) {
+    return res.status(400).json({ error: 'A senha deve ter no mínimo 6 caracteres' });
+  }
+
+  const corretor = await prisma.corretor.findFirst({
+    where: { id, imobiliariaId: req.imobiliariaId },
+  });
+
+  if (!corretor) {
+    return res.status(404).json({ error: 'Corretor não encontrado' });
+  }
+
+  const emailEmUso = await prisma.corretor.findFirst({
+    where: { email, id: { not: id } },
+  });
+  if (emailEmUso) {
+    return res.status(409).json({ error: 'Email já está em uso por outro corretor' });
+  }
+
+  const senhaHash = await bcrypt.hash(senha, 12);
+
+  const atualizado = await prisma.corretor.update({
+    where: { id },
+    data: { email, senhaHash, usuarioAtivo: true },
+  });
+
+  res.json({
+    message: 'Acesso ativado com sucesso',
+    corretor: { id: atualizado.id, nome: atualizado.nome, email: atualizado.email, usuarioAtivo: atualizado.usuarioAtivo },
+  });
+}
+
+async function resetarSenha(req, res) {
+  const { id } = req.params;
+  const { novaSenha } = req.body;
+
+  if (!novaSenha) {
+    return res.status(400).json({ error: 'Campo obrigatório: novaSenha' });
+  }
+
+  if (novaSenha.length < 6) {
+    return res.status(400).json({ error: 'A senha deve ter no mínimo 6 caracteres' });
+  }
+
+  const corretor = await prisma.corretor.findFirst({
+    where: { id, imobiliariaId: req.imobiliariaId },
+  });
+
+  if (!corretor) {
+    return res.status(404).json({ error: 'Corretor não encontrado' });
+  }
+
+  const senhaHash = await bcrypt.hash(novaSenha, 12);
+  await prisma.corretor.update({ where: { id }, data: { senhaHash } });
+
+  res.json({ message: 'Senha resetada com sucesso' });
+}
+
+module.exports = { listar, buscarFila, criar, atualizar, atualizarDisponibilidade, remover, ativarAcesso, resetarSenha };
