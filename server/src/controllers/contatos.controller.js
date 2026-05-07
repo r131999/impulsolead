@@ -121,6 +121,13 @@ async function enviarMensagem(req, res) {
       { headers: { apikey: EVOLUTION_API_KEY } }
     );
   } catch (err) {
+    console.error('[Evolution API] Falha ao enviar mensagem:', {
+      message: err.message,
+      status: err.response?.status,
+      data: err.response?.data,
+      url: `${EVOLUTION_API_URL}/message/sendText/${EVOLUTION_INSTANCE_NAME}`,
+      number: jid,
+    });
     await prisma.contatoImportado.update({
       where: { id },
       data: { status: 'erro', mensagemEnviada: mensagem },
