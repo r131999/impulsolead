@@ -166,7 +166,7 @@ async function login(req, res) {
 }
 
 async function me(req, res) {
-  if (req.role === 'corretor') {
+  if (req.role === 'corretor' || req.role === 'gerente') {
     const corretor = await prisma.corretor.findUnique({
       where: { id: req.corretorId },
       include: {
@@ -182,9 +182,10 @@ async function me(req, res) {
       id: corretor.id,
       nome: corretor.nome,
       email: corretor.email,
-      role: 'corretor',
+      role: corretor.role || 'corretor',
       imobiliariaId: corretor.imobiliariaId,
       imobiliaria: corretor.imobiliaria,
+      equipeId: req.equipeId || null,
     });
   }
 
@@ -272,8 +273,24 @@ async function loginCorretor(req, res) {
     return res.status(403).json({ error: 'Período de trial expirado. Entre em contato para contratar o plano.' });
   }
 
+  const roleCorretor = corretor.role || 'corretor';
+  let equipeId = null;
+
+  if (roleCorretor === 'gerente') {
+    const equipe = await prisma.equipe.findFirst({
+      where: { liderId: corretor.id, imobiliariaId: corretor.imobiliariaId, ativo: true },
+      select: { id: true },
+    });
+    equipeId = equipe?.id || null;
+  }
+
   const token = jwt.sign(
-    { corretorId: corretor.id, imobiliariaId: corretor.imobiliariaId, role: 'corretor' },
+    {
+      corretorId: corretor.id,
+      imobiliariaId: corretor.imobiliariaId,
+      role: roleCorretor,
+      ...(equipeId && { equipeId }),
+    },
     process.env.JWT_SECRET,
     { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
   );
@@ -284,8 +301,9 @@ async function loginCorretor(req, res) {
       id: corretor.id,
       nome: corretor.nome,
       email: corretor.email,
-      role: 'corretor',
+      role: roleCorretor,
       imobiliariaId: corretor.imobiliariaId,
+      ...(equipeId && { equipeId }),
     },
   });
 }

@@ -3,7 +3,7 @@ import * as corretoresApi from '../api/corretores'
 import * as equipesApi from '../api/equipes'
 
 const FORM_VAZIO = { nome: '', telefone: '', whatsapp: '', email: '' }
-const FORM_ACESSO_VAZIO = { email: '', senha: '' }
+const FORM_ACESSO_VAZIO = { email: '', senha: '', role: 'corretor' }
 const FORM_RESET_VAZIO = { novaSenha: '' }
 
 export default function Corretores() {
@@ -50,7 +50,7 @@ export default function Corretores() {
   }
   const abrirAcesso = (c) => {
     setEditando(c)
-    setFormAcesso({ email: c.email || '', senha: '' })
+    setFormAcesso({ email: c.email || '', senha: '', role: 'corretor' })
     setErro('')
     setModal('acesso')
   }
@@ -85,7 +85,7 @@ export default function Corretores() {
     setErro('')
     setSalvando(true)
     try {
-      await corretoresApi.ativarAcesso(editando.id, formAcesso.email, formAcesso.senha)
+      await corretoresApi.ativarAcesso(editando.id, formAcesso.email, formAcesso.senha, formAcesso.role)
       setModal(null)
       carregar()
     } catch (err) {
@@ -409,6 +409,32 @@ export default function Corretores() {
                   minLength={6}
                   required
                 />
+              </div>
+              <div>
+                <label className="label">Perfil de acesso</label>
+                <div className="flex gap-4 mt-1">
+                  {[
+                    { value: 'corretor', label: 'Corretor' },
+                    { value: 'gerente', label: 'Gerente' },
+                  ].map(({ value, label }) => (
+                    <label key={value} className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="role"
+                        value={value}
+                        checked={formAcesso.role === value}
+                        onChange={setAcesso('role')}
+                        className="accent-indigo-500"
+                      />
+                      <span className="text-sm" style={{ color: '#F1F5F9' }}>{label}</span>
+                    </label>
+                  ))}
+                </div>
+                {formAcesso.role === 'gerente' && (
+                  <p className="text-xs mt-1.5" style={{ color: '#F59E0B' }}>
+                    O corretor precisa ser líder de uma equipe para ter acesso de gerente.
+                  </p>
+                )}
               </div>
               {erro && <p className="text-sm" style={{ color: '#EF4444' }}>{erro}</p>}
               <div className="flex gap-2 pt-1">

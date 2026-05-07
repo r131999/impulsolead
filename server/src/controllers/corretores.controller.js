@@ -8,6 +8,7 @@ async function listar(req, res) {
   const { ativo, disponivel } = req.query;
 
   const where = { imobiliariaId: req.imobiliariaId };
+  if (req.role === 'gerente' && req.equipeId) where.equipeId = req.equipeId;
   if (ativo !== undefined) where.ativo = ativo === 'true';
   if (disponivel !== undefined) where.disponivel = disponivel === 'true';
 
@@ -154,11 +155,13 @@ async function remover(req, res) {
 
 async function ativarAcesso(req, res) {
   const { id } = req.params;
-  const { email, senha } = req.body;
+  const { email, senha, role } = req.body;
 
   if (!email || !senha) {
     return res.status(400).json({ error: 'Campos obrigatórios: email, senha' });
   }
+
+  const roleValido = ['corretor', 'gerente'].includes(role) ? role : 'corretor';
 
   if (senha.length < 6) {
     return res.status(400).json({ error: 'A senha deve ter no mínimo 6 caracteres' });
@@ -183,12 +186,12 @@ async function ativarAcesso(req, res) {
 
   const atualizado = await prisma.corretor.update({
     where: { id },
-    data: { email, senhaHash, usuarioAtivo: true },
+    data: { email, senhaHash, usuarioAtivo: true, role: roleValido },
   });
 
   res.json({
     message: 'Acesso ativado com sucesso',
-    corretor: { id: atualizado.id, nome: atualizado.nome, email: atualizado.email, usuarioAtivo: atualizado.usuarioAtivo },
+    corretor: { id: atualizado.id, nome: atualizado.nome, email: atualizado.email, usuarioAtivo: atualizado.usuarioAtivo, role: atualizado.role },
   });
 }
 

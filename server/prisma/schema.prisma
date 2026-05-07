@@ -54,6 +54,7 @@ model Corretor {
   leadsRecebidos Int     @default(0)
   senhaHash     String?
   usuarioAtivo  Boolean  @default(false)
+  role          String   @default("corretor") // "corretor" ou "gerente"
   equipeId      String?
   criadoEm     DateTime @default(now())
   atualizadoEm  DateTime @updatedAt

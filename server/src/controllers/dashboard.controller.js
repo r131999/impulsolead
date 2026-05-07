@@ -173,4 +173,86 @@ async function getDashboardCorretor(req, res) {
   });
 }
 
-module.exports = { getDashboard, getDashboardCorretor };
+async function getDashboardGerente(req, res) {
+  const equipeId = req.equipeId;
+  const imobiliariaId = req.imobiliariaId;
+
+  if (!equipeId) {
+    return res.status(400).json({ error: 'Gerente não possui equipe vinculada' });
+  }
+
+  const agora = new Date();
+  const mesInicio = new Date(agora.getFullYear(), agora.getMonth(), 1);
+  const hojeInicio = inicioDia(agora);
+  const hojeFim = fimDia(agora);
+
+  const equipe = await prisma.equipe.findUnique({
+    where: { id: equipeId },
+    include: {
+      corretores: {
+        where: { ativo: true },
+        select: { id: true, nome: true },
+      },
+    },
+  });
+
+  if (!equipe) return res.status(404).json({ error: 'Equipe não encontrada' });
+
+  const corretorIds = equipe.corretores.map((c) => c.id);
+  const whereEquipe = { imobiliariaId, corretorId: { in: corretorIds } };
+
+  const [
+    leadsHoje,
+    emAtendimento,
+    visitasAgendadas,
+    fechadosMes,
+    totalLeadsMes,
+    ultimosLeads,
+    leadsDoMes,
+  ] = await prisma.$transaction([
+    prisma.lead.count({ where: { ...whereEquipe, criadoEm: { gte: hojeInicio, lte: hojeFim } } }),
+    prisma.lead.count({ where: { ...whereEquipe, status: 'atendimento' } }),
+    prisma.lead.count({ where: { ...whereEquipe, status: 'visita' } }),
+    prisma.lead.count({ where: { ...whereEquipe, status: 'fechado', criadoEm: { gte: mesInicio } } }),
+    prisma.lead.count({ where: { ...whereEquipe, status: { not: 'perdido' } } }),
+    prisma.lead.findMany({
+      where: whereEquipe,
+      orderBy: { criadoEm: 'desc' },
+      take: 5,
+      select: {
+        id: true, nome: true, telefone: true, status: true,
+        regiao: true, urgencia: true, criadoEm: true,
+        corretor: { select: { id: true, nome: true } },
+      },
+    }),
+    prisma.lead.findMany({
+      where: { ...whereEquipe, criadoEm: { gte: mesInicio } },
+      select: { id: true, status: true, corretorId: true },
+    }),
+  ]);
+
+  const taxaConversaoEquipe = totalLeadsMes === 0 ? 0 : Math.round((fechadosMes / totalLeadsMes) * 100);
+
+  const rankingCorretores = equipe.corretores.map((c) => {
+    const leadsC = leadsDoMes.filter((l) => l.corretorId === c.id);
+    return {
+      nome: c.nome,
+      leads: leadsC.length,
+      fechamentos: leadsC.filter((l) => l.status === 'fechado').length,
+    };
+  }).sort((a, b) => b.fechamentos - a.fechamentos || b.leads - a.leads);
+
+  res.json({
+    nomeEquipe: equipe.nome,
+    totalCorretores: equipe.corretores.length,
+    leadsHoje,
+    emAtendimento,
+    visitasAgendadas,
+    fechadosMes,
+    taxaConversaoEquipe,
+    rankingCorretores,
+    ultimosLeads,
+  });
+}
+
+module.exports = { getDashboard, getDashboardCorretor, getDashboardGerente };

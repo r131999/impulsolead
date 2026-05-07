@@ -15,6 +15,16 @@ async function listar(req, res) {
 
   if (req.role === 'corretor') {
     where.corretorId = req.corretorId;
+  } else if (req.role === 'gerente') {
+    if (req.equipeId) {
+      const corretoresDaEquipe = await prisma.corretor.findMany({
+        where: { equipeId: req.equipeId, imobiliariaId: req.imobiliariaId },
+        select: { id: true },
+      });
+      where.corretorId = { in: corretoresDaEquipe.map((c) => c.id) };
+    } else {
+      where.corretorId = req.corretorId;
+    }
   } else {
     if (corretorId) where.corretorId = corretorId;
   }
@@ -62,7 +72,19 @@ async function buscarPorId(req, res) {
   const { id } = req.params;
 
   const where = { id, imobiliariaId: req.imobiliariaId };
-  if (req.role === 'corretor') where.corretorId = req.corretorId;
+  if (req.role === 'corretor') {
+    where.corretorId = req.corretorId;
+  } else if (req.role === 'gerente') {
+    if (req.equipeId) {
+      const idsEquipe = await prisma.corretor.findMany({
+        where: { equipeId: req.equipeId, imobiliariaId: req.imobiliariaId },
+        select: { id: true },
+      });
+      where.corretorId = { in: idsEquipe.map((c) => c.id) };
+    } else {
+      where.corretorId = req.corretorId;
+    }
+  }
 
   const lead = await prisma.lead.findFirst({
     where,
@@ -129,7 +151,22 @@ async function atualizar(req, res) {
   const { nome, telefone, whatsappJid, corretorId, observacoes, ...qualificacao } = req.body;
 
   const whereFind = { id, imobiliariaId: req.imobiliariaId };
-  if (req.role === 'corretor') whereFind.corretorId = req.corretorId;
+  let idsEquipeGerente = null;
+
+  if (req.role === 'corretor') {
+    whereFind.corretorId = req.corretorId;
+  } else if (req.role === 'gerente') {
+    if (req.equipeId) {
+      const corretoresDaEquipe = await prisma.corretor.findMany({
+        where: { equipeId: req.equipeId, imobiliariaId: req.imobiliariaId },
+        select: { id: true },
+      });
+      idsEquipeGerente = corretoresDaEquipe.map((c) => c.id);
+      whereFind.corretorId = { in: idsEquipeGerente };
+    } else {
+      whereFind.corretorId = req.corretorId;
+    }
+  }
 
   const lead = await prisma.lead.findFirst({ where: whereFind });
   if (!lead) return res.status(404).json({ error: 'Lead não encontrado' });
@@ -140,6 +177,41 @@ async function atualizar(req, res) {
       data: { ...(observacoes !== undefined && { observacoes }) },
       include: { corretor: { select: { id: true, nome: true } } },
     });
+    return res.json({ lead: atualizado });
+  }
+
+  if (req.role === 'gerente') {
+    if (corretorId !== undefined && corretorId !== null) {
+      const ids = idsEquipeGerente || [];
+      if (!ids.includes(corretorId)) {
+        return res.status(403).json({ error: 'Corretor não pertence à sua equipe' });
+      }
+    }
+
+    const atualizado = await prisma.$transaction(async (tx) => {
+      const result = await tx.lead.update({
+        where: { id },
+        data: {
+          ...(observacoes !== undefined && { observacoes }),
+          ...(corretorId !== undefined && { corretorId }),
+        },
+        include: { corretor: { select: { id: true, nome: true } } },
+      });
+
+      if (corretorId !== undefined && corretorId !== lead.corretorId) {
+        const nomeCorretor = result.corretor?.nome || 'nenhum';
+        await tx.historicoLead.create({
+          data: {
+            leadId: id,
+            acao: 'Corretor reatribuído',
+            detalhes: `Novo corretor: ${nomeCorretor}`,
+          },
+        });
+      }
+
+      return result;
+    });
+
     return res.json({ lead: atualizado });
   }
 
@@ -199,7 +271,19 @@ async function mudarStatus(req, res) {
   }
 
   const whereStatus = { id, imobiliariaId: req.imobiliariaId };
-  if (req.role === 'corretor') whereStatus.corretorId = req.corretorId;
+  if (req.role === 'corretor') {
+    whereStatus.corretorId = req.corretorId;
+  } else if (req.role === 'gerente') {
+    if (req.equipeId) {
+      const idsEquipe = await prisma.corretor.findMany({
+        where: { equipeId: req.equipeId, imobiliariaId: req.imobiliariaId },
+        select: { id: true },
+      });
+      whereStatus.corretorId = { in: idsEquipe.map((c) => c.id) };
+    } else {
+      whereStatus.corretorId = req.corretorId;
+    }
+  }
 
   const lead = await prisma.lead.findFirst({ where: whereStatus });
   if (!lead) return res.status(404).json({ error: 'Lead não encontrado' });

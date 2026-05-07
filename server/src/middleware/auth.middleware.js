@@ -37,11 +37,12 @@ async function authMiddleware(req, res, next) {
         return res.status(403).json({ error: 'Período de trial expirado. Entre em contato para contratar o plano.' });
       }
 
-      req.role = 'corretor';
+      req.role = corretor.role || 'corretor';
       req.corretorId = corretor.id;
       req.imobiliariaId = corretor.imobiliariaId;
       req.imobiliaria = corretor.imobiliaria;
-      req.usuario = { id: corretor.id, nome: corretor.nome, email: corretor.email, role: 'corretor' };
+      req.equipeId = decoded.equipeId || null;
+      req.usuario = { id: corretor.id, nome: corretor.nome, email: corretor.email, role: corretor.role || 'corretor' };
     } else {
       const usuario = await prisma.usuario.findUnique({
         where: { id: decoded.userId },

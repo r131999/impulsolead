@@ -17,13 +17,20 @@ const NAV_CORRETOR = [
   { to: '/meu-desempenho',label: 'Meu Desempenho', icon: ChartIcon },
 ]
 
+const NAV_GERENTE = [
+  { to: '/gerente/dashboard',  label: 'Dashboard da Equipe', icon: ChartIcon },
+  { to: '/gerente/leads',      label: 'Leads da Equipe',     icon: KanbanIcon },
+  { to: '/gerente/minha-equipe', label: 'Minha Equipe',      icon: UsersIcon },
+  { to: '/gerente/relatorios', label: 'Relatório da Equipe', icon: BarChartIcon },
+]
+
 export default function Layout() {
-  const { usuario, logout, isCorretor } = useAuth()
+  const { usuario, logout, isCorretor, isGerente } = useAuth()
   const navigate = useNavigate()
   const [aberta, setAberta] = useState(false)
 
   const fechar = () => setAberta(false)
-  const navItems = isCorretor ? NAV_CORRETOR : NAV_GESTOR
+  const navItems = isGerente ? NAV_GERENTE : isCorretor ? NAV_CORRETOR : NAV_GESTOR
 
   return (
     <div className="app-shell">
@@ -43,6 +50,11 @@ export default function Layout() {
         <div className="px-5 py-4 border-b border-indigo-800">
           <h1 className="text-white font-bold text-lg tracking-tight">ImpulsoLead</h1>
           <p className="text-indigo-300 text-xs mt-0.5 truncate">{usuario?.imobiliaria?.nome}</p>
+          {isGerente && (
+            <span className="inline-block mt-1 px-2 py-0.5 rounded text-xs font-medium" style={{ backgroundColor: 'rgba(16,185,129,0.15)', color: '#10B981' }}>
+              Gerente
+            </span>
+          )}
           {isCorretor && (
             <span className="inline-block mt-1 px-2 py-0.5 rounded text-xs font-medium" style={{ backgroundColor: 'rgba(99,102,241,0.2)', color: '#818cf8' }}>
               Corretor

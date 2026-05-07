@@ -11,9 +11,13 @@ import Relatorios from './pages/Relatorios'
 import ConfigAgente from './pages/ConfigAgente'
 import DesempenhoCorretor from './pages/DesempenhoCorretor'
 import Equipes from './pages/Equipes'
+import DashboardGerente from './pages/DashboardGerente'
+import MinhaEquipe from './pages/MinhaEquipe'
+import RelatoriosGerente from './pages/RelatoriosGerente'
 
 function HomeRedirect() {
   const { usuario } = useAuth()
+  if (usuario?.role === 'gerente') return <Navigate to="/gerente/dashboard" replace />
   if (usuario?.role === 'corretor') return <Navigate to="/meus-leads" replace />
   return <Navigate to="/dashboard" replace />
 }
@@ -46,6 +50,12 @@ export default function App() {
             {/* Rotas do corretor */}
             <Route path="meus-leads" element={<Kanban />} />
             <Route path="meu-desempenho" element={<DesempenhoCorretor />} />
+
+            {/* Rotas do gerente */}
+            <Route path="gerente/dashboard" element={<DashboardGerente />} />
+            <Route path="gerente/leads" element={<Kanban />} />
+            <Route path="gerente/minha-equipe" element={<MinhaEquipe />} />
+            <Route path="gerente/relatorios" element={<RelatoriosGerente />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

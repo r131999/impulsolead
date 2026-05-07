@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import * as leadsApi from '../api/leads'
+import { useAuth } from '../context/AuthContext'
 
 const COLUNAS = [
   { id: 'novo',        label: 'Novo',        dot: '#3B82F6' },
@@ -34,6 +35,7 @@ function agrupar(leads) {
 }
 
 export default function Kanban() {
+  const { isCorretor, isGerente } = useAuth()
   const [grupos, setGrupos] = useState(() => agrupar([]))
   const [loading, setLoading] = useState(true)
   const [modal, setModal] = useState(null) // { leadId, statusAtual }
@@ -92,7 +94,9 @@ export default function Kanban() {
         style={{ borderBottom: '1px solid #1E293B', backgroundColor: '#111827' }}
       >
         <div>
-          <h1 className="text-lg md:text-xl font-bold" style={{ color: '#F1F5F9' }}>Kanban</h1>
+          <h1 className="text-lg md:text-xl font-bold" style={{ color: '#F1F5F9' }}>
+            {isGerente ? 'Leads da Equipe' : isCorretor ? 'Meus Leads' : 'Kanban'}
+          </h1>
           <p className="text-xs md:text-sm" style={{ color: '#94A3B8' }}>{totalLeads} leads</p>
         </div>
         <button onClick={carregar} className="btn-secondary text-xs">
