@@ -10,6 +10,7 @@ const corretoresRoutes = require('./routes/corretores.routes');
 const dashboardRoutes = require('./routes/dashboard.routes');
 const configRoutes = require('./routes/config.routes');
 const relatoriosRoutes = require('./routes/relatorios.routes');
+const equipesRoutes = require('./routes/equipes.routes');
 const webhookRoutes = require('./routes/webhook.routes');
 
 const app = express();
@@ -43,6 +44,7 @@ app.use('/api/corretores', corretoresRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/config', configRoutes);
 app.use('/api/relatorios', relatoriosRoutes);
+app.use('/api/equipes', equipesRoutes);
 app.use('/api/webhook', webhookRoutes);
 
 app.get('/api/health', (req, res) => {

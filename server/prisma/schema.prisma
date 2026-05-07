@@ -23,6 +23,7 @@ model Imobiliaria {
   corretores   Corretor[]
   leads        Lead[]
   configAgente ConfigAgente?
+  equipes      Equipe[]
 }
 
 model Usuario {
@@ -51,11 +52,14 @@ model Corretor {
   leadsRecebidos Int     @default(0)
   senhaHash     String?
   usuarioAtivo  Boolean  @default(false)
+  equipeId      String?
   criadoEm     DateTime @default(now())
   atualizadoEm  DateTime @updatedAt
 
   imobiliariaId String
   imobiliaria   Imobiliaria @relation(fields: [imobiliariaId], references: [id])
+  equipe        Equipe?     @relation("EquipeCorretores", fields: [equipeId], references: [id])
+  equipeLiderada Equipe[]   @relation("EquipeLider")
 
   leads Lead[]
 }
@@ -99,6 +103,24 @@ model HistoricoLead {
 
   leadId String
   lead   Lead   @relation(fields: [leadId], references: [id])
+}
+
+model Equipe {
+  id            String   @id @default(uuid())
+  nome          String
+  descricao     String?
+  ativo         Boolean  @default(true)
+
+  liderId       String?
+  lider         Corretor?   @relation("EquipeLider", fields: [liderId], references: [id])
+
+  imobiliariaId String
+  imobiliaria   Imobiliaria @relation(fields: [imobiliariaId], references: [id])
+
+  corretores    Corretor[]  @relation("EquipeCorretores")
+
+  criadoEm      DateTime @default(now())
+  atualizadoEm  DateTime @updatedAt
 }
 
 model ConfigAgente {

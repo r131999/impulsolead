@@ -140,4 +140,77 @@ async function getRelatorios(req, res) {
   });
 }
 
-module.exports = { getRelatorios };
+async function getRelatoriosEquipes(req, res) {
+  const periodo = parseInt(req.query.periodo) || 30;
+
+  if (!PERIODOS_VALIDOS.includes(periodo)) {
+    return res.status(400).json({ error: `Período inválido. Use: ${PERIODOS_VALIDOS.join(', ')}` });
+  }
+
+  const imobiliariaId = req.imobiliariaId;
+  const agora = new Date();
+  const dataInicio = new Date(agora);
+  dataInicio.setDate(dataInicio.getDate() - periodo);
+  dataInicio.setHours(0, 0, 0, 0);
+
+  const [equipes, leads] = await prisma.$transaction([
+    prisma.equipe.findMany({
+      where: { imobiliariaId, ativo: true },
+      include: {
+        lider: { select: { id: true, nome: true } },
+        corretores: {
+          where: { ativo: true },
+          select: { id: true, nome: true },
+        },
+      },
+      orderBy: { criadoEm: 'asc' },
+    }),
+    prisma.lead.findMany({
+      where: { imobiliariaId, criadoEm: { gte: dataInicio } },
+      select: { id: true, status: true, corretorId: true },
+    }),
+  ]);
+
+  const leadsPorCorretor = {};
+  leads.forEach((l) => {
+    if (l.corretorId) {
+      if (!leadsPorCorretor[l.corretorId]) leadsPorCorretor[l.corretorId] = [];
+      leadsPorCorretor[l.corretorId].push(l);
+    }
+  });
+
+  const result = equipes.map((equipe) => {
+    const rankingCorretores = equipe.corretores.map((c) => {
+      const cLeads = leadsPorCorretor[c.id] || [];
+      return {
+        id: c.id,
+        nome: c.nome,
+        leads: cLeads.length,
+        fechamentos: cLeads.filter((l) => l.status === 'fechado').length,
+      };
+    }).sort((a, b) => b.fechamentos - a.fechamentos || b.leads - a.leads);
+
+    const totalLeads = rankingCorretores.reduce((s, c) => s + c.leads, 0);
+    const fechamentos = rankingCorretores.reduce((s, c) => s + c.fechamentos, 0);
+    const taxaConversao = totalLeads === 0 ? 0 : Math.round((fechamentos / totalLeads) * 100);
+
+    return {
+      id: equipe.id,
+      nome: equipe.nome,
+      lider: equipe.lider,
+      totalLeads,
+      fechamentos,
+      taxaConversao,
+      rankingCorretores,
+    };
+  }).sort((a, b) => b.totalLeads - a.totalLeads);
+
+  const equipeMaisLeads = result.length > 0 ? result[0].nome : null;
+  const equipeMaiorConversao = result.length > 0
+    ? result.reduce((a, b) => (a.taxaConversao >= b.taxaConversao ? a : b)).nome
+    : null;
+
+  res.json({ periodo, equipes: result, equipeMaisLeads, equipeMaiorConversao });
+}
+
+module.exports = { getRelatorios, getRelatoriosEquipes };

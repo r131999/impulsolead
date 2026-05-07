@@ -17,7 +17,8 @@ async function listar(req, res) {
     select: {
       id: true, nome: true, email: true, telefone: true, whatsapp: true,
       ativo: true, disponivel: true, posicaoFila: true, leadsRecebidos: true,
-      usuarioAtivo: true, criadoEm: true,
+      usuarioAtivo: true, equipeId: true, criadoEm: true,
+      equipe: { select: { id: true, nome: true } },
       _count: { select: { leads: true } },
     },
   });
@@ -70,7 +71,7 @@ async function criar(req, res) {
 
 async function atualizar(req, res) {
   const { id } = req.params;
-  const { nome, email, telefone, whatsapp } = req.body;
+  const { nome, email, telefone, whatsapp, equipeId } = req.body;
 
   const corretor = await prisma.corretor.findFirst({
     where: { id, imobiliariaId: req.imobiliariaId },
@@ -80,6 +81,13 @@ async function atualizar(req, res) {
     return res.status(404).json({ error: 'Corretor não encontrado' });
   }
 
+  if (equipeId) {
+    const equipe = await prisma.equipe.findFirst({
+      where: { id: equipeId, imobiliariaId: req.imobiliariaId, ativo: true },
+    });
+    if (!equipe) return res.status(400).json({ error: 'Equipe não encontrada' });
+  }
+
   const atualizado = await prisma.corretor.update({
     where: { id },
     data: {
@@ -87,6 +95,7 @@ async function atualizar(req, res) {
       ...(email !== undefined && { email }),
       ...(telefone && { telefone }),
       ...(whatsapp && { whatsapp }),
+      ...(equipeId !== undefined && { equipeId: equipeId || null }),
     },
   });
 

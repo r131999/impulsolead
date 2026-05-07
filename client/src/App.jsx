@@ -10,6 +10,7 @@ import Corretores from './pages/Corretores'
 import Relatorios from './pages/Relatorios'
 import ConfigAgente from './pages/ConfigAgente'
 import DesempenhoCorretor from './pages/DesempenhoCorretor'
+import Equipes from './pages/Equipes'
 
 function HomeRedirect() {
   const { usuario } = useAuth()
@@ -38,6 +39,7 @@ export default function App() {
             <Route path="kanban" element={<Kanban />} />
             <Route path="leads" element={<Leads />} />
             <Route path="corretores" element={<Corretores />} />
+            <Route path="equipes" element={<Equipes />} />
             <Route path="relatorios" element={<Relatorios />} />
             <Route path="config" element={<ConfigAgente />} />
 

@@ -149,7 +149,7 @@ async function getDashboardCorretor(req, res) {
     }),
     prisma.corretor.findUnique({
       where: { id: corretorId },
-      select: { posicaoFila: true },
+      select: { posicaoFila: true, equipe: { select: { id: true, nome: true } } },
     }),
   ]);
 
@@ -169,6 +169,7 @@ async function getDashboardCorretor(req, res) {
     taxaConversaoPessoal,
     posicaoNaFila,
     ultimosLeads,
+    equipe: corretor?.equipe || null,
   });
 }
 

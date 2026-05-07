@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import * as corretoresApi from '../api/corretores'
+import * as equipesApi from '../api/equipes'
 
 const FORM_VAZIO = { nome: '', telefone: '', whatsapp: '', email: '' }
 const FORM_ACESSO_VAZIO = { email: '', senha: '' }
@@ -8,6 +9,7 @@ const FORM_RESET_VAZIO = { novaSenha: '' }
 export default function Corretores() {
   const [corretores, setCorretores] = useState([])
   const [fila, setFila] = useState([])
+  const [equipes, setEquipes] = useState([])
   const [loading, setLoading] = useState(true)
   const [modal, setModal] = useState(null)
   const [editando, setEditando] = useState(null)
@@ -17,12 +19,18 @@ export default function Corretores() {
   const [salvando, setSalvando] = useState(false)
   const [erro, setErro] = useState('')
   const [aba, setAba] = useState('lista')
+  const [atualizandoEquipe, setAtualizandoEquipe] = useState(null)
 
   const carregar = useCallback(() => {
-    Promise.all([corretoresApi.listar(), corretoresApi.buscarFila()])
-      .then(([r1, r2]) => {
+    Promise.all([
+      corretoresApi.listar(),
+      corretoresApi.buscarFila(),
+      equipesApi.listar(),
+    ])
+      .then(([r1, r2, r3]) => {
         setCorretores(r1.data.corretores)
         setFila(r2.data.fila)
+        setEquipes(r3.data.equipes)
       })
       .finally(() => setLoading(false))
   }, [])
@@ -112,6 +120,16 @@ export default function Corretores() {
     carregar()
   }
 
+  const mudarEquipe = async (c, novoEquipeId) => {
+    setAtualizandoEquipe(c.id)
+    try {
+      await corretoresApi.atualizar(c.id, { equipeId: novoEquipeId || null })
+      carregar()
+    } finally {
+      setAtualizandoEquipe(null)
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -160,6 +178,7 @@ export default function Corretores() {
                   <th className="text-left px-4 py-3 font-medium text-xs uppercase tracking-wide" style={{ color: '#64748B' }}>Nome</th>
                   <th className="text-left px-4 py-3 font-medium text-xs uppercase tracking-wide hidden sm:table-cell" style={{ color: '#64748B' }}>Telefone</th>
                   <th className="text-left px-4 py-3 font-medium text-xs uppercase tracking-wide" style={{ color: '#64748B' }}>Status</th>
+                  <th className="text-left px-4 py-3 font-medium text-xs uppercase tracking-wide hidden md:table-cell" style={{ color: '#64748B' }}>Equipe</th>
                   <th className="text-left px-4 py-3 font-medium text-xs uppercase tracking-wide hidden sm:table-cell" style={{ color: '#64748B' }}>Leads</th>
                   <th className="text-left px-4 py-3 font-medium text-xs uppercase tracking-wide" style={{ color: '#64748B' }}>Acesso</th>
                   <th className="text-left px-4 py-3 font-medium text-xs uppercase tracking-wide" style={{ color: '#64748B' }}></th>
@@ -198,6 +217,25 @@ export default function Corretores() {
                           Inativo
                         </span>
                       )}
+                    </td>
+                    <td className="px-4 py-3 hidden md:table-cell">
+                      <select
+                        value={c.equipeId || ''}
+                        onChange={(e) => mudarEquipe(c, e.target.value)}
+                        disabled={atualizandoEquipe === c.id || !c.ativo}
+                        className="text-xs rounded-md px-2 py-1 transition-opacity disabled:opacity-50"
+                        style={{
+                          backgroundColor: '#0B1120',
+                          border: '1px solid #1E293B',
+                          color: c.equipeId ? '#818cf8' : '#64748B',
+                          minWidth: 120,
+                        }}
+                      >
+                        <option value="">Sem equipe</option>
+                        {equipes.map((eq) => (
+                          <option key={eq.id} value={eq.id}>{eq.nome}</option>
+                        ))}
+                      </select>
                     </td>
                     <td className="px-4 py-3 hidden sm:table-cell" style={{ color: '#94A3B8' }}>{c.leadsRecebidos}</td>
                     <td className="px-4 py-3">

@@ -48,6 +48,14 @@ export default function DesempenhoCorretor() {
         <p className="text-sm mt-0.5" style={{ color: '#94A3B8' }}>
           Olá, {usuario?.nome} — aqui estão suas métricas pessoais
         </p>
+        {dados?.equipe && (
+          <span
+            className="inline-block mt-2 px-3 py-1 rounded-full text-xs font-medium"
+            style={{ backgroundColor: 'rgba(99,102,241,0.15)', color: '#818cf8' }}
+          >
+            {dados.equipe.nome}
+          </span>
+        )}
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
