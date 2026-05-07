@@ -19,11 +19,13 @@ model Imobiliaria {
   criadoEm      DateTime @default(now())
   atualizadoEm  DateTime @updatedAt
 
-  usuarios     Usuario[]
-  corretores   Corretor[]
-  leads        Lead[]
-  configAgente ConfigAgente?
-  equipes      Equipe[]
+  usuarios           Usuario[]
+  corretores         Corretor[]
+  leads              Lead[]
+  configAgente       ConfigAgente?
+  equipes            Equipe[]
+  contatosImportados ContatoImportado[]
+  modelosMensagem    ModeloMensagem[]
 }
 
 model Usuario {
@@ -121,6 +123,34 @@ model Equipe {
 
   criadoEm      DateTime @default(now())
   atualizadoEm  DateTime @updatedAt
+}
+
+model ContatoImportado {
+  id            String   @id @default(uuid())
+  nome          String
+  telefone      String
+  status        String   @default("pendente") // pendente | enviado | convertido | erro
+  mensagemEnviada String?
+  leadId        String?
+  criadoEm     DateTime @default(now())
+  atualizadoEm  DateTime @updatedAt
+
+  imobiliariaId String
+  imobiliaria   Imobiliaria @relation(fields: [imobiliariaId], references: [id])
+
+  @@unique([telefone, imobiliariaId])
+}
+
+model ModeloMensagem {
+  id            String   @id @default(uuid())
+  nome          String
+  conteudo      String
+  ativo         Boolean  @default(true)
+  criadoEm     DateTime @default(now())
+  atualizadoEm  DateTime @updatedAt
+
+  imobiliariaId String
+  imobiliaria   Imobiliaria @relation(fields: [imobiliariaId], references: [id])
 }
 
 model ConfigAgente {

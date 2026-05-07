@@ -73,6 +73,26 @@ async function register(req, res) {
       },
     });
 
+    await tx.modeloMensagem.createMany({
+      data: [
+        {
+          nome: 'Reativação Geral',
+          conteudo: `Olá, {{nome}}! Tudo bem? Aqui é da ${nomeImobiliaria}. Percebemos que você demonstrou interesse em nossos imóveis e gostaríamos de saber se ainda podemos te ajudar. Temos ótimas oportunidades disponíveis! 😊`,
+          imobiliariaId: imobiliaria.id,
+        },
+        {
+          nome: 'Promoção / Lançamento',
+          conteudo: `Olá, {{nome}}! 👋 Temos um lançamento imperdível que pode ser exatamente o que você procura. Posso te enviar mais detalhes?`,
+          imobiliariaId: imobiliaria.id,
+        },
+        {
+          nome: 'Follow-up Simples',
+          conteudo: `Oi, {{nome}}! Como você está? Passando para saber se ficou com alguma dúvida sobre os imóveis que conversamos. Estou à disposição! 🏠`,
+          imobiliariaId: imobiliaria.id,
+        },
+      ],
+    });
+
     return { imobiliaria, usuario };
   });
 

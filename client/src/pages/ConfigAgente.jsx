@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { getConfig, atualizarConfig } from '../api/config'
 import { useAuth } from '../context/AuthContext'
+import * as modelosApi from '../api/modelos-mensagem'
 
 export default function ConfigAgente() {
   const { usuario } = useAuth()
@@ -11,6 +12,10 @@ export default function ConfigAgente() {
   const [sucesso, setSucesso] = useState(false)
   const [erro, setErro] = useState('')
   const [novaPergunta, setNovaPergunta] = useState('')
+  const [modelos, setModelos] = useState([])
+  const [modalModelo, setModalModelo] = useState(null)
+  const [modeloForm, setModeloForm] = useState({ nome: '', conteudo: '' })
+  const [salvandoModelo, setSalvandoModelo] = useState(false)
 
   useEffect(() => {
     getConfig()
@@ -19,6 +24,7 @@ export default function ConfigAgente() {
         setForm({ ...res.data.config })
       })
       .finally(() => setLoading(false))
+    modelosApi.listar().then((res) => setModelos(res.data))
   }, [])
 
   const set = (k) => (e) => {
@@ -44,6 +50,30 @@ export default function ConfigAgente() {
       ;[arr[idx], arr[alvo]] = [arr[alvo], arr[idx]]
       return { ...f, perguntas: arr }
     })
+  }
+
+  const abrirNovoModelo = () => { setModeloForm({ nome: '', conteudo: '' }); setModalModelo('novo') }
+  const abrirEditarModelo = (m) => { setModeloForm({ nome: m.nome, conteudo: m.conteudo, id: m.id }); setModalModelo('editar') }
+  const removerModelo = async (id) => {
+    if (!confirm('Remover este modelo?')) return
+    await modelosApi.remover(id)
+    setModelos((prev) => prev.filter((m) => m.id !== id))
+  }
+  const salvarModelo = async () => {
+    if (!modeloForm.nome.trim() || !modeloForm.conteudo.trim()) return
+    setSalvandoModelo(true)
+    try {
+      if (modalModelo === 'novo') {
+        const res = await modelosApi.criar({ nome: modeloForm.nome, conteudo: modeloForm.conteudo })
+        setModelos((prev) => [...prev, res.data])
+      } else {
+        const res = await modelosApi.atualizar(modeloForm.id, { nome: modeloForm.nome, conteudo: modeloForm.conteudo })
+        setModelos((prev) => prev.map((m) => m.id === modeloForm.id ? res.data : m))
+      }
+      setModalModelo(null)
+    } finally {
+      setSalvandoModelo(false)
+    }
   }
 
   const salvar = async (e) => {
@@ -257,6 +287,54 @@ export default function ConfigAgente() {
           </div>
         </div>
 
+        {/* Modelos de mensagem */}
+        <div className="card">
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <h2 className="font-semibold" style={{ color: '#F1F5F9' }}>Modelos de mensagem</h2>
+              <p className="text-xs mt-0.5" style={{ color: '#94A3B8' }}>Usado na reativação de contatos importados. Use {'{{nome}}'} para personalizar.</p>
+            </div>
+            <button type="button" onClick={abrirNovoModelo} className="btn-secondary text-xs flex-shrink-0">+ Novo</button>
+          </div>
+          <div className="space-y-2">
+            {modelos.length === 0 && (
+              <p className="text-sm text-center py-4" style={{ color: '#64748B' }}>Nenhum modelo. Clique em "+ Novo" para criar.</p>
+            )}
+            {modelos.map((m) => (
+              <div
+                key={m.id}
+                className="rounded-lg px-3 py-2.5"
+                style={{ backgroundColor: '#0B1120', border: '1px solid #1E293B' }}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium" style={{ color: '#818cf8' }}>{m.nome}</p>
+                    <p className="text-xs mt-0.5 line-clamp-2" style={{ color: '#64748B' }}>{m.conteudo}</p>
+                  </div>
+                  <div className="flex gap-2 flex-shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => abrirEditarModelo(m)}
+                      className="text-xs hover:opacity-80 transition-opacity"
+                      style={{ color: '#60A5FA' }}
+                    >
+                      Editar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => removerModelo(m.id)}
+                      className="text-xs hover:opacity-80 transition-opacity"
+                      style={{ color: '#EF4444' }}
+                    >
+                      Remover
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
         {/* Ações */}
         <div className="flex items-center gap-4">
           <button type="submit" className="btn-primary px-8" disabled={salvando}>
@@ -273,6 +351,54 @@ export default function ConfigAgente() {
           {erro && <span className="text-sm" style={{ color: '#EF4444' }}>{erro}</span>}
         </div>
       </form>
+
+      {/* Modal modelo de mensagem */}
+      {modalModelo && (
+        <div className="fixed inset-0 bg-black/60 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
+          <div
+            className="w-full rounded-t-2xl sm:rounded-2xl shadow-2xl sm:max-w-md max-h-[92vh] flex flex-col"
+            style={{ backgroundColor: '#111827', border: '1px solid #1E293B' }}
+          >
+            <div className="flex items-center justify-between px-5 py-4 flex-shrink-0" style={{ borderBottom: '1px solid #1E293B' }}>
+              <h2 className="font-bold" style={{ color: '#F1F5F9' }}>
+                {modalModelo === 'novo' ? 'Novo modelo' : 'Editar modelo'}
+              </h2>
+              <button onClick={() => setModalModelo(null)} className="text-xl leading-none hover:opacity-80" style={{ color: '#64748B' }}>×</button>
+            </div>
+            <div className="px-5 py-5 overflow-y-auto space-y-3">
+              <div>
+                <label className="label">Nome do modelo</label>
+                <input
+                  className="input"
+                  value={modeloForm.nome}
+                  onChange={(e) => setModeloForm((f) => ({ ...f, nome: e.target.value }))}
+                  placeholder="Ex: Reativação Geral"
+                />
+              </div>
+              <div>
+                <label className="label">Conteúdo</label>
+                <textarea
+                  className="input resize-none"
+                  rows={5}
+                  value={modeloForm.conteudo}
+                  onChange={(e) => setModeloForm((f) => ({ ...f, conteudo: e.target.value }))}
+                  placeholder="Use {{nome}} para personalizar com o nome do contato"
+                />
+              </div>
+              <div className="flex gap-2 pt-1">
+                <button onClick={() => setModalModelo(null)} className="btn-secondary flex-1">Cancelar</button>
+                <button
+                  onClick={salvarModelo}
+                  disabled={!modeloForm.nome.trim() || !modeloForm.conteudo.trim() || salvandoModelo}
+                  className="btn-primary flex-1"
+                >
+                  {salvandoModelo ? 'Salvando...' : 'Salvar'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

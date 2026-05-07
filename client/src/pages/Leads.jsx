@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import * as leadsApi from '../api/leads'
 import * as corretoresApi from '../api/corretores'
+import ContatosImportados from './ContatosImportados'
 
 const STATUS_BADGE_STYLE = {
   novo:        { color: '#60A5FA',  bg: 'rgba(59,130,246,0.15)' },
@@ -21,6 +22,7 @@ const FORM_VAZIO = {
 }
 
 export default function Leads() {
+  const [aba, setAba] = useState('leads')
   const [leads, setLeads] = useState([])
   const [total, setTotal] = useState(0)
   const [corretores, setCorretores] = useState([])
@@ -106,13 +108,41 @@ export default function Leads() {
 
   return (
     <div className="p-4 md:p-6 max-w-7xl mx-auto">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
         <div>
           <h1 className="text-xl md:text-2xl font-bold" style={{ color: '#F1F5F9' }}>Leads</h1>
-          <p className="text-xs md:text-sm mt-0.5" style={{ color: '#94A3B8' }}>{total} leads encontrados</p>
+          <p className="text-xs md:text-sm mt-0.5" style={{ color: '#94A3B8' }}>
+            {aba === 'leads' ? `${total} leads encontrados` : 'Contatos importados para reativação'}
+          </p>
         </div>
-        <button onClick={abrirCriar} className="btn-primary self-start sm:self-auto">+ Novo lead</button>
+        {aba === 'leads' && (
+          <button onClick={abrirCriar} className="btn-primary self-start sm:self-auto">+ Novo lead</button>
+        )}
       </div>
+
+      {/* Tabs */}
+      <div className="flex gap-1 mb-4 p-1 rounded-xl w-fit" style={{ backgroundColor: '#0B1120' }}>
+        {[
+          { key: 'leads', label: 'Leads' },
+          { key: 'contatos', label: 'Contatos Importados' },
+        ].map(({ key, label }) => (
+          <button
+            key={key}
+            onClick={() => setAba(key)}
+            className="px-4 py-1.5 rounded-lg text-sm font-medium transition-colors"
+            style={{
+              backgroundColor: aba === key ? '#1E293B' : 'transparent',
+              color: aba === key ? '#F1F5F9' : '#64748B',
+            }}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {aba === 'contatos' && <ContatosImportados />}
+
+      {aba === 'leads' && <>
 
       {/* Filtros */}
       <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 mb-4">
@@ -247,6 +277,8 @@ export default function Leads() {
           </div>
         )}
       </div>
+
+      </> }
 
       {/* Modal criar lead */}
       {modal === 'criar' && (
