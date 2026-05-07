@@ -117,7 +117,7 @@ async function enviarMensagem(req, res) {
   try {
     await axios.post(
       `${EVOLUTION_API_URL}/message/sendText/${EVOLUTION_INSTANCE_NAME}`,
-      { number: jid, text: mensagem },
+      { number: telefoneFormatado, text: mensagem },
       { headers: { apikey: EVOLUTION_API_KEY } }
     );
   } catch (err) {
