@@ -20,6 +20,20 @@ const URGENCIA_COR = {
   baixa: '#10B981',
 }
 
+function tempoNaEtapa(atualizadoEm) {
+  const diffMs = Date.now() - new Date(atualizadoEm).getTime()
+  const h = diffMs / 3600000
+  if (h < 24) {
+    const horas = Math.max(1, Math.floor(h))
+    return { texto: `${horas}h na etapa`, cor: '#10B981' }
+  }
+  const dias = Math.floor(h / 24)
+  if (dias <= 3) return { texto: `${dias} dia${dias > 1 ? 's' : ''} na etapa`, cor: '#F59E0B' }
+  if (dias < 14) return { texto: `${dias} dias na etapa`, cor: '#EF4444' }
+  const semanas = Math.floor(dias / 7)
+  return { texto: `${semanas} semana${semanas > 1 ? 's' : ''} na etapa`, cor: '#EF4444' }
+}
+
 function proximoStatus(status) {
   const idx = SEQUENCIA.indexOf(status)
   return idx >= 0 && idx < SEQUENCIA.length - 1 ? SEQUENCIA[idx + 1] : null
@@ -160,6 +174,7 @@ function LeadCard({ lead, atualizando, onAvancar, onPerdido }) {
   const proximo = proximoStatus(lead.status)
   const podeAvancar = !!proximo
   const podePerdido = lead.status !== 'fechado' && lead.status !== 'perdido'
+  const tempo = lead.atualizadoEm ? tempoNaEtapa(lead.atualizadoEm) : null
 
   return (
     <div
@@ -173,6 +188,11 @@ function LeadCard({ lead, atualizando, onAvancar, onPerdido }) {
     >
       <p className="text-sm font-semibold truncate" style={{ color: '#F1F5F9' }}>{lead.nome}</p>
       <p className="text-xs mt-0.5" style={{ color: '#64748B' }}>{lead.telefone}</p>
+      {tempo && (
+        <p className="text-xs mt-1" style={{ color: tempo.cor }}>
+          ⏱ {tempo.texto}
+        </p>
+      )}
       {lead.corretor && (
         <p className="text-xs mt-1 truncate" style={{ color: '#60A5FA' }}>
           👤 {lead.corretor.nome}
