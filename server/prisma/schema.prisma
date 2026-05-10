@@ -35,6 +35,7 @@ model Usuario {
   senhaHash    String
   role         String   @default("gestor")
   ativo        Boolean  @default(true)
+  fotoPerfil   String?
   criadoEm    DateTime @default(now())
   atualizadoEm DateTime @updatedAt
 
@@ -55,6 +56,7 @@ model Corretor {
   senhaHash     String?
   usuarioAtivo  Boolean  @default(false)
   role          String   @default("corretor") // "corretor" ou "gerente"
+  fotoPerfil    String?
   equipeId      String?
   criadoEm     DateTime @default(now())
   atualizadoEm  DateTime @updatedAt

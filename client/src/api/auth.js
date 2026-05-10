@@ -8,3 +8,7 @@ export const alterarSenha = (senhaAtual, novaSenha) =>
   api.put('/auth/password', { senhaAtual, novaSenha })
 export const alterarSenhaCorretor = (senhaAtual, novaSenha) =>
   api.put('/auth/corretor/password', { senhaAtual, novaSenha })
+export const atualizarFotoPerfil = (fotoPerfil) =>
+  api.put('/auth/foto-perfil', { fotoPerfil })
+export const atualizarFotoPerfilCorretor = (fotoPerfil) =>
+  api.put('/auth/corretor/foto-perfil', { fotoPerfil })

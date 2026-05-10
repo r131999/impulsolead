@@ -1,6 +1,7 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import * as corretoresApi from '../api/corretores'
 import * as equipesApi from '../api/equipes'
+import { Avatar, redimensionarImagem } from '../components/Avatar'
 
 const FORM_VAZIO = { nome: '', telefone: '', whatsapp: '', email: '' }
 const FORM_ACESSO_VAZIO = { email: '', senha: '', role: 'corretor' }
@@ -17,9 +18,11 @@ export default function Corretores() {
   const [formAcesso, setFormAcesso] = useState(FORM_ACESSO_VAZIO)
   const [formReset, setFormReset] = useState(FORM_RESET_VAZIO)
   const [salvando, setSalvando] = useState(false)
+  const [salvandoFoto, setSalvandoFoto] = useState(false)
   const [erro, setErro] = useState('')
   const [aba, setAba] = useState('lista')
   const [atualizandoEquipe, setAtualizandoEquipe] = useState(null)
+  const fotoInputRef = useRef(null)
 
   const carregar = useCallback(() => {
     Promise.all([
@@ -120,6 +123,22 @@ export default function Corretores() {
     carregar()
   }
 
+  const handleFotoCorretor = async (e) => {
+    const file = e.target.files[0]
+    if (!file || !editando) return
+    setSalvandoFoto(true)
+    try {
+      const base64 = await redimensionarImagem(file)
+      await corretoresApi.atualizarFoto(editando.id, base64)
+      setEditando((prev) => ({ ...prev, fotoPerfil: base64 }))
+      setCorretores((prev) => prev.map((c) => c.id === editando.id ? { ...c, fotoPerfil: base64 } : c))
+    } catch {}
+    finally {
+      setSalvandoFoto(false)
+      e.target.value = ''
+    }
+  }
+
   const mudarEquipe = async (c, novoEquipeId) => {
     setAtualizandoEquipe(c.id)
     try {
@@ -197,7 +216,12 @@ export default function Corretores() {
                     onMouseEnter={(e) => { if (c.ativo) e.currentTarget.style.backgroundColor = '#1a2332' }}
                     onMouseLeave={(e) => e.currentTarget.style.backgroundColor = idx % 2 === 1 ? 'rgba(255,255,255,0.02)' : 'transparent'}
                   >
-                    <td className="px-4 py-3 font-medium" style={{ color: '#F1F5F9' }}>{c.nome}</td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <Avatar nome={c.nome} fotoPerfil={c.fotoPerfil} size={32} />
+                        <span className="font-medium" style={{ color: '#F1F5F9' }}>{c.nome}</span>
+                      </div>
+                    </td>
                     <td className="px-4 py-3 hidden sm:table-cell" style={{ color: '#94A3B8' }}>{c.telefone}</td>
                     <td className="px-4 py-3">
                       {c.ativo ? (
@@ -345,6 +369,29 @@ export default function Corretores() {
               <button onClick={() => setModal(null)} className="text-xl leading-none hover:opacity-80" style={{ color: '#64748B' }}>×</button>
             </div>
             <form onSubmit={salvar} className="px-5 py-5 space-y-3 overflow-y-auto">
+              {editando && (
+                <div className="flex flex-col items-center pb-1">
+                  <button
+                    type="button"
+                    onClick={() => fotoInputRef.current?.click()}
+                    title="Clique para alterar foto"
+                    disabled={salvandoFoto}
+                    className="focus:outline-none"
+                  >
+                    <Avatar nome={editando.nome} fotoPerfil={editando.fotoPerfil} size={72} />
+                  </button>
+                  <p className="text-xs mt-2" style={{ color: '#64748B' }}>
+                    {salvandoFoto ? 'Salvando...' : 'Clique para alterar foto'}
+                  </p>
+                  <input
+                    ref={fotoInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleFotoCorretor}
+                  />
+                </div>
+              )}
               <div>
                 <label className="label">Nome *</label>
                 <input className="input" value={form.nome} onChange={set('nome')} required />

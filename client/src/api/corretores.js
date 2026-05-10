@@ -11,3 +11,5 @@ export const ativarAcesso = (id, email, senha, role = 'corretor') =>
   api.post(`/corretores/${id}/ativar-acesso`, { email, senha, role })
 export const resetarSenha = (id, novaSenha) =>
   api.put(`/corretores/${id}/resetar-senha`, { novaSenha })
+export const atualizarFoto = (id, fotoPerfil) =>
+  api.put(`/corretores/${id}/foto-perfil`, { fotoPerfil })

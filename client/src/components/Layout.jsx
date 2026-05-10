@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { Avatar, redimensionarImagem } from './Avatar'
 
 const NAV_GESTOR = [
   { to: '/dashboard',  label: 'Dashboard',    icon: ChartIcon },
@@ -25,9 +26,25 @@ const NAV_GERENTE = [
 ]
 
 export default function Layout() {
-  const { usuario, logout, isCorretor, isGerente } = useAuth()
+  const { usuario, logout, isCorretor, isGerente, atualizarFotoPerfil } = useAuth()
   const navigate = useNavigate()
   const [aberta, setAberta] = useState(false)
+  const [salvandoFoto, setSalvandoFoto] = useState(false)
+  const fotoInputRef = useRef(null)
+
+  const handleFoto = async (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+    setSalvandoFoto(true)
+    try {
+      const base64 = await redimensionarImagem(file)
+      await atualizarFotoPerfil(base64)
+    } catch {}
+    finally {
+      setSalvandoFoto(false)
+      e.target.value = ''
+    }
+  }
 
   const fechar = () => setAberta(false)
   const navItems = isGerente ? NAV_GERENTE : isCorretor ? NAV_CORRETOR : NAV_GESTOR
@@ -83,7 +100,24 @@ export default function Layout() {
         </nav>
 
         <div className="p-3 border-t border-indigo-800">
-          <div className="px-3 py-1.5 text-indigo-300 text-xs truncate">{usuario?.nome}</div>
+          <button
+            className="w-full flex items-center gap-2.5 px-2 py-1.5 mb-1 rounded-lg hover:bg-indigo-800 transition-colors text-left"
+            onClick={() => fotoInputRef.current?.click()}
+            title="Clique para alterar foto de perfil"
+            disabled={salvandoFoto}
+          >
+            <Avatar nome={usuario?.nome} fotoPerfil={usuario?.fotoPerfil} size={36} />
+            <span className="text-indigo-200 text-xs truncate flex-1">
+              {salvandoFoto ? 'Salvando...' : usuario?.nome}
+            </span>
+          </button>
+          <input
+            ref={fotoInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handleFoto}
+          />
           <button
             onClick={() => { logout(); navigate('/login') }}
             className="w-full text-left px-3 py-2 text-indigo-300 hover:text-white text-sm rounded-lg hover:bg-indigo-800 transition-colors"

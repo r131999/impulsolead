@@ -159,6 +159,7 @@ async function login(req, res) {
       nome: usuario.nome,
       email: usuario.email,
       role: usuario.role,
+      fotoPerfil: usuario.fotoPerfil || null,
       imobiliariaId: usuario.imobiliariaId,
       imobiliaria: usuario.imobiliaria,
     },
@@ -183,6 +184,7 @@ async function me(req, res) {
       nome: corretor.nome,
       email: corretor.email,
       role: corretor.role || 'corretor',
+      fotoPerfil: corretor.fotoPerfil || null,
       imobiliariaId: corretor.imobiliariaId,
       imobiliaria: corretor.imobiliaria,
       equipeId: req.equipeId || null,
@@ -207,6 +209,7 @@ async function me(req, res) {
     nome: usuario.nome,
     email: usuario.email,
     role: usuario.role,
+    fotoPerfil: usuario.fotoPerfil || null,
     imobiliariaId: usuario.imobiliariaId,
     imobiliaria: usuario.imobiliaria,
   });
@@ -302,6 +305,7 @@ async function loginCorretor(req, res) {
       nome: corretor.nome,
       email: corretor.email,
       role: roleCorretor,
+      fotoPerfil: corretor.fotoPerfil || null,
       imobiliariaId: corretor.imobiliariaId,
       ...(equipeId && { equipeId }),
     },
@@ -335,4 +339,22 @@ async function alterarSenhaCorretor(req, res) {
   res.json({ message: 'Senha alterada com sucesso' });
 }
 
-module.exports = { register, login, me, alterarSenha, loginCorretor, alterarSenhaCorretor };
+async function atualizarFotoPerfilGestor(req, res) {
+  const { fotoPerfil } = req.body;
+  if (!fotoPerfil || !fotoPerfil.startsWith('data:image/')) {
+    return res.status(400).json({ error: 'Foto inválida' });
+  }
+  await prisma.usuario.update({ where: { id: req.usuario.id }, data: { fotoPerfil } });
+  res.json({ ok: true });
+}
+
+async function atualizarFotoPerfilCorretor(req, res) {
+  const { fotoPerfil } = req.body;
+  if (!fotoPerfil || !fotoPerfil.startsWith('data:image/')) {
+    return res.status(400).json({ error: 'Foto inválida' });
+  }
+  await prisma.corretor.update({ where: { id: req.corretorId }, data: { fotoPerfil } });
+  res.json({ ok: true });
+}
+
+module.exports = { register, login, me, alterarSenha, loginCorretor, alterarSenhaCorretor, atualizarFotoPerfilGestor, atualizarFotoPerfilCorretor };

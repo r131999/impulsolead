@@ -18,7 +18,7 @@ async function listar(req, res) {
     select: {
       id: true, nome: true, email: true, telefone: true, whatsapp: true,
       ativo: true, disponivel: true, posicaoFila: true, leadsRecebidos: true,
-      usuarioAtivo: true, equipeId: true, criadoEm: true,
+      usuarioAtivo: true, equipeId: true, fotoPerfil: true, criadoEm: true,
       equipe: { select: { id: true, nome: true } },
       _count: { select: { leads: true } },
     },
@@ -221,4 +221,20 @@ async function resetarSenha(req, res) {
   res.json({ message: 'Senha resetada com sucesso' });
 }
 
-module.exports = { listar, buscarFila, criar, atualizar, atualizarDisponibilidade, remover, ativarAcesso, resetarSenha };
+async function atualizarFotoCorretor(req, res) {
+  const { id } = req.params;
+  const { fotoPerfil } = req.body;
+  const imobiliariaId = req.imobiliariaId;
+
+  if (!fotoPerfil || !fotoPerfil.startsWith('data:image/')) {
+    return res.status(400).json({ error: 'Foto inválida' });
+  }
+
+  const corretor = await prisma.corretor.findFirst({ where: { id, imobiliariaId } });
+  if (!corretor) return res.status(404).json({ error: 'Corretor não encontrado' });
+
+  await prisma.corretor.update({ where: { id }, data: { fotoPerfil } });
+  res.json({ ok: true });
+}
+
+module.exports = { listar, buscarFila, criar, atualizar, atualizarDisponibilidade, remover, ativarAcesso, resetarSenha, atualizarFotoCorretor };

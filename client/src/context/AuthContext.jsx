@@ -39,12 +39,22 @@ export function AuthProvider({ children }) {
     setUsuario(null)
   }
 
+  const atualizarFotoPerfil = async (fotoPerfil) => {
+    const role = usuario?.role
+    if (role === 'corretor' || role === 'gerente') {
+      await authApi.atualizarFotoPerfilCorretor(fotoPerfil)
+    } else {
+      await authApi.atualizarFotoPerfil(fotoPerfil)
+    }
+    setUsuario((prev) => ({ ...prev, fotoPerfil }))
+  }
+
   const isCorretor = usuario?.role === 'corretor'
   const isGerente = usuario?.role === 'gerente'
   const isGestor = usuario?.role === 'gestor' || usuario?.role === 'admin'
 
   return (
-    <AuthContext.Provider value={{ usuario, loading, login, loginCorretor, logout, isCorretor, isGerente, isGestor }}>
+    <AuthContext.Provider value={{ usuario, loading, login, loginCorretor, logout, isCorretor, isGerente, isGestor, atualizarFotoPerfil }}>
       {children}
     </AuthContext.Provider>
   )
