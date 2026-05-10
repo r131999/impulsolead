@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { getConfig, atualizarConfig } from '../api/config'
 import { useAuth } from '../context/AuthContext'
 import * as modelosApi from '../api/modelos-mensagem'
+import * as usuariosApi from '../api/usuarios'
+import { Avatar } from '../components/Avatar'
 
 export default function ConfigAgente() {
   const { usuario } = useAuth()
@@ -16,6 +18,12 @@ export default function ConfigAgente() {
   const [modalModelo, setModalModelo] = useState(null)
   const [modeloForm, setModeloForm] = useState({ nome: '', conteudo: '' })
   const [salvandoModelo, setSalvandoModelo] = useState(false)
+  const [usuarios, setUsuarios] = useState([])
+  const [modalUsuario, setModalUsuario] = useState(null) // null | 'criar' | 'editar' | 'senha'
+  const [usuarioSel, setUsuarioSel] = useState(null)
+  const [formUsuario, setFormUsuario] = useState({ nome: '', email: '', senha: '', novaSenha: '' })
+  const [salvandoUsuario, setSalvandoUsuario] = useState(false)
+  const [erroUsuario, setErroUsuario] = useState('')
 
   useEffect(() => {
     getConfig()
@@ -25,6 +33,7 @@ export default function ConfigAgente() {
       })
       .finally(() => setLoading(false))
     modelosApi.listar().then((res) => setModelos(res.data))
+    usuariosApi.listar().then((res) => setUsuarios(res.data.usuarios))
   }, [])
 
   const set = (k) => (e) => {
@@ -73,6 +82,54 @@ export default function ConfigAgente() {
       setModalModelo(null)
     } finally {
       setSalvandoModelo(false)
+    }
+  }
+
+  const abrirCriarUsuario = () => {
+    setFormUsuario({ nome: '', email: '', senha: '', novaSenha: '' })
+    setErroUsuario('')
+    setUsuarioSel(null)
+    setModalUsuario('criar')
+  }
+  const abrirEditarUsuario = (u) => {
+    setFormUsuario({ nome: u.nome, email: u.email, senha: '', novaSenha: '' })
+    setErroUsuario('')
+    setUsuarioSel(u)
+    setModalUsuario('editar')
+  }
+  const abrirSenhaUsuario = (u) => {
+    setFormUsuario({ nome: '', email: '', senha: '', novaSenha: '' })
+    setErroUsuario('')
+    setUsuarioSel(u)
+    setModalUsuario('senha')
+  }
+  const removerUsuario = async (u) => {
+    if (!confirm(`Remover usuário "${u.nome}"?`)) return
+    try {
+      await usuariosApi.remover(u.id)
+      setUsuarios((prev) => prev.filter((x) => x.id !== u.id))
+    } catch (err) {
+      alert(err.response?.data?.error || 'Erro ao remover usuário')
+    }
+  }
+  const salvarUsuario = async () => {
+    setErroUsuario('')
+    setSalvandoUsuario(true)
+    try {
+      if (modalUsuario === 'criar') {
+        const res = await usuariosApi.criar({ nome: formUsuario.nome, email: formUsuario.email, senha: formUsuario.senha })
+        setUsuarios((prev) => [...prev, res.data.usuario])
+      } else if (modalUsuario === 'editar') {
+        const res = await usuariosApi.atualizar(usuarioSel.id, { nome: formUsuario.nome, email: formUsuario.email })
+        setUsuarios((prev) => prev.map((u) => u.id === usuarioSel.id ? res.data.usuario : u))
+      } else {
+        await usuariosApi.resetarSenha(usuarioSel.id, formUsuario.novaSenha)
+      }
+      setModalUsuario(null)
+    } catch (err) {
+      setErroUsuario(err.response?.data?.error || 'Erro ao salvar')
+    } finally {
+      setSalvandoUsuario(false)
     }
   }
 
@@ -335,6 +392,45 @@ export default function ConfigAgente() {
           </div>
         </div>
 
+        {/* Usuários do sistema */}
+        <div className="card">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="font-semibold" style={{ color: '#F1F5F9' }}>Usuários do sistema</h2>
+              <p className="text-xs mt-0.5" style={{ color: '#94A3B8' }}>Gestores com acesso ao CRM desta imobiliária</p>
+            </div>
+            <button type="button" onClick={abrirCriarUsuario} className="btn-secondary text-xs flex-shrink-0">+ Novo usuário</button>
+          </div>
+          <div className="space-y-2">
+            {usuarios.map((u) => (
+              <div
+                key={u.id}
+                className="flex items-center gap-3 rounded-lg px-3 py-2.5"
+                style={{ backgroundColor: '#0B1120', border: '1px solid #1E293B' }}
+              >
+                <Avatar nome={u.nome} fotoPerfil={u.fotoPerfil} size={34} />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate" style={{ color: '#F1F5F9' }}>{u.nome}</p>
+                  <p className="text-xs truncate" style={{ color: '#64748B' }}>{u.email}</p>
+                </div>
+                <p className="text-xs hidden sm:block flex-shrink-0" style={{ color: '#475569' }}>
+                  {new Intl.DateTimeFormat('pt-BR').format(new Date(u.criadoEm))}
+                </p>
+                <div className="flex gap-3 flex-shrink-0">
+                  <button type="button" onClick={() => abrirEditarUsuario(u)} className="text-xs font-medium hover:opacity-80 transition-opacity" style={{ color: '#60A5FA' }}>Editar</button>
+                  <button type="button" onClick={() => abrirSenhaUsuario(u)} className="text-xs font-medium hover:opacity-80 transition-opacity" style={{ color: '#F59E0B' }}>Senha</button>
+                  {u.id !== usuario?.id && (
+                    <button type="button" onClick={() => removerUsuario(u)} className="text-xs font-medium hover:opacity-80 transition-opacity" style={{ color: '#EF4444' }}>Remover</button>
+                  )}
+                </div>
+              </div>
+            ))}
+            {usuarios.length === 0 && (
+              <p className="text-sm text-center py-4" style={{ color: '#64748B' }}>Nenhum usuário cadastrado.</p>
+            )}
+          </div>
+        </div>
+
         {/* Ações */}
         <div className="flex items-center gap-4">
           <button type="submit" className="btn-primary px-8" disabled={salvando}>
@@ -351,6 +447,94 @@ export default function ConfigAgente() {
           {erro && <span className="text-sm" style={{ color: '#EF4444' }}>{erro}</span>}
         </div>
       </form>
+
+      {/* Modal usuário */}
+      {modalUsuario && (
+        <div className="fixed inset-0 bg-black/60 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
+          <div
+            className="w-full rounded-t-2xl sm:rounded-2xl shadow-2xl sm:max-w-md"
+            style={{ backgroundColor: '#111827', border: '1px solid #1E293B' }}
+          >
+            <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid #1E293B' }}>
+              <div>
+                <h2 className="font-bold" style={{ color: '#F1F5F9' }}>
+                  {modalUsuario === 'criar' ? 'Novo usuário gestor' : modalUsuario === 'editar' ? 'Editar usuário' : 'Resetar senha'}
+                </h2>
+                {usuarioSel && <p className="text-xs mt-0.5" style={{ color: '#94A3B8' }}>{usuarioSel.nome}</p>}
+              </div>
+              <button onClick={() => setModalUsuario(null)} className="text-xl leading-none hover:opacity-80" style={{ color: '#64748B' }}>×</button>
+            </div>
+            <div className="px-5 py-5 space-y-3">
+              {modalUsuario !== 'senha' && (
+                <>
+                  <div>
+                    <label className="label">Nome *</label>
+                    <input
+                      className="input"
+                      value={formUsuario.nome}
+                      onChange={(e) => setFormUsuario((f) => ({ ...f, nome: e.target.value }))}
+                      placeholder="Nome completo"
+                      autoFocus
+                    />
+                  </div>
+                  <div>
+                    <label className="label">E-mail *</label>
+                    <input
+                      type="email"
+                      className="input"
+                      value={formUsuario.email}
+                      onChange={(e) => setFormUsuario((f) => ({ ...f, email: e.target.value }))}
+                      placeholder="email@exemplo.com"
+                    />
+                  </div>
+                </>
+              )}
+              {modalUsuario === 'criar' && (
+                <div>
+                  <label className="label">Senha *</label>
+                  <input
+                    type="password"
+                    className="input"
+                    value={formUsuario.senha}
+                    onChange={(e) => setFormUsuario((f) => ({ ...f, senha: e.target.value }))}
+                    placeholder="mínimo 6 caracteres"
+                  />
+                </div>
+              )}
+              {modalUsuario === 'senha' && (
+                <div>
+                  <label className="label">Nova senha *</label>
+                  <input
+                    type="password"
+                    className="input"
+                    value={formUsuario.novaSenha}
+                    onChange={(e) => setFormUsuario((f) => ({ ...f, novaSenha: e.target.value }))}
+                    placeholder="mínimo 6 caracteres"
+                    autoFocus
+                  />
+                </div>
+              )}
+              {erroUsuario && <p className="text-sm" style={{ color: '#EF4444' }}>{erroUsuario}</p>}
+              <div className="flex gap-2 pt-1">
+                <button type="button" onClick={() => setModalUsuario(null)} className="btn-secondary flex-1">Cancelar</button>
+                <button
+                  type="button"
+                  onClick={salvarUsuario}
+                  disabled={
+                    salvandoUsuario ||
+                    (modalUsuario !== 'senha' && (!formUsuario.nome.trim() || !formUsuario.email.trim())) ||
+                    (modalUsuario === 'criar' && !formUsuario.senha) ||
+                    (modalUsuario === 'senha' && !formUsuario.novaSenha)
+                  }
+                  className="btn-primary flex-1"
+                >
+                  {salvandoUsuario ? 'Salvando...' : modalUsuario === 'senha' ? 'Resetar senha' : 'Salvar'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal modelo de mensagem */}
       {modalModelo && (

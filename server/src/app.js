@@ -13,6 +13,7 @@ const relatoriosRoutes = require('./routes/relatorios.routes');
 const equipesRoutes = require('./routes/equipes.routes');
 const contatosRoutes = require('./routes/contatos.routes');
 const modelosMensagemRoutes = require('./routes/modelos-mensagem.routes');
+const usuariosRoutes = require('./routes/usuarios.routes');
 const webhookRoutes = require('./routes/webhook.routes');
 
 const app = express();
@@ -50,6 +51,7 @@ app.use('/api/relatorios', relatoriosRoutes);
 app.use('/api/equipes', equipesRoutes);
 app.use('/api/contatos', contatosRoutes);
 app.use('/api/modelos-mensagem', modelosMensagemRoutes);
+app.use('/api/usuarios', usuariosRoutes);
 app.use('/api/webhook', webhookRoutes);
 
 app.get('/api/health', (req, res) => {
