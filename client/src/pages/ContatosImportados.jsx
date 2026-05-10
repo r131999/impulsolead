@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
 import * as contatosApi from '../api/contatos'
 import * as modelosApi from '../api/modelos-mensagem'
+import * as corretoresApi from '../api/corretores'
 
 const STATUS_STYLE = {
   pendente:   { color: '#94A3B8', bg: 'rgba(148,163,184,0.15)' },
@@ -25,6 +26,14 @@ export default function ContatosImportados() {
   const [resultImport, setResultImport] = useState(null)
   const [dragOver, setDragOver] = useState(false)
   const fileInputRef = useRef(null)
+  const [modalTransferir, setModalTransferir] = useState(false)
+  const [contatoTransf, setContatoTransf] = useState(null)
+  const [corretores, setCorretores] = useState([])
+  const [tipoAtrib, setTipoAtrib] = useState('roundRobin')
+  const [corretorIdSel, setCorretorIdSel] = useState('')
+  const [transferindo, setTransferindo] = useState(false)
+  const [erroTransf, setErroTransf] = useState('')
+  const [toast, setToast] = useState('')
 
   const carregar = useCallback(() => {
     setLoading(true)
@@ -91,6 +100,36 @@ export default function ContatosImportados() {
     if (!confirm(`Remover contato "${contato.nome}"?`)) return
     await contatosApi.remover(contato.id)
     carregar()
+  }
+
+  const abrirTransferir = async (contato) => {
+    setContatoTransf(contato)
+    setTipoAtrib('roundRobin')
+    setCorretorIdSel('')
+    setErroTransf('')
+    setModalTransferir(true)
+    if (corretores.length === 0) {
+      try {
+        const res = await corretoresApi.listar({ ativo: true })
+        setCorretores(res.data.corretores || [])
+      } catch {}
+    }
+  }
+
+  const confirmarTransferir = async () => {
+    setTransferindo(true)
+    setErroTransf('')
+    try {
+      await contatosApi.transferir(contatoTransf.id, tipoAtrib === 'especifico' ? corretorIdSel : null)
+      setModalTransferir(false)
+      setToast('Contato transferido e lead criado com sucesso!')
+      setTimeout(() => setToast(''), 4000)
+      carregar()
+    } catch (err) {
+      setErroTransf(err.response?.data?.error || 'Erro ao transferir contato')
+    } finally {
+      setTransferindo(false)
+    }
   }
 
   const totalPages = Math.ceil(total / 50)
@@ -215,8 +254,8 @@ export default function ContatosImportados() {
                         {new Intl.DateTimeFormat('pt-BR').format(new Date(c.criadoEm))}
                       </td>
                       <td className="px-4 py-3">
-                        <div className="flex gap-2">
-                          {c.status === 'pendente' || c.status === 'erro' ? (
+                        <div className="flex gap-2 flex-wrap">
+                          {(c.status === 'pendente' || c.status === 'erro') && (
                             <button
                               onClick={() => abrirEnviar(c)}
                               className="text-xs font-medium hover:opacity-80 transition-opacity"
@@ -224,7 +263,16 @@ export default function ContatosImportados() {
                             >
                               Enviar msg
                             </button>
-                          ) : null}
+                          )}
+                          {c.status !== 'convertido' && (
+                            <button
+                              onClick={() => abrirTransferir(c)}
+                              className="text-xs font-medium hover:opacity-80 transition-opacity"
+                              style={{ color: '#10B981' }}
+                            >
+                              Transferir
+                            </button>
+                          )}
                           <button
                             onClick={() => remover(c)}
                             className="text-xs font-medium hover:opacity-80 transition-opacity"
@@ -252,6 +300,89 @@ export default function ContatosImportados() {
           </div>
         )}
       </div>
+
+      {/* Modal transferir para corretor */}
+      {modalTransferir && contatoTransf && (
+        <div className="fixed inset-0 bg-black/60 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
+          <div
+            className="w-full rounded-t-2xl sm:rounded-2xl shadow-2xl sm:max-w-lg"
+            style={{ backgroundColor: '#111827', border: '1px solid #1E293B' }}
+          >
+            <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid #1E293B' }}>
+              <div>
+                <h2 className="font-bold" style={{ color: '#F1F5F9' }}>Transferir para corretor</h2>
+                <p className="text-xs mt-0.5" style={{ color: '#64748B' }}>{contatoTransf.nome} · {contatoTransf.telefone}</p>
+              </div>
+              <button onClick={() => setModalTransferir(false)} className="text-xl leading-none hover:opacity-80" style={{ color: '#64748B' }}>×</button>
+            </div>
+            <div className="px-5 py-5 space-y-4">
+              <div className="space-y-3">
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="radio"
+                    className="mt-0.5 accent-indigo-500"
+                    checked={tipoAtrib === 'roundRobin'}
+                    onChange={() => setTipoAtrib('roundRobin')}
+                  />
+                  <div>
+                    <p className="text-sm font-medium" style={{ color: '#F1F5F9' }}>Próximo da fila (round-robin)</p>
+                    <p className="text-xs" style={{ color: '#64748B' }}>Atribui ao próximo corretor disponível automaticamente</p>
+                  </div>
+                </label>
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="radio"
+                    className="mt-0.5 accent-indigo-500"
+                    checked={tipoAtrib === 'especifico'}
+                    onChange={() => setTipoAtrib('especifico')}
+                  />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium" style={{ color: '#F1F5F9' }}>Corretor específico</p>
+                    <p className="text-xs mb-2" style={{ color: '#64748B' }}>Escolha um corretor manualmente</p>
+                    {tipoAtrib === 'especifico' && (
+                      <select
+                        className="input w-full"
+                        value={corretorIdSel}
+                        onChange={(e) => setCorretorIdSel(e.target.value)}
+                      >
+                        <option value="">Selecione um corretor...</option>
+                        {corretores.map((cor) => (
+                          <option key={cor.id} value={cor.id}>
+                            {cor.nome}{!cor.disponivel ? ' (indisponível)' : ''}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+                </label>
+              </div>
+
+              {erroTransf && <p className="text-sm" style={{ color: '#EF4444' }}>{erroTransf}</p>}
+
+              <div className="flex gap-2 pt-1">
+                <button onClick={() => setModalTransferir(false)} className="btn-secondary flex-1">Cancelar</button>
+                <button
+                  onClick={confirmarTransferir}
+                  disabled={transferindo || (tipoAtrib === 'especifico' && !corretorIdSel)}
+                  className="btn-primary flex-1"
+                >
+                  {transferindo ? 'Transferindo...' : 'Confirmar transferência'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Toast de sucesso */}
+      {toast && (
+        <div
+          className="fixed bottom-6 left-1/2 -translate-x-1/2 rounded-lg px-5 py-3 text-sm font-medium z-50 shadow-lg whitespace-nowrap"
+          style={{ backgroundColor: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.3)', color: '#10B981' }}
+        >
+          {toast}
+        </div>
+      )}
 
       {/* Modal enviar mensagem */}
       {modal === 'enviar' && contatoSel && (

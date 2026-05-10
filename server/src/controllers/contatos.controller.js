@@ -2,6 +2,7 @@ const { PrismaClient } = require('@prisma/client');
 const { parse } = require('csv-parse/sync');
 const XLSX = require('xlsx');
 const axios = require('axios');
+const { notificarCorretor } = require('../services/notificacao.service');
 
 const prisma = new PrismaClient();
 
@@ -165,6 +166,83 @@ async function enviarMensagem(req, res) {
   res.json({ ok: true, leadId: lead.id });
 }
 
+async function transferir(req, res) {
+  const { id } = req.params;
+  const { corretorId } = req.body; // null/undefined = round-robin
+  const imobiliariaId = req.imobiliariaId;
+
+  const contato = await prisma.contatoImportado.findFirst({ where: { id, imobiliariaId } });
+  if (!contato) return res.status(404).json({ error: 'Contato não encontrado' });
+  if (contato.status === 'convertido') return res.status(400).json({ error: 'Contato já foi convertido em lead' });
+
+  const telefoneFormatado = contato.telefone.startsWith('55') ? contato.telefone : `55${contato.telefone}`;
+  const jid = `${telefoneFormatado}@s.whatsapp.net`;
+
+  let result;
+  try {
+    result = await prisma.$transaction(async (tx) => {
+      const lead = await tx.lead.create({
+        data: {
+          nome: contato.nome,
+          telefone: contato.telefone,
+          whatsappJid: jid,
+          status: 'novo',
+          imobiliariaId,
+        },
+      });
+
+      let corretor = null;
+
+      if (corretorId) {
+        corretor = await tx.corretor.findFirst({ where: { id: corretorId, imobiliariaId, ativo: true } });
+        if (!corretor) throw Object.assign(new Error('Corretor não encontrado ou inativo'), { status: 404 });
+        await tx.lead.update({ where: { id: lead.id }, data: { corretorId: corretor.id } });
+      } else {
+        // Round-robin: pega o próximo disponível e rotaciona a fila
+        const corretores = await tx.corretor.findMany({
+          where: { imobiliariaId, ativo: true, disponivel: true },
+          orderBy: { posicaoFila: 'asc' },
+        });
+        if (corretores.length > 0) {
+          const proximo = corretores[0];
+          const maxPosicao = corretores[corretores.length - 1].posicaoFila;
+          await tx.corretor.update({
+            where: { id: proximo.id },
+            data: { leadsRecebidos: { increment: 1 }, posicaoFila: maxPosicao + 1 },
+          });
+          await tx.lead.update({ where: { id: lead.id }, data: { corretorId: proximo.id } });
+          corretor = proximo;
+        }
+      }
+
+      const origemTexto = corretorId ? 'selecionado manualmente' : 'round-robin';
+      const detalhes = corretor
+        ? `Corretor: ${corretor.nome} | Origem: Transferência de contato importado (${origemTexto})`
+        : 'Sem corretor disponível na fila';
+
+      await tx.historicoLead.create({
+        data: { leadId: lead.id, acao: 'criado', detalhes },
+      });
+
+      await tx.contatoImportado.update({
+        where: { id },
+        data: { status: 'convertido', leadId: lead.id },
+      });
+
+      return { lead, corretor };
+    });
+  } catch (err) {
+    if (err.status === 404) return res.status(404).json({ error: err.message });
+    throw err;
+  }
+
+  if (result.corretor) {
+    notificarCorretor(result.corretor, result.lead, req.imobiliaria).catch(() => {});
+  }
+
+  res.json({ ok: true, leadId: result.lead.id, semCorretor: !result.corretor });
+}
+
 async function limpar(req, res) {
   const imobiliariaId = req.imobiliariaId;
   const { status } = req.query;
@@ -176,4 +254,4 @@ async function limpar(req, res) {
   res.json({ removidos: count });
 }
 
-module.exports = { importar, listar, remover, enviarMensagem, limpar };
+module.exports = { importar, listar, remover, enviarMensagem, transferir, limpar };
