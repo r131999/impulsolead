@@ -8,6 +8,15 @@ const SELECT_USUARIO = {
   ativo: true, fotoPerfil: true, criadoEm: true,
 };
 
+async function buscarPrincipalId(imobiliariaId) {
+  const p = await prisma.usuario.findFirst({
+    where: { imobiliariaId },
+    orderBy: { criadoEm: 'asc' },
+    select: { id: true },
+  });
+  return p?.id ?? null;
+}
+
 async function listar(req, res) {
   const usuarios = await prisma.usuario.findMany({
     where: { imobiliariaId: req.imobiliariaId },
@@ -49,6 +58,12 @@ async function atualizar(req, res) {
     return res.status(400).json({ error: 'Informe ao menos nome ou email para atualizar' });
   }
 
+  const principalId = await buscarPrincipalId(req.imobiliariaId);
+  const logadoEhPrincipal = req.usuario.id === principalId;
+  if (!logadoEhPrincipal && id !== req.usuario.id) {
+    return res.status(403).json({ error: 'Sem permissão para editar outros usuários' });
+  }
+
   const usuario = await prisma.usuario.findFirst({ where: { id, imobiliariaId: req.imobiliariaId } });
   if (!usuario) return res.status(404).json({ error: 'Usuário não encontrado' });
 
@@ -73,18 +88,16 @@ async function remover(req, res) {
     return res.status(400).json({ error: 'Não é possível remover seu próprio usuário' });
   }
 
-  const usuario = await prisma.usuario.findFirst({ where: { id, imobiliariaId } });
-  if (!usuario) return res.status(404).json({ error: 'Usuário não encontrado' });
-
-  // Protege o usuário mais antigo da imobiliária (usuário principal)
-  const principal = await prisma.usuario.findFirst({
-    where: { imobiliariaId },
-    orderBy: { criadoEm: 'asc' },
-    select: { id: true },
-  });
-  if (principal?.id === id) {
+  const principalId = await buscarPrincipalId(imobiliariaId);
+  if (req.usuario.id !== principalId) {
+    return res.status(403).json({ error: 'Sem permissão para remover usuários' });
+  }
+  if (id === principalId) {
     return res.status(403).json({ error: 'Este usuário não pode ser removido' });
   }
+
+  const usuario = await prisma.usuario.findFirst({ where: { id, imobiliariaId } });
+  if (!usuario) return res.status(404).json({ error: 'Usuário não encontrado' });
 
   await prisma.usuario.delete({ where: { id } });
   res.json({ ok: true });
@@ -96,6 +109,12 @@ async function resetarSenha(req, res) {
 
   if (!novaSenha || novaSenha.length < 6) {
     return res.status(400).json({ error: 'Nova senha deve ter no mínimo 6 caracteres' });
+  }
+
+  const principalId = await buscarPrincipalId(req.imobiliariaId);
+  const logadoEhPrincipal = req.usuario.id === principalId;
+  if (!logadoEhPrincipal && id !== req.usuario.id) {
+    return res.status(403).json({ error: 'Sem permissão para resetar senha de outros usuários' });
   }
 
   const usuario = await prisma.usuario.findFirst({ where: { id, imobiliariaId: req.imobiliariaId } });

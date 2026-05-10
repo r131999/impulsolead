@@ -402,29 +402,52 @@ export default function ConfigAgente() {
             <button type="button" onClick={abrirCriarUsuario} className="btn-secondary text-xs flex-shrink-0">+ Novo usuário</button>
           </div>
           <div className="space-y-2">
-            {usuarios.map((u) => (
-              <div
-                key={u.id}
-                className="flex items-center gap-3 rounded-lg px-3 py-2.5"
-                style={{ backgroundColor: '#0B1120', border: '1px solid #1E293B' }}
-              >
-                <Avatar nome={u.nome} fotoPerfil={u.fotoPerfil} size={34} />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate" style={{ color: '#F1F5F9' }}>{u.nome}</p>
-                  <p className="text-xs truncate" style={{ color: '#64748B' }}>{u.email}</p>
-                </div>
-                <p className="text-xs hidden sm:block flex-shrink-0" style={{ color: '#475569' }}>
-                  {new Intl.DateTimeFormat('pt-BR').format(new Date(u.criadoEm))}
-                </p>
-                <div className="flex gap-3 flex-shrink-0">
-                  <button type="button" onClick={() => abrirEditarUsuario(u)} className="text-xs font-medium hover:opacity-80 transition-opacity" style={{ color: '#60A5FA' }}>Editar</button>
-                  <button type="button" onClick={() => abrirSenhaUsuario(u)} className="text-xs font-medium hover:opacity-80 transition-opacity" style={{ color: '#F59E0B' }}>Senha</button>
-                  {u.id !== usuario?.id && u.id !== usuarios[0]?.id && (
-                    <button type="button" onClick={() => removerUsuario(u)} className="text-xs font-medium hover:opacity-80 transition-opacity" style={{ color: '#EF4444' }}>Remover</button>
-                  )}
-                </div>
-              </div>
-            ))}
+            {(() => {
+              const principalId = usuarios[0]?.id
+              const isLoggedInPrincipal = usuario?.id === principalId
+              return usuarios.map((u) => {
+                const podeEditar = isLoggedInPrincipal || u.id === usuario?.id
+                const podeSenha  = isLoggedInPrincipal || u.id === usuario?.id
+                const podeRemover = isLoggedInPrincipal && u.id !== usuario?.id && u.id !== principalId
+                if (!podeEditar && !podeSenha && !podeRemover) return (
+                  <div
+                    key={u.id}
+                    className="flex items-center gap-3 rounded-lg px-3 py-2.5"
+                    style={{ backgroundColor: '#0B1120', border: '1px solid #1E293B' }}
+                  >
+                    <Avatar nome={u.nome} fotoPerfil={u.fotoPerfil} size={34} />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate" style={{ color: '#F1F5F9' }}>{u.nome}</p>
+                      <p className="text-xs truncate" style={{ color: '#64748B' }}>{u.email}</p>
+                    </div>
+                    <p className="text-xs hidden sm:block flex-shrink-0" style={{ color: '#475569' }}>
+                      {new Intl.DateTimeFormat('pt-BR').format(new Date(u.criadoEm))}
+                    </p>
+                  </div>
+                )
+                return (
+                  <div
+                    key={u.id}
+                    className="flex items-center gap-3 rounded-lg px-3 py-2.5"
+                    style={{ backgroundColor: '#0B1120', border: '1px solid #1E293B' }}
+                  >
+                    <Avatar nome={u.nome} fotoPerfil={u.fotoPerfil} size={34} />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate" style={{ color: '#F1F5F9' }}>{u.nome}</p>
+                      <p className="text-xs truncate" style={{ color: '#64748B' }}>{u.email}</p>
+                    </div>
+                    <p className="text-xs hidden sm:block flex-shrink-0" style={{ color: '#475569' }}>
+                      {new Intl.DateTimeFormat('pt-BR').format(new Date(u.criadoEm))}
+                    </p>
+                    <div className="flex gap-3 flex-shrink-0">
+                      {podeEditar && <button type="button" onClick={() => abrirEditarUsuario(u)} className="text-xs font-medium hover:opacity-80 transition-opacity" style={{ color: '#60A5FA' }}>Editar</button>}
+                      {podeSenha  && <button type="button" onClick={() => abrirSenhaUsuario(u)} className="text-xs font-medium hover:opacity-80 transition-opacity" style={{ color: '#F59E0B' }}>{!isLoggedInPrincipal ? 'Minha senha' : 'Senha'}</button>}
+                      {podeRemover && <button type="button" onClick={() => removerUsuario(u)} className="text-xs font-medium hover:opacity-80 transition-opacity" style={{ color: '#EF4444' }}>Remover</button>}
+                    </div>
+                  </div>
+                )
+              })
+            })()}
             {usuarios.length === 0 && (
               <p className="text-sm text-center py-4" style={{ color: '#64748B' }}>Nenhum usuário cadastrado.</p>
             )}
