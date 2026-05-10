@@ -85,9 +85,11 @@ model Lead {
   regiao         String?
   faixaValor     String?
 
-  status      String  @default("novo")
-  motivoPerda String?
-  observacoes String?
+  status            String  @default("novo")
+  motivoPerda       String?
+  observacoes       String?
+  historicoConversa String?
+  temConversa       Boolean @default(false)
 
   corretorId String?
   corretor   Corretor?   @relation(fields: [corretorId], references: [id])

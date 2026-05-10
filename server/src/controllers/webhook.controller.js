@@ -13,11 +13,20 @@ function sanitizarTexto(valor) {
     .slice(0, 500);
 }
 
+function processarHistorico(historico) {
+  if (historico == null) return null;
+  const texto = typeof historico === 'string'
+    ? historico
+    : JSON.stringify(historico);
+  return texto.slice(0, 200000); // cap 200KB
+}
+
 async function receberLead(req, res) {
   const {
     nome, telefone, whatsappJid,
     primeiroImovel, tipoRenda, rendaMensal, restricaoCpf,
     valorEntrada, urgencia, regiao, faixaValor,
+    historico,
   } = req.body;
 
   if (!nome || !String(nome).trim()) {
@@ -32,6 +41,7 @@ async function receberLead(req, res) {
     return res.status(400).json({ error: 'Telefone deve ter entre 10 e 15 dígitos numéricos' });
   }
 
+  const historicoProcessado  = processarHistorico(historico);
   const nomeSanitizado       = sanitizarTexto(nome);
   const telefoneSanitizado   = digitos;
   const regiaoSanitizada     = sanitizarTexto(regiao);
@@ -59,6 +69,8 @@ async function receberLead(req, res) {
         urgencia: urgenciaSan,
         regiao: regiaoSanitizada,
         faixaValor: faixaValorSan,
+        historicoConversa: historicoProcessado,
+        temConversa: !!historicoProcessado,
         imobiliariaId: req.imobiliariaId,
       },
     });

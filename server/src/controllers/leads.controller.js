@@ -59,6 +59,7 @@ async function listar(req, res) {
         primeiroImovel: true, tipoRenda: true, rendaMensal: true,
         urgencia: true, regiao: true, faixaValor: true,
         observacoes: true, criadoEm: true, atualizadoEm: true,
+        temConversa: true,
         corretor: { select: { id: true, nome: true } },
       },
     }),
@@ -337,4 +338,30 @@ async function remover(req, res) {
   res.json({ message: 'Lead removido' });
 }
 
-module.exports = { listar, buscarPorId, criar, atualizar, mudarStatus, remover };
+async function getHistoricoConversa(req, res) {
+  const { id } = req.params;
+
+  const where = { id, imobiliariaId: req.imobiliariaId };
+  if (req.role === 'corretor') where.corretorId = req.corretorId;
+
+  const lead = await prisma.lead.findFirst({
+    where,
+    select: { id: true, nome: true, historicoConversa: true, temConversa: true },
+  });
+
+  if (!lead) return res.status(404).json({ error: 'Lead não encontrado' });
+  if (!lead.temConversa || !lead.historicoConversa) {
+    return res.json({ historico: null });
+  }
+
+  let historico;
+  try {
+    historico = JSON.parse(lead.historicoConversa);
+  } catch {
+    historico = [{ role: 'lia', texto: lead.historicoConversa, ts: null }];
+  }
+
+  res.json({ historico, nome: lead.nome });
+}
+
+module.exports = { listar, buscarPorId, criar, atualizar, mudarStatus, remover, getHistoricoConversa };
