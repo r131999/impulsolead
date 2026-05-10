@@ -66,7 +66,8 @@ model Corretor {
   equipe        Equipe?     @relation("EquipeCorretores", fields: [equipeId], references: [id])
   equipeLiderada Equipe[]   @relation("EquipeLider")
 
-  leads Lead[]
+  leads     Lead[]
+  followUps FollowUp[]
 }
 
 model Lead {
@@ -95,6 +96,7 @@ model Lead {
   imobiliaria   Imobiliaria @relation(fields: [imobiliariaId], references: [id])
 
   historico HistoricoLead[]
+  followUps FollowUp[]
 
   criadoEm    DateTime @default(now())
   atualizadoEm DateTime @updatedAt
@@ -154,6 +156,21 @@ model ModeloMensagem {
 
   imobiliariaId String
   imobiliaria   Imobiliaria @relation(fields: [imobiliariaId], references: [id])
+}
+
+model FollowUp {
+  id           String   @id @default(uuid())
+  dataHora     DateTime
+  observacao   String?
+  status       String   @default("pendente")
+  criadoEm    DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  leadId     String
+  lead       Lead     @relation(fields: [leadId], references: [id])
+
+  corretorId String
+  corretor   Corretor @relation(fields: [corretorId], references: [id])
 }
 
 model ConfigAgente {

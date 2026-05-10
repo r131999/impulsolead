@@ -15,6 +15,7 @@ const contatosRoutes = require('./routes/contatos.routes');
 const modelosMensagemRoutes = require('./routes/modelos-mensagem.routes');
 const usuariosRoutes = require('./routes/usuarios.routes');
 const webhookRoutes = require('./routes/webhook.routes');
+const followupsRoutes = require('./routes/followups.routes');
 
 const app = express();
 
@@ -53,6 +54,7 @@ app.use('/api/contatos', contatosRoutes);
 app.use('/api/modelos-mensagem', modelosMensagemRoutes);
 app.use('/api/usuarios', usuariosRoutes);
 app.use('/api/webhook', webhookRoutes);
+app.use('/api/followups', followupsRoutes);
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
