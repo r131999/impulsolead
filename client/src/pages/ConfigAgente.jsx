@@ -419,7 +419,7 @@ export default function ConfigAgente() {
                 <div className="flex gap-3 flex-shrink-0">
                   <button type="button" onClick={() => abrirEditarUsuario(u)} className="text-xs font-medium hover:opacity-80 transition-opacity" style={{ color: '#60A5FA' }}>Editar</button>
                   <button type="button" onClick={() => abrirSenhaUsuario(u)} className="text-xs font-medium hover:opacity-80 transition-opacity" style={{ color: '#F59E0B' }}>Senha</button>
-                  {u.id !== usuario?.id && (
+                  {u.id !== usuario?.id && u.id !== usuarios[0]?.id && (
                     <button type="button" onClick={() => removerUsuario(u)} className="text-xs font-medium hover:opacity-80 transition-opacity" style={{ color: '#EF4444' }}>Remover</button>
                   )}
                 </div>

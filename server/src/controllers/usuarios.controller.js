@@ -67,13 +67,24 @@ async function atualizar(req, res) {
 
 async function remover(req, res) {
   const { id } = req.params;
+  const imobiliariaId = req.imobiliariaId;
 
   if (id === req.usuario.id) {
     return res.status(400).json({ error: 'Não é possível remover seu próprio usuário' });
   }
 
-  const usuario = await prisma.usuario.findFirst({ where: { id, imobiliariaId: req.imobiliariaId } });
+  const usuario = await prisma.usuario.findFirst({ where: { id, imobiliariaId } });
   if (!usuario) return res.status(404).json({ error: 'Usuário não encontrado' });
+
+  // Protege o usuário mais antigo da imobiliária (usuário principal)
+  const principal = await prisma.usuario.findFirst({
+    where: { imobiliariaId },
+    orderBy: { criadoEm: 'asc' },
+    select: { id: true },
+  });
+  if (principal?.id === id) {
+    return res.status(403).json({ error: 'Este usuário não pode ser removido' });
+  }
 
   await prisma.usuario.delete({ where: { id } });
   res.json({ ok: true });
