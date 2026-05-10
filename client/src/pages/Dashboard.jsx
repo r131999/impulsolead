@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { getDashboard, getFunil } from '../api/dashboard'
+import { pendentes as followUpsPendentes, atualizar as atualizarFollowUp } from '../api/followups'
 import { useNavigate } from 'react-router-dom'
 
 const STATUS_BADGE = {
@@ -25,8 +26,15 @@ const STATUS_BADGE_BG = {
 export default function Dashboard() {
   const [dados, setDados] = useState(null)
   const [funil, setFunil] = useState(null)
+  const [followUps, setFollowUps] = useState([])
   const [loading, setLoading] = useState(true)
   const navigate = useNavigate()
+
+  const carregarFollowUps = () => {
+    followUpsPendentes()
+      .then((res) => setFollowUps(res.data.followUps))
+      .catch(() => {})
+  }
 
   useEffect(() => {
     Promise.all([getDashboard(), getFunil()])
@@ -35,7 +43,13 @@ export default function Dashboard() {
         setFunil(f.data)
       })
       .finally(() => setLoading(false))
+    carregarFollowUps()
   }, [])
+
+  const realizarFollowUp = async (id) => {
+    await atualizarFollowUp(id, { status: 'realizado' })
+    carregarFollowUps()
+  }
 
   if (loading) return <PageLoading />
 
@@ -83,6 +97,8 @@ export default function Dashboard() {
       </div>
 
       {funil && <FunilVendas funil={funil.funil} perdidos={funil.perdidos} />}
+
+      <FollowUpsHoje followUps={followUps} onRealizar={realizarFollowUp} />
 
       <div className="card mt-6">
         <div className="flex items-center justify-between mb-4">
@@ -225,6 +241,92 @@ function FunilVendas({ funil, perdidos }) {
       <p className="text-xs mt-3" style={{ color: '#475569' }}>
         % dos estágios Qualificado→Fechado é em relação ao total de Novos leads
       </p>
+    </div>
+  )
+}
+
+function FollowUpsHoje({ followUps, onRealizar }) {
+  const now = new Date()
+  const hojeInicio = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const hojeProx = new Date(hojeInicio.getTime() + 86400000)
+
+  const hoje = followUps.filter((f) => {
+    const d = new Date(f.dataHora)
+    return d >= hojeInicio && d < hojeProx
+  })
+  const vencidos = followUps.filter((f) => new Date(f.dataHora) < hojeInicio)
+  const itens = [...vencidos, ...hoje]
+
+  if (itens.length === 0) return null
+
+  return (
+    <div className="card mt-6">
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="font-semibold" style={{ color: '#F1F5F9' }}>📅 Follow-ups de hoje</h2>
+        <span
+          className="text-xs px-2.5 py-1 rounded-full font-medium"
+          style={{ backgroundColor: 'rgba(245,158,11,0.15)', color: '#F59E0B' }}
+        >
+          {itens.length} pendente{itens.length > 1 ? 's' : ''}
+        </span>
+      </div>
+      <div className="space-y-2">
+        {itens.map((fu) => (
+          <FollowUpCard key={fu.id} followUp={fu} onRealizar={() => onRealizar(fu.id)} />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function FollowUpCard({ followUp, onRealizar }) {
+  const [realizando, setRealizando] = useState(false)
+  const d = new Date(followUp.dataHora)
+  const vencido = d < new Date()
+  const hora = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+
+  const handleRealizar = async () => {
+    setRealizando(true)
+    try { await onRealizar() } finally { setRealizando(false) }
+  }
+
+  return (
+    <div
+      className="flex items-center gap-3 p-3 rounded-lg"
+      style={{
+        backgroundColor: vencido ? 'rgba(239,68,68,0.07)' : 'rgba(245,158,11,0.07)',
+        border: `1px solid ${vencido ? 'rgba(239,68,68,0.2)' : 'rgba(245,158,11,0.2)'}`,
+      }}
+    >
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium truncate" style={{ color: '#F1F5F9' }}>
+          {followUp.lead.nome}
+        </p>
+        <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+          <span className="text-xs font-medium" style={{ color: vencido ? '#EF4444' : '#F59E0B' }}>
+            {vencido ? `Vencido ${hora}` : hora}
+          </span>
+          {followUp.observacao && (
+            <span className="text-xs truncate max-w-[160px]" style={{ color: '#64748B' }}>
+              {followUp.observacao}
+            </span>
+          )}
+          {followUp.corretor && (
+            <span className="text-xs" style={{ color: '#60A5FA' }}>
+              👤 {followUp.corretor.nome}
+            </span>
+          )}
+        </div>
+      </div>
+      <button
+        onClick={handleRealizar}
+        disabled={realizando}
+        className="text-xs font-medium px-3 py-1.5 rounded-lg flex-shrink-0 disabled:opacity-50 transition-colors"
+        style={{ backgroundColor: 'rgba(16,185,129,0.15)', color: '#10B981' }}
+        title="Marcar como realizado"
+      >
+        {realizando ? '...' : '✓ Feito'}
+      </button>
     </div>
   )
 }
