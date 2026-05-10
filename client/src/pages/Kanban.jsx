@@ -85,6 +85,7 @@ export default function Kanban() {
   const [atualizando, setAtualizando] = useState(null)
   const [followUpsMap, setFollowUpsMap] = useState({})
   const [modalFU, setModalFU] = useState(null) // { lead, followUp? }
+  const [modalConversa, setModalConversa] = useState(null) // lead
 
   const carregar = useCallback(() => {
     leadsApi
@@ -213,6 +214,7 @@ export default function Kanban() {
                     onAvancar={() => avancar(lead)}
                     onPerdido={() => abrirPerda(lead)}
                     onFollowUp={() => setModalFU({ lead, followUp: followUpsMap[lead.id] || null })}
+                    onConversa={lead.temConversa ? () => setModalConversa(lead) : null}
                   />
                 ))}
                 {grupos[col.id].length === 0 && (
@@ -246,11 +248,15 @@ export default function Kanban() {
           onClose={() => setModalFU(null)}
         />
       )}
+
+      {modalConversa && (
+        <ModalConversa lead={modalConversa} onClose={() => setModalConversa(null)} />
+      )}
     </div>
   )
 }
 
-function LeadCard({ lead, atualizando, followUp, onAvancar, onPerdido, onFollowUp }) {
+function LeadCard({ lead, atualizando, followUp, onAvancar, onPerdido, onFollowUp, onConversa }) {
   const proximo = proximoStatus(lead.status)
   const podeAvancar = !!proximo
   const podePerdido = lead.status !== 'fechado' && lead.status !== 'perdido'
@@ -267,7 +273,21 @@ function LeadCard({ lead, atualizando, followUp, onAvancar, onPerdido, onFollowU
         opacity: atualizando ? 0.6 : 1,
       }}
     >
-      <p className="text-sm font-semibold truncate" style={{ color: '#F1F5F9' }}>{lead.nome}</p>
+      <div className="flex items-start justify-between gap-1">
+        <p className="text-sm font-semibold truncate" style={{ color: '#F1F5F9' }}>{lead.nome}</p>
+        {onConversa && (
+          <button
+            onClick={onConversa}
+            className="flex-shrink-0 text-sm leading-none px-1 py-0.5 rounded transition-colors"
+            style={{ color: '#64748B' }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = '#94A3B8'; e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.06)' }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = '#64748B'; e.currentTarget.style.backgroundColor = 'transparent' }}
+            title="Ver conversa com agente"
+          >
+            💬
+          </button>
+        )}
+      </div>
       <p className="text-xs mt-0.5" style={{ color: '#64748B' }}>{lead.telefone}</p>
       {tempo && (
         <p className="text-xs mt-1" style={{ color: tempo.cor }}>
@@ -351,6 +371,99 @@ function LeadCard({ lead, atualizando, followUp, onAvancar, onPerdido, onFollowU
         >
           📅
         </button>
+      </div>
+    </div>
+  )
+}
+
+function ModalConversa({ lead, onClose }) {
+  const [conversa, setConversa] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [erro, setErro] = useState('')
+
+  useEffect(() => {
+    leadsApi.getHistoricoConversa(lead.id)
+      .then((res) => setConversa(res.data.historico))
+      .catch(() => setErro('Erro ao carregar conversa'))
+      .finally(() => setLoading(false))
+  }, [lead.id])
+
+  return (
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+      <div
+        className="rounded-2xl shadow-2xl w-full max-w-lg flex flex-col"
+        style={{ backgroundColor: '#111827', border: '1px solid #1E293B', maxHeight: '85vh' }}
+      >
+        <div
+          className="flex items-center justify-between px-5 py-4 flex-shrink-0"
+          style={{ borderBottom: '1px solid #1E293B' }}
+        >
+          <div>
+            <h2 className="font-bold" style={{ color: '#F1F5F9' }}>💬 Conversa com agente</h2>
+            <p className="text-xs mt-0.5" style={{ color: '#94A3B8' }}>{lead.nome}</p>
+          </div>
+          <button onClick={onClose} className="text-lg leading-none ml-4" style={{ color: '#64748B' }}>✕</button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-4 space-y-3">
+          {loading && (
+            <div className="flex justify-center py-10">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-500" />
+            </div>
+          )}
+          {erro && (
+            <p className="text-sm text-center py-10" style={{ color: '#EF4444' }}>{erro}</p>
+          )}
+          {!loading && !erro && (!conversa || conversa.length === 0) && (
+            <p className="text-sm text-center py-10" style={{ color: '#64748B' }}>Nenhuma conversa registrada.</p>
+          )}
+          {!loading && conversa && conversa.map((msg, i) => (
+            <MensagemBubble key={i} msg={msg} />
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function MensagemBubble({ msg }) {
+  const isLia = ['lia', 'assistant', 'bot', 'agent'].includes(String(msg.role).toLowerCase())
+  const texto = msg.texto || msg.text || msg.content || msg.mensagem || ''
+  const ts = msg.ts || msg.timestamp || msg.criadoEm || null
+  const hora = ts ? new Date(ts).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : null
+
+  return (
+    <div className={`flex ${isLia ? 'justify-start' : 'justify-end'}`}>
+      <div style={{ maxWidth: '82%' }}>
+        {isLia && (
+          <div className="flex items-center gap-1.5 mb-1">
+            <span
+              className="flex items-center justify-center w-5 h-5 rounded-full font-bold flex-shrink-0"
+              style={{ backgroundColor: 'rgba(139,92,246,0.3)', color: '#A78BFA', fontSize: 10 }}
+            >
+              L
+            </span>
+            <span className="text-xs font-semibold" style={{ color: '#8B5CF6' }}>Lia</span>
+          </div>
+        )}
+        <div
+          className="px-3 py-2 text-sm leading-relaxed whitespace-pre-wrap break-words"
+          style={{
+            backgroundColor: isLia ? 'rgba(139,92,246,0.13)' : 'rgba(59,130,246,0.13)',
+            color: '#E2E8F0',
+            borderRadius: isLia ? '4px 16px 16px 16px' : '16px 4px 16px 16px',
+          }}
+        >
+          {texto}
+        </div>
+        {hora && (
+          <p
+            className={`text-xs mt-1 ${isLia ? 'text-left' : 'text-right'}`}
+            style={{ color: '#475569' }}
+          >
+            {hora}
+          </p>
+        )}
       </div>
     </div>
   )
