@@ -191,7 +191,7 @@ function LeadCard({ lead, atualizando, onAvancar, onPerdido }) {
         </div>
       )}
 
-      {(podeAvancar || podePerdido) && (
+      {(podeAvancar || podePerdido || lead.telefone) && (
         <div className="flex gap-1.5 mt-2.5 pt-2" style={{ borderTop: '1px solid #1E293B' }}>
           {podeAvancar && (
             <button
@@ -215,6 +215,22 @@ function LeadCard({ lead, atualizando, onAvancar, onPerdido }) {
               onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'rgba(239,68,68,0.12)'}
             >
               Perdido
+            </button>
+          )}
+          {lead.telefone && (
+            <button
+              onClick={() => {
+                const d = lead.telefone.replace(/\D/g, '')
+                const numero = d.startsWith('55') && d.length >= 12 ? d : `55${d}`
+                window.open(`https://wa.me/${numero}`, '_blank')
+              }}
+              className="text-xs font-medium px-2 py-1 rounded-md transition-colors"
+              style={{ backgroundColor: 'rgba(37,211,102,0.12)', color: '#25D366' }}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(37,211,102,0.22)'}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'rgba(37,211,102,0.12)'}
+              title="Abrir WhatsApp"
+            >
+              💬
             </button>
           )}
         </div>
