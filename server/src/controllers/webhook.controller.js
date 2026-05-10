@@ -4,6 +4,15 @@ const { notificarCorretor } = require('../services/notificacao.service');
 
 const prisma = new PrismaClient();
 
+function sanitizarTexto(valor) {
+  if (valor == null) return null;
+  return String(valor)
+    .replace(/<[^>]*>/g, '')
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
+    .trim()
+    .slice(0, 500);
+}
+
 async function receberLead(req, res) {
   const {
     nome, telefone, whatsappJid,
@@ -11,26 +20,45 @@ async function receberLead(req, res) {
     valorEntrada, urgencia, regiao, faixaValor,
   } = req.body;
 
-  if (!nome || !telefone) {
+  if (!nome || !String(nome).trim()) {
     return res.status(400).json({ error: 'Campos obrigatórios: nome, telefone' });
   }
+  if (!telefone) {
+    return res.status(400).json({ error: 'Campos obrigatórios: nome, telefone' });
+  }
+
+  const digitos = String(telefone).replace(/\D/g, '');
+  if (digitos.length < 10 || digitos.length > 15) {
+    return res.status(400).json({ error: 'Telefone deve ter entre 10 e 15 dígitos numéricos' });
+  }
+
+  const nomeSanitizado       = sanitizarTexto(nome);
+  const telefoneSanitizado   = digitos;
+  const regiaoSanitizada     = sanitizarTexto(regiao);
+  const primeiroImovelSan    = sanitizarTexto(primeiroImovel);
+  const tipoRendaSan         = sanitizarTexto(tipoRenda);
+  const rendaMensalSan       = sanitizarTexto(rendaMensal);
+  const restricaoCpfSan      = sanitizarTexto(restricaoCpf);
+  const valorEntradaSan      = sanitizarTexto(valorEntrada);
+  const urgenciaSan          = sanitizarTexto(urgencia);
+  const faixaValorSan        = sanitizarTexto(faixaValor);
 
   const result = await prisma.$transaction(async (tx) => {
     // 1. Cria o lead com status qualificado
     const lead = await tx.lead.create({
       data: {
-        nome,
-        telefone,
-        whatsappJid: whatsappJid || `${telefone}@s.whatsapp.net`,
+        nome: nomeSanitizado,
+        telefone: telefoneSanitizado,
+        whatsappJid: whatsappJid || `${telefoneSanitizado}@s.whatsapp.net`,
         status: 'qualificado',
-        primeiroImovel: primeiroImovel || null,
-        tipoRenda: tipoRenda || null,
-        rendaMensal: rendaMensal || null,
-        restricaoCpf: restricaoCpf || null,
-        valorEntrada: valorEntrada || null,
-        urgencia: urgencia || null,
-        regiao: regiao || null,
-        faixaValor: faixaValor || null,
+        primeiroImovel: primeiroImovelSan,
+        tipoRenda: tipoRendaSan,
+        rendaMensal: rendaMensalSan,
+        restricaoCpf: restricaoCpfSan,
+        valorEntrada: valorEntradaSan,
+        urgencia: urgenciaSan,
+        regiao: regiaoSanitizada,
+        faixaValor: faixaValorSan,
         imobiliariaId: req.imobiliariaId,
       },
     });

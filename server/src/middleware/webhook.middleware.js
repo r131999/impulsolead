@@ -15,6 +15,8 @@ async function webhookAuthMiddleware(req, res, next) {
   });
 
   if (!imobiliaria) {
+    const ip = req.ip || req.socket?.remoteAddress || 'desconhecido';
+    console.warn(`[webhook] x-api-key inválida | IP: ${ip} | key: ${apiKey.slice(0, 8)}...`);
     return res.status(401).json({ error: 'API key inválida' });
   }
 
