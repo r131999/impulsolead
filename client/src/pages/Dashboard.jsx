@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { getDashboard } from '../api/dashboard'
+import { getDashboard, getFunil } from '../api/dashboard'
 import { useNavigate } from 'react-router-dom'
 
 const STATUS_BADGE = {
@@ -24,12 +24,16 @@ const STATUS_BADGE_BG = {
 
 export default function Dashboard() {
   const [dados, setDados] = useState(null)
+  const [funil, setFunil] = useState(null)
   const [loading, setLoading] = useState(true)
   const navigate = useNavigate()
 
   useEffect(() => {
-    getDashboard()
-      .then((res) => setDados(res.data))
+    Promise.all([getDashboard(), getFunil()])
+      .then(([kpi, f]) => {
+        setDados(kpi.data)
+        setFunil(f.data)
+      })
       .finally(() => setLoading(false))
   }, [])
 
@@ -78,7 +82,9 @@ export default function Dashboard() {
         ))}
       </div>
 
-      <div className="card">
+      {funil && <FunilVendas funil={funil.funil} perdidos={funil.perdidos} />}
+
+      <div className="card mt-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="font-semibold" style={{ color: '#F1F5F9' }}>Últimos leads</h2>
           <button
@@ -137,6 +143,88 @@ export default function Dashboard() {
           </div>
         )}
       </div>
+    </div>
+  )
+}
+
+const FUNIL_CONFIG = [
+  { status: 'novo',        label: 'Novo',        cor: '#3B82F6' },
+  { status: 'qualificado', label: 'Qualificado', cor: '#6366f1' },
+  { status: 'atendimento', label: 'Atendimento', cor: '#F59E0B' },
+  { status: 'visita',      label: 'Visita',      cor: '#F97316' },
+  { status: 'proposta',    label: 'Proposta',    cor: '#8B5CF6' },
+  { status: 'fechado',     label: 'Fechado',     cor: '#10B981' },
+]
+
+function FunilVendas({ funil, perdidos }) {
+  const totalGeral = funil.reduce((s, e) => s + e.total, 0) + perdidos
+  const maxVal = Math.max(...funil.map((e) => e.total), 1)
+  const primeiroValor = funil[0]?.total || 0
+
+  return (
+    <div className="card mb-6">
+      <h2 className="font-semibold mb-5" style={{ color: '#F1F5F9' }}>Funil de Vendas</h2>
+      <div className="space-y-3">
+        {FUNIL_CONFIG.map(({ status, label, cor }) => {
+          const etapa = funil.find((e) => e.status === status)
+          const count = etapa?.total || 0
+          const pctTotal = totalGeral > 0 ? Math.round((count / totalGeral) * 100) : 0
+          const pctConversao = primeiroValor > 0 ? Math.round((count / primeiroValor) * 100) : 0
+          const barWidth = (count / maxVal) * 100
+
+          return (
+            <div key={status} className="flex items-center gap-3">
+              <span
+                className="text-xs font-semibold flex-shrink-0 text-right"
+                style={{ color: cor, width: 80 }}
+              >
+                {label}
+              </span>
+              <div className="flex-1 rounded-full overflow-hidden" style={{ height: 20, backgroundColor: '#1E293B' }}>
+                <div
+                  className="h-full rounded-full transition-all duration-700"
+                  style={{ width: `${barWidth}%`, backgroundColor: cor, opacity: 0.8 }}
+                />
+              </div>
+              <span className="text-sm font-bold flex-shrink-0 w-8 text-right" style={{ color: '#F1F5F9' }}>
+                {count}
+              </span>
+              <span className="text-xs flex-shrink-0 w-10 text-right" style={{ color: '#64748B' }}>
+                {status === 'novo' ? `${pctTotal}%` : `${pctConversao}%`}
+              </span>
+            </div>
+          )
+        })}
+      </div>
+
+      <div
+        className="mt-5 pt-4 flex items-center gap-3"
+        style={{ borderTop: '1px solid #1E293B' }}
+      >
+        <span className="text-xs font-semibold flex-shrink-0 text-right" style={{ color: '#EF4444', width: 80 }}>
+          Perdidos
+        </span>
+        <div className="flex-1 rounded-full overflow-hidden" style={{ height: 20, backgroundColor: '#1E293B' }}>
+          <div
+            className="h-full rounded-full"
+            style={{
+              width: `${maxVal > 0 ? (perdidos / maxVal) * 100 : 0}%`,
+              backgroundColor: '#EF4444',
+              opacity: 0.6,
+            }}
+          />
+        </div>
+        <span className="text-sm font-bold flex-shrink-0 w-8 text-right" style={{ color: '#EF4444' }}>
+          {perdidos}
+        </span>
+        <span className="text-xs flex-shrink-0 w-10 text-right" style={{ color: '#64748B' }}>
+          {totalGeral > 0 ? Math.round((perdidos / totalGeral) * 100) : 0}%
+        </span>
+      </div>
+
+      <p className="text-xs mt-3" style={{ color: '#475569' }}>
+        % dos estágios Qualificado→Fechado é em relação ao total de Novos leads
+      </p>
     </div>
   )
 }

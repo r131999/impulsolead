@@ -255,4 +255,22 @@ async function getDashboardGerente(req, res) {
   });
 }
 
-module.exports = { getDashboard, getDashboardCorretor, getDashboardGerente };
+async function getFunil(req, res) {
+  const imobiliariaId = req.imobiliariaId;
+
+  const contagens = await prisma.lead.groupBy({
+    by: ['status'],
+    where: { imobiliariaId },
+    _count: { id: true },
+  });
+
+  const mapa = {};
+  for (const c of contagens) mapa[c.status] = c._count.id;
+
+  const etapas = ['novo', 'qualificado', 'atendimento', 'visita', 'proposta', 'fechado'];
+  const funil = etapas.map((s) => ({ status: s, total: mapa[s] || 0 }));
+
+  res.json({ funil, perdidos: mapa['perdido'] || 0 });
+}
+
+module.exports = { getDashboard, getDashboardCorretor, getDashboardGerente, getFunil };
