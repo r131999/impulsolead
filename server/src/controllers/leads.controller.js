@@ -55,8 +55,10 @@ async function listar(req, res) {
       take: Number(limit),
       orderBy: { criadoEm: 'desc' },
       select: {
-        id: true, nome: true, telefone: true, status: true,
+        id: true, nome: true, nomeEditado: true, telefone: true, status: true,
+        origem: true,
         primeiroImovel: true, tipoRenda: true, rendaMensal: true,
+        restricaoCpf: true, valorEntrada: true,
         urgencia: true, regiao: true, faixaValor: true,
         observacoes: true, criadoEm: true, atualizadoEm: true,
         temConversa: true,
@@ -338,6 +340,45 @@ async function remover(req, res) {
   res.json({ message: 'Lead removido' });
 }
 
+async function detalhes(req, res) {
+  const { id } = req.params;
+  const { nome, origem, observacoes } = req.body;
+
+  const where = { id, imobiliariaId: req.imobiliariaId };
+  if (req.role === 'corretor') {
+    where.corretorId = req.corretorId;
+  } else if (req.role === 'gerente') {
+    if (req.equipeId) {
+      const idsEquipe = await prisma.corretor.findMany({
+        where: { equipeId: req.equipeId, imobiliariaId: req.imobiliariaId },
+        select: { id: true },
+      });
+      where.corretorId = { in: idsEquipe.map((c) => c.id) };
+    } else {
+      where.corretorId = req.corretorId;
+    }
+  }
+
+  const lead = await prisma.lead.findFirst({ where });
+  if (!lead) return res.status(404).json({ error: 'Lead não encontrado' });
+
+  const data = {};
+  if (nome !== undefined && nome.trim()) {
+    data.nome = nome.trim();
+    data.nomeEditado = nome.trim();
+  }
+  if (origem !== undefined) data.origem = origem || null;
+  if (observacoes !== undefined) data.observacoes = observacoes.trim() || null;
+
+  const atualizado = await prisma.lead.update({
+    where: { id },
+    data,
+    include: { corretor: { select: { id: true, nome: true } } },
+  });
+
+  return res.json({ lead: atualizado });
+}
+
 async function getHistoricoConversa(req, res) {
   const { id } = req.params;
 
@@ -364,4 +405,4 @@ async function getHistoricoConversa(req, res) {
   res.json({ historico, nome: lead.nome });
 }
 
-module.exports = { listar, buscarPorId, criar, atualizar, mudarStatus, remover, getHistoricoConversa };
+module.exports = { listar, buscarPorId, criar, atualizar, mudarStatus, remover, detalhes, getHistoricoConversa };

@@ -85,6 +85,9 @@ model Lead {
   regiao         String?
   faixaValor     String?
 
+  origem            String?
+  nomeEditado       String?
+
   status            String  @default("novo")
   motivoPerda       String?
   observacoes       String?

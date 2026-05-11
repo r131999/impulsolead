@@ -86,6 +86,7 @@ export default function Kanban() {
   const [followUpsMap, setFollowUpsMap] = useState({})
   const [modalFU, setModalFU] = useState(null) // { lead, followUp? }
   const [modalConversa, setModalConversa] = useState(null) // lead
+  const [modalDetalhes, setModalDetalhes] = useState(null) // lead
 
   const carregar = useCallback(() => {
     leadsApi
@@ -211,6 +212,7 @@ export default function Kanban() {
                     lead={lead}
                     atualizando={atualizando === lead.id}
                     followUp={followUpsMap[lead.id] || null}
+                    onDetalhes={() => setModalDetalhes(lead)}
                     onAvancar={() => avancar(lead)}
                     onPerdido={() => abrirPerda(lead)}
                     onFollowUp={() => setModalFU({ lead, followUp: followUpsMap[lead.id] || null })}
@@ -252,11 +254,19 @@ export default function Kanban() {
       {modalConversa && (
         <ModalConversa lead={modalConversa} onClose={() => setModalConversa(null)} />
       )}
+
+      {modalDetalhes && (
+        <ModalDetalhes
+          lead={modalDetalhes}
+          onClose={() => setModalDetalhes(null)}
+          onSalvo={() => { carregar(); setModalDetalhes(null) }}
+        />
+      )}
     </div>
   )
 }
 
-function LeadCard({ lead, atualizando, followUp, onAvancar, onPerdido, onFollowUp, onConversa }) {
+function LeadCard({ lead, atualizando, followUp, onDetalhes, onAvancar, onPerdido, onFollowUp, onConversa }) {
   const proximo = proximoStatus(lead.status)
   const podeAvancar = !!proximo
   const podePerdido = lead.status !== 'fechado' && lead.status !== 'perdido'
@@ -274,7 +284,14 @@ function LeadCard({ lead, atualizando, followUp, onAvancar, onPerdido, onFollowU
       }}
     >
       <div className="flex items-start justify-between gap-1">
-        <p className="text-sm font-semibold truncate" style={{ color: '#F1F5F9' }}>{lead.nome}</p>
+        <button
+          onClick={onDetalhes}
+          className="text-sm font-semibold truncate text-left flex-1 hover:underline underline-offset-2"
+          style={{ color: '#F1F5F9' }}
+          title="Ver detalhes do lead"
+        >
+          {lead.nome}
+        </button>
         {onConversa && (
           <button
             onClick={onConversa}
@@ -578,6 +595,188 @@ function ModalFollowUp({ lead, followUp, onSalvar, onRealizar, onRemover, onClos
           >
             {salvando ? 'Salvando...' : followUp ? 'Reagendar' : 'Agendar'}
           </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+const ORIGENS = [
+  'Meta Ads', 'Google Ads', 'Instagram Orgânico', 'Indicação',
+  'Site', 'WhatsApp Direto', 'Lista Importada', 'Outros',
+]
+
+const QUALIFICACAO_LABELS = {
+  primeiroImovel: 'Primeiro imóvel',
+  tipoRenda: 'Tipo de renda',
+  rendaMensal: 'Renda mensal',
+  restricaoCpf: 'Restrição CPF',
+  valorEntrada: 'Valor de entrada',
+  urgencia: 'Urgência',
+  regiao: 'Região',
+  faixaValor: 'Faixa de valor',
+}
+
+const STATUS_COR_MODAL = {
+  novo: '#3B82F6', qualificado: '#8B5CF6', atendimento: '#F59E0B',
+  visita: '#f97316', proposta: '#6366f1', fechado: '#10B981', perdido: '#EF4444',
+}
+
+function ModalDetalhes({ lead, onClose, onSalvo }) {
+  const [nome, setNome] = useState(lead.nome)
+  const [origem, setOrigem] = useState(lead.origem || '')
+  const [observacoes, setObservacoes] = useState(lead.observacoes || '')
+  const [salvando, setSalvando] = useState(false)
+  const [erro, setErro] = useState('')
+  const [copiado, setCopiado] = useState(false)
+
+  const camposQual = Object.entries(QUALIFICACAO_LABELS)
+    .filter(([key]) => lead[key])
+    .map(([key, label]) => ({ label, valor: lead[key] }))
+
+  const copiarTelefone = () => {
+    navigator.clipboard.writeText(lead.telefone).then(() => {
+      setCopiado(true)
+      setTimeout(() => setCopiado(false), 1500)
+    })
+  }
+
+  const handleSalvar = async () => {
+    if (!nome.trim()) return setErro('Nome é obrigatório')
+    setSalvando(true)
+    setErro('')
+    try {
+      await leadsApi.atualizarDetalhes(lead.id, {
+        nome: nome.trim(),
+        origem: origem || null,
+        observacoes: observacoes.trim() || null,
+      })
+      onSalvo()
+    } catch (e) {
+      setErro(e.response?.data?.error || 'Erro ao salvar')
+      setSalvando(false)
+    }
+  }
+
+  const corStatus = STATUS_COR_MODAL[lead.status] || '#94A3B8'
+
+  return (
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+      <div
+        className="rounded-2xl shadow-2xl w-full flex flex-col"
+        style={{ backgroundColor: '#111827', border: '1px solid #1E293B', maxWidth: 560, maxHeight: '90vh' }}
+      >
+        {/* Cabeçalho */}
+        <div className="flex items-start gap-3 px-5 py-4 flex-shrink-0" style={{ borderBottom: '1px solid #1E293B' }}>
+          <div className="flex-1 min-w-0">
+            <input
+              value={nome}
+              onChange={(e) => setNome(e.target.value)}
+              className="input w-full text-base font-bold mb-2"
+              placeholder="Nome do lead"
+            />
+            <div className="flex items-center flex-wrap gap-2">
+              <span className="text-sm" style={{ color: '#94A3B8' }}>{lead.telefone}</span>
+              <button
+                onClick={copiarTelefone}
+                className="text-xs px-2 py-0.5 rounded transition-colors"
+                style={{ backgroundColor: '#1E293B', color: copiado ? '#10B981' : '#64748B' }}
+              >
+                {copiado ? '✓ copiado' : 'copiar'}
+              </button>
+              <span
+                className="text-xs px-2 py-0.5 rounded-full font-medium capitalize"
+                style={{ backgroundColor: `${corStatus}20`, color: corStatus }}
+              >
+                {lead.status}
+              </span>
+            </div>
+            {lead.corretor && (
+              <p className="text-xs mt-1.5" style={{ color: '#60A5FA' }}>👤 {lead.corretor.nome}</p>
+            )}
+          </div>
+          <button
+            onClick={onClose}
+            className="flex items-center justify-center flex-shrink-0 rounded-lg transition-colors"
+            style={{ color: '#64748B', minWidth: 36, minHeight: 36 }}
+            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.05)' }}
+            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent' }}
+          >
+            ✕
+          </button>
+        </div>
+
+        {/* Corpo */}
+        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
+          {/* Origem */}
+          <div>
+            <label className="text-xs font-semibold uppercase tracking-wide block mb-1.5" style={{ color: '#64748B' }}>
+              De onde veio esse lead?
+            </label>
+            <select
+              value={origem}
+              onChange={(e) => setOrigem(e.target.value)}
+              className="input w-full"
+              style={{ backgroundColor: '#0B1120', color: '#E2E8F0' }}
+            >
+              <option value="">Selecionar origem...</option>
+              {ORIGENS.map((o) => <option key={o} value={o}>{o}</option>)}
+            </select>
+          </div>
+
+          {/* Qualificação */}
+          {camposQual.length > 0 && (
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: '#64748B' }}>
+                Dados de Qualificação
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                {camposQual.map(({ label, valor }) => (
+                  <div key={label} className="rounded-lg px-3 py-2" style={{ backgroundColor: '#0B1120', border: '1px solid #1E293B' }}>
+                    <p className="text-xs" style={{ color: '#64748B' }}>{label}</p>
+                    <p className="text-sm font-medium mt-0.5 break-words" style={{ color: '#E2E8F0' }}>{valor}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Observações */}
+          <div>
+            <label className="text-xs font-semibold uppercase tracking-wide block mb-1.5" style={{ color: '#64748B' }}>
+              Observações
+            </label>
+            <textarea
+              className="input resize-none w-full"
+              rows={3}
+              value={observacoes}
+              onChange={(e) => setObservacoes(e.target.value)}
+              placeholder="Adicione observações sobre este lead..."
+            />
+          </div>
+        </div>
+
+        {/* Rodapé */}
+        <div className="flex-shrink-0 px-5 pb-4 pt-3" style={{ borderTop: '1px solid #1E293B' }}>
+          {erro && <p className="text-xs mb-2" style={{ color: '#EF4444' }}>{erro}</p>}
+          <div className="flex gap-2">
+            <button
+              onClick={onClose}
+              className="btn-secondary flex-1"
+            >
+              Fechar
+            </button>
+            <button
+              onClick={handleSalvar}
+              disabled={salvando}
+              className="flex-1 text-sm font-medium py-2 rounded-lg disabled:opacity-50 transition-colors"
+              style={{ backgroundColor: 'rgba(99,102,241,0.2)', color: '#818cf8' }}
+              onMouseEnter={(e) => { if (!salvando) e.currentTarget.style.backgroundColor = 'rgba(99,102,241,0.3)' }}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'rgba(99,102,241,0.2)'}
+            >
+              {salvando ? 'Salvando...' : 'Salvar alterações'}
+            </button>
+          </div>
         </div>
       </div>
     </div>
