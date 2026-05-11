@@ -363,12 +363,13 @@ async function detalhes(req, res) {
   if (!lead) return res.status(404).json({ error: 'Lead não encontrado' });
 
   const data = {};
-  if (nome !== undefined && nome.trim()) {
-    data.nome = nome.trim();
-    data.nomeEditado = nome.trim();
+  const nomeTrimmed = nome ? nome.trim() : null;
+  if (nome !== undefined && nomeTrimmed) {
+    data.nome = nomeTrimmed;
+    data.nomeEditado = nomeTrimmed;
   }
   if (origem !== undefined) data.origem = origem || null;
-  if (observacoes !== undefined) data.observacoes = observacoes.trim() || null;
+  if (observacoes !== undefined) data.observacoes = observacoes ? observacoes.trim() || null : null;
 
   const atualizado = await prisma.lead.update({
     where: { id },
