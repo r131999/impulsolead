@@ -3,7 +3,7 @@ import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, PieChart, Pie, Cell,
 } from 'recharts'
-import { getRelatorios, getRelatoriosEquipes } from '../api/relatorios'
+import { getRelatorios, getRelatoriosEquipes, getRelatoriosOrigem } from '../api/relatorios'
 
 const CORES_FUNIL = {
   novo:        '#3b82f6',
@@ -34,6 +34,8 @@ export default function Relatorios() {
   const [periodo, setPeriodo] = useState(30)
   const [loading, setLoading] = useState(true)
   const [loadingEquipes, setLoadingEquipes] = useState(false)
+  const [dadosOrigem, setDadosOrigem] = useState(null)
+  const [loadingOrigem, setLoadingOrigem] = useState(false)
 
   useEffect(() => {
     setLoading(true)
@@ -48,6 +50,15 @@ export default function Relatorios() {
       getRelatoriosEquipes(periodo)
         .then((res) => setDadosEquipes(res.data))
         .finally(() => setLoadingEquipes(false))
+    }
+  }, [aba, periodo])
+
+  useEffect(() => {
+    if (aba === 'origem') {
+      setLoadingOrigem(true)
+      getRelatoriosOrigem(periodo)
+        .then((res) => setDadosOrigem(res.data))
+        .finally(() => setLoadingOrigem(false))
     }
   }, [aba, periodo])
 
@@ -82,7 +93,7 @@ export default function Relatorios() {
 
       {/* Tabs */}
       <div className="flex gap-1 mb-6 p-1 rounded-lg w-fit" style={{ backgroundColor: '#0B1120' }}>
-        {[{ id: 'geral', label: 'Geral' }, { id: 'equipes', label: 'Equipes' }].map(({ id, label }) => (
+        {[{ id: 'geral', label: 'Geral' }, { id: 'equipes', label: 'Equipes' }, { id: 'origem', label: 'Origem' }].map(({ id, label }) => (
           <button
             key={id}
             onClick={() => setAba(id)}
@@ -389,6 +400,100 @@ export default function Relatorios() {
                   </div>
                 )
               ))}
+            </div>
+          </div>
+        )
+      )}
+      {aba === 'origem' && (
+        loadingOrigem ? (
+          <div className="flex items-center justify-center py-32">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-500" />
+          </div>
+        ) : !dadosOrigem || dadosOrigem.origens.length === 0 ? (
+          <div className="rounded-xl p-12 text-center" style={{ backgroundColor: '#111827', border: '1px solid #1E293B' }}>
+            <p className="text-lg font-semibold mb-2" style={{ color: '#F1F5F9' }}>Sem leads no período</p>
+            <p className="text-sm" style={{ color: '#64748B' }}>
+              Registre a origem dos leads para ver os dados aqui.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {/* Card destaque: melhor origem */}
+            {dadosOrigem.melhorOrigem && (() => {
+              const best = dadosOrigem.origens.find((o) => o.origem === dadosOrigem.melhorOrigem)
+              return (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="rounded-xl p-4" style={{ backgroundColor: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)' }}>
+                    <p className="text-xs font-medium mb-1" style={{ color: '#10B981' }}>Melhor taxa de conversão</p>
+                    <p className="text-lg font-bold" style={{ color: '#F1F5F9' }}>{best.origem}</p>
+                    <p className="text-sm mt-0.5" style={{ color: '#94A3B8' }}>
+                      {best.conversao}% de conversão · {best.total} lead{best.total !== 1 ? 's' : ''}
+                    </p>
+                  </div>
+                  <div className="rounded-xl p-4" style={{ backgroundColor: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)' }}>
+                    <p className="text-xs font-medium mb-1" style={{ color: '#818cf8' }}>Origem com mais leads</p>
+                    <p className="text-lg font-bold" style={{ color: '#F1F5F9' }}>{dadosOrigem.origens[0].origem}</p>
+                    <p className="text-sm mt-0.5" style={{ color: '#94A3B8' }}>
+                      {dadosOrigem.origens[0].total} lead{dadosOrigem.origens[0].total !== 1 ? 's' : ''} · {dadosOrigem.origens[0].conversao}% conv.
+                    </p>
+                  </div>
+                </div>
+              )
+            })()}
+
+            {/* Aviso se nenhuma origem nomeada */}
+            {dadosOrigem.origens.every((o) => o.origem === 'Não informado') && (
+              <div className="rounded-lg px-4 py-3 flex items-start gap-2" style={{ backgroundColor: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)' }}>
+                <span style={{ color: '#F59E0B' }}>⚠</span>
+                <p className="text-sm" style={{ color: '#94A3B8' }}>
+                  Registre a origem dos leads para ver os dados aqui.
+                </p>
+              </div>
+            )}
+
+            {/* Tabela com barra de progresso */}
+            <div className="card p-0 overflow-hidden">
+              <div className="px-5 py-3 font-semibold text-sm" style={{ borderBottom: '1px solid #1E293B', color: '#F1F5F9' }}>
+                Conversão por origem — últimos {periodo} dias
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm min-w-[480px]">
+                  <thead style={{ backgroundColor: '#0B1120', borderBottom: '1px solid #1E293B' }}>
+                    <tr>
+                      {['Origem', 'Total de Leads', 'Fechamentos', 'Taxa de Conversão'].map((h) => (
+                        <th key={h} className="text-left px-5 py-3 font-medium text-xs uppercase tracking-wide" style={{ color: '#64748B' }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {dadosOrigem.origens.map((o, idx) => {
+                      const corConv = o.conversao >= 25 ? '#10B981' : o.conversao >= 10 ? '#F59E0B' : '#EF4444'
+                      return (
+                        <tr key={o.origem} style={{ borderBottom: '1px solid #1E293B', backgroundColor: idx % 2 === 1 ? 'rgba(255,255,255,0.02)' : 'transparent' }}>
+                          <td className="px-5 py-3 font-medium" style={{ color: o.origem === 'Não informado' ? '#64748B' : '#F1F5F9' }}>
+                            {o.origem}
+                          </td>
+                          <td className="px-5 py-3" style={{ color: '#94A3B8' }}>{o.total}</td>
+                          <td className="px-5 py-3 font-medium" style={{ color: '#10B981' }}>{o.fechados}</td>
+                          <td className="px-5 py-3">
+                            <div className="flex items-center gap-3">
+                              <span className="text-xs font-semibold w-9 text-right flex-shrink-0" style={{ color: corConv }}>
+                                {o.conversao}%
+                              </span>
+                              <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: '#1E293B', minWidth: 80 }}>
+                                <div
+                                  className="h-full rounded-full"
+                                  style={{ width: `${o.conversao}%`, backgroundColor: corConv, transition: 'width 0.4s ease' }}
+                                />
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         )

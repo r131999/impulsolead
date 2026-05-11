@@ -334,4 +334,46 @@ async function getRelatoriosGerente(req, res) {
   });
 }
 
-module.exports = { getRelatorios, getRelatoriosEquipes, getRelatoriosGerente };
+async function getRelatoriosOrigem(req, res) {
+  const periodo = parseInt(req.query.periodo) || 30;
+
+  if (!PERIODOS_VALIDOS.includes(periodo)) {
+    return res.status(400).json({ error: `Período inválido. Use: ${PERIODOS_VALIDOS.join(', ')}` });
+  }
+
+  const imobiliariaId = req.imobiliariaId;
+  const agora = new Date();
+  const dataInicio = new Date(agora);
+  dataInicio.setDate(dataInicio.getDate() - periodo);
+  dataInicio.setHours(0, 0, 0, 0);
+
+  const leads = await prisma.lead.findMany({
+    where: { imobiliariaId, criadoEm: { gte: dataInicio } },
+    select: { id: true, status: true, origem: true },
+  });
+
+  const grupos = {};
+  leads.forEach((l) => {
+    const key = l.origem || 'Não informado';
+    if (!grupos[key]) grupos[key] = { total: 0, fechados: 0 };
+    grupos[key].total++;
+    if (l.status === 'fechado') grupos[key].fechados++;
+  });
+
+  const origens = Object.entries(grupos)
+    .map(([origem, { total, fechados }]) => ({
+      origem,
+      total,
+      fechados,
+      conversao: total === 0 ? 0 : Math.round((fechados / total) * 100),
+    }))
+    .sort((a, b) => b.total - a.total);
+
+  const melhorOrigem = origens.length === 0
+    ? null
+    : origens.reduce((a, b) => (a.conversao >= b.conversao ? a : b)).origem;
+
+  res.json({ origens, melhorOrigem, periodo });
+}
+
+module.exports = { getRelatorios, getRelatoriosEquipes, getRelatoriosGerente, getRelatoriosOrigem };
