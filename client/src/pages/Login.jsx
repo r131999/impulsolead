@@ -61,7 +61,7 @@ export default function Login() {
     <div className="min-h-screen flex items-center justify-center p-4" style={{ background: 'linear-gradient(135deg, #0B1120 0%, #1a1040 50%, #0B1120 100%)' }}>
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-white">ImpulsoLead</h1>
+          <img src="/logo-colorida.png" alt="ImpulsoLead" style={{ height: '48px' }} />
           <p className="text-indigo-300 mt-1 text-sm">CRM para imobiliárias</p>
         </div>
 

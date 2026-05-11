@@ -65,7 +65,7 @@ export default function Layout() {
 
       <aside className={`app-sidebar${aberta ? ' sidebar-open' : ''}`}>
         <div className="px-5 py-4 border-b border-indigo-800">
-          <h1 className="text-white font-bold text-lg tracking-tight">ImpulsoLead</h1>
+          <img src="/logo-branca.png" alt="ImpulsoLead" style={{ height: '32px' }} />
           <p className="text-indigo-300 text-xs mt-0.5 truncate">{usuario?.imobiliaria?.nome}</p>
           {isGerente && (
             <span className="inline-block mt-1 px-2 py-0.5 rounded text-xs font-medium" style={{ backgroundColor: 'rgba(16,185,129,0.15)', color: '#10B981' }}>
