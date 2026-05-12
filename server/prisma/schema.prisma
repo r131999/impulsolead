@@ -26,6 +26,7 @@ model Imobiliaria {
   equipes            Equipe[]
   contatosImportados ContatoImportado[]
   modelosMensagem    ModeloMensagem[]
+  contatosPessoais   ContatoPessoal[]
 }
 
 model Usuario {
@@ -66,8 +67,9 @@ model Corretor {
   equipe        Equipe?     @relation("EquipeCorretores", fields: [equipeId], references: [id])
   equipeLiderada Equipe[]   @relation("EquipeLider")
 
-  leads     Lead[]
-  followUps FollowUp[]
+  leads            Lead[]
+  followUps        FollowUp[]
+  contatosPessoais ContatoPessoal[]
 }
 
 model Lead {
@@ -176,6 +178,25 @@ model FollowUp {
 
   corretorId String
   corretor   Corretor @relation(fields: [corretorId], references: [id])
+}
+
+model ContatoPessoal {
+  id          String   @id @default(uuid())
+  nome        String
+  telefone    String
+  email       String?
+  observacoes String?
+  status      String   @default("ativo") // "ativo" | "convertido"
+  leadId      String?
+
+  corretorId    String
+  corretor      Corretor    @relation(fields: [corretorId], references: [id])
+
+  imobiliariaId String
+  imobiliaria   Imobiliaria @relation(fields: [imobiliariaId], references: [id])
+
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
 }
 
 model ConfigAgente {
