@@ -14,15 +14,17 @@ const NAV_GESTOR = [
 ]
 
 const NAV_CORRETOR = [
-  { to: '/meus-leads',    label: 'Meus Leads',     icon: KanbanIcon },
-  { to: '/meu-desempenho',label: 'Meu Desempenho', icon: ChartIcon },
+  { to: '/meus-leads',     label: 'Meus Leads',     icon: KanbanIcon },
+  { to: '/meu-desempenho', label: 'Meu Desempenho', icon: ChartIcon },
+  { to: '/meus-contatos',  label: 'Meus Contatos',  icon: ContactIcon },
 ]
 
 const NAV_GERENTE = [
-  { to: '/gerente/dashboard',  label: 'Dashboard da Equipe', icon: ChartIcon },
-  { to: '/gerente/leads',      label: 'Leads da Equipe',     icon: KanbanIcon },
-  { to: '/gerente/minha-equipe', label: 'Minha Equipe',      icon: UsersIcon },
-  { to: '/gerente/relatorios', label: 'Relatório da Equipe', icon: BarChartIcon },
+  { to: '/gerente/dashboard',    label: 'Dashboard da Equipe', icon: ChartIcon },
+  { to: '/gerente/leads',        label: 'Leads da Equipe',     icon: KanbanIcon },
+  { to: '/gerente/minha-equipe', label: 'Minha Equipe',        icon: UsersIcon },
+  { to: '/gerente/relatorios',   label: 'Relatório da Equipe', icon: BarChartIcon },
+  { to: '/meus-contatos',        label: 'Meus Contatos',       icon: ContactIcon },
 ]
 
 export default function Layout() {
@@ -186,6 +188,14 @@ function BotIcon({ className }) {
   return (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17H4a2 2 0 01-2-2V5a2 2 0 012-2h16a2 2 0 012 2v10a2 2 0 01-2 2h-1" />
+    </svg>
+  )
+}
+
+function ContactIcon({ className }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
     </svg>
   )
 }

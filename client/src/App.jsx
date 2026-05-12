@@ -14,6 +14,7 @@ import Equipes from './pages/Equipes'
 import DashboardGerente from './pages/DashboardGerente'
 import MinhaEquipe from './pages/MinhaEquipe'
 import RelatoriosGerente from './pages/RelatoriosGerente'
+import MeusContatos from './pages/MeusContatos'
 
 function HomeRedirect() {
   const { usuario } = useAuth()
@@ -50,6 +51,7 @@ export default function App() {
             {/* Rotas do corretor */}
             <Route path="meus-leads" element={<Kanban />} />
             <Route path="meu-desempenho" element={<DesempenhoCorretor />} />
+            <Route path="meus-contatos" element={<MeusContatos />} />
 
             {/* Rotas do gerente */}
             <Route path="gerente/dashboard" element={<DashboardGerente />} />
