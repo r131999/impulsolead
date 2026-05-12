@@ -4,23 +4,23 @@ import { pendentes as followUpsPendentes, atualizar as atualizarFollowUp } from 
 import { useNavigate } from 'react-router-dom'
 
 const STATUS_BADGE = {
-  novo: 'text-[#60A5FA]',
-  qualificado: 'text-[#8B5CF6]',
-  atendimento: 'text-[#F59E0B]',
-  visita: 'text-orange-400',
-  proposta: 'text-indigo-400',
-  fechado: 'text-[#10B981]',
-  perdido: 'text-[#EF4444]',
+  lead:        'text-[#60A5FA]',
+  atendimento: 'text-indigo-400',
+  agendamento: 'text-[#A78BFA]',
+  visita:      'text-[#F59E0B]',
+  proposta:    'text-orange-400',
+  venda:       'text-[#10B981]',
+  perdido:     'text-[#EF4444]',
 }
 
 const STATUS_BADGE_BG = {
-  novo: 'rgba(59,130,246,0.15)',
-  qualificado: 'rgba(139,92,246,0.15)',
-  atendimento: 'rgba(245,158,11,0.15)',
-  visita: 'rgba(249,115,22,0.15)',
-  proposta: 'rgba(99,102,241,0.15)',
-  fechado: 'rgba(16,185,129,0.15)',
-  perdido: 'rgba(239,68,68,0.15)',
+  lead:        'rgba(59,130,246,0.15)',
+  atendimento: 'rgba(99,102,241,0.15)',
+  agendamento: 'rgba(139,92,246,0.15)',
+  visita:      'rgba(245,158,11,0.15)',
+  proposta:    'rgba(249,115,22,0.15)',
+  venda:       'rgba(16,185,129,0.15)',
+  perdido:     'rgba(239,68,68,0.15)',
 }
 
 export default function Dashboard() {
@@ -164,12 +164,12 @@ export default function Dashboard() {
 }
 
 const FUNIL_CONFIG = [
-  { status: 'novo',        label: 'Novo',        cor: '#3B82F6' },
-  { status: 'qualificado', label: 'Qualificado', cor: '#6366f1' },
-  { status: 'atendimento', label: 'Atendimento', cor: '#F59E0B' },
-  { status: 'visita',      label: 'Visita',      cor: '#F97316' },
-  { status: 'proposta',    label: 'Proposta',    cor: '#8B5CF6' },
-  { status: 'fechado',     label: 'Fechado',     cor: '#10B981' },
+  { status: 'lead',        label: 'Lead',        cor: '#3B82F6' },
+  { status: 'atendimento', label: 'Atendimento', cor: '#6366f1' },
+  { status: 'agendamento', label: 'Agendamento', cor: '#8B5CF6' },
+  { status: 'visita',      label: 'Visita',      cor: '#F59E0B' },
+  { status: 'proposta',    label: 'Proposta',    cor: '#F97316' },
+  { status: 'venda',       label: 'Venda',       cor: '#10B981' },
 ]
 
 function FunilVendas({ funil, perdidos }) {
@@ -206,7 +206,7 @@ function FunilVendas({ funil, perdidos }) {
                 {count}
               </span>
               <span className="text-xs flex-shrink-0 w-10 text-right" style={{ color: '#64748B' }}>
-                {status === 'novo' ? `${pctTotal}%` : `${pctConversao}%`}
+                {status === 'lead' ? `${pctTotal}%` : `${pctConversao}%`}
               </span>
             </div>
           )

@@ -3,12 +3,12 @@ import { getDashboardGerente } from '../api/dashboard'
 import { useAuth } from '../context/AuthContext'
 
 const STATUS_LABEL = {
-  novo: 'Novo', qualificado: 'Qualificado', atendimento: 'Atendimento',
-  visita: 'Visita', proposta: 'Proposta', fechado: 'Fechado', perdido: 'Perdido',
+  lead: 'Lead', atendimento: 'Atendimento', agendamento: 'Agendamento',
+  visita: 'Visita', proposta: 'Proposta', venda: 'Venda', perdido: 'Perdido',
 }
 const STATUS_COR = {
-  novo: '#3B82F6', qualificado: '#8B5CF6', atendimento: '#F59E0B',
-  visita: '#f97316', proposta: '#6366f1', fechado: '#10B981', perdido: '#EF4444',
+  lead: '#3B82F6', atendimento: '#6366f1', agendamento: '#8B5CF6',
+  visita: '#F59E0B', proposta: '#f97316', venda: '#10B981', perdido: '#EF4444',
 }
 
 export default function DashboardGerente() {

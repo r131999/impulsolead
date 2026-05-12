@@ -170,7 +170,7 @@ async function converter(req, res) {
         nome: contato.nome,
         telefone: contato.telefone,
         whatsappJid: jid,
-        status: 'novo',
+        status: 'lead',
         observacoes: contato.observacoes || null,
         origem: 'contato_pessoal',
         corretorId,

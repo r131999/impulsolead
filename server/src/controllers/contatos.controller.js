@@ -142,7 +142,7 @@ async function enviarMensagem(req, res) {
         nome: contato.nome,
         telefone: contato.telefone,
         whatsappJid: jid,
-        status: 'novo',
+        status: 'lead',
         imobiliariaId,
       },
     });
@@ -186,7 +186,7 @@ async function transferir(req, res) {
           nome: contato.nome,
           telefone: contato.telefone,
           whatsappJid: jid,
-          status: 'novo',
+          status: 'lead',
           imobiliariaId,
         },
       });

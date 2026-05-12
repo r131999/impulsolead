@@ -90,7 +90,7 @@ model Lead {
   origem            String?
   nomeEditado       String?
 
-  status            String  @default("novo")
+  status            String  @default("lead")
   motivoPerda       String?
   observacoes       String?
   historicoConversa String?

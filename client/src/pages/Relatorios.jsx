@@ -6,12 +6,12 @@ import {
 import { getRelatorios, getRelatoriosEquipes, getRelatoriosOrigem } from '../api/relatorios'
 
 const CORES_FUNIL = {
-  novo:        '#3b82f6',
-  qualificado: '#8b5cf6',
-  atendimento: '#f59e0b',
-  visita:      '#f97316',
-  proposta:    '#6366f1',
-  fechado:     '#10B981',
+  lead:        '#3b82f6',
+  atendimento: '#6366f1',
+  agendamento: '#8b5cf6',
+  visita:      '#f59e0b',
+  proposta:    '#f97316',
+  venda:       '#10B981',
   perdido:     '#ef4444',
 }
 

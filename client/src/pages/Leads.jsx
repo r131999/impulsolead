@@ -4,16 +4,16 @@ import * as corretoresApi from '../api/corretores'
 import ContatosImportados from './ContatosImportados'
 
 const STATUS_BADGE_STYLE = {
-  novo:        { color: '#60A5FA',  bg: 'rgba(59,130,246,0.15)' },
-  qualificado: { color: '#8B5CF6',  bg: 'rgba(139,92,246,0.15)' },
-  atendimento: { color: '#F59E0B',  bg: 'rgba(245,158,11,0.15)' },
-  visita:      { color: '#fb923c',  bg: 'rgba(249,115,22,0.15)' },
-  proposta:    { color: '#818cf8',  bg: 'rgba(99,102,241,0.15)' },
-  fechado:     { color: '#10B981',  bg: 'rgba(16,185,129,0.15)' },
+  lead:        { color: '#60A5FA',  bg: 'rgba(59,130,246,0.15)' },
+  atendimento: { color: '#818cf8',  bg: 'rgba(99,102,241,0.15)' },
+  agendamento: { color: '#A78BFA',  bg: 'rgba(139,92,246,0.15)' },
+  visita:      { color: '#F59E0B',  bg: 'rgba(245,158,11,0.15)' },
+  proposta:    { color: '#fb923c',  bg: 'rgba(249,115,22,0.15)' },
+  venda:       { color: '#10B981',  bg: 'rgba(16,185,129,0.15)' },
   perdido:     { color: '#EF4444',  bg: 'rgba(239,68,68,0.15)' },
 }
 
-const STATUS_LIST = ['novo', 'qualificado', 'atendimento', 'visita', 'proposta', 'fechado', 'perdido']
+const STATUS_LIST = ['lead', 'atendimento', 'agendamento', 'visita', 'proposta', 'venda', 'perdido']
 
 const FORM_VAZIO = {
   nome: '', telefone: '', corretorId: '', observacoes: '',

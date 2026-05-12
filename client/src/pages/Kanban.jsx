@@ -4,16 +4,16 @@ import * as followupsApi from '../api/followups'
 import { useAuth } from '../context/AuthContext'
 
 const COLUNAS = [
-  { id: 'novo',        label: 'Novo',        dot: '#3B82F6' },
-  { id: 'qualificado', label: 'Qualificado', dot: '#8B5CF6' },
-  { id: 'atendimento', label: 'Atendimento', dot: '#F59E0B' },
-  { id: 'visita',      label: 'Visita',      dot: '#f97316' },
-  { id: 'proposta',    label: 'Proposta',    dot: '#6366f1' },
-  { id: 'fechado',     label: 'Fechado',     dot: '#10B981' },
+  { id: 'lead',        label: 'Lead',        dot: '#3B82F6' },
+  { id: 'atendimento', label: 'Atendimento', dot: '#6366f1' },
+  { id: 'agendamento', label: 'Agendamento', dot: '#8B5CF6' },
+  { id: 'visita',      label: 'Visita',      dot: '#F59E0B' },
+  { id: 'proposta',    label: 'Proposta',    dot: '#f97316' },
+  { id: 'venda',       label: 'Venda',       dot: '#10B981' },
   { id: 'perdido',     label: 'Perdido',     dot: '#EF4444' },
 ]
 
-const SEQUENCIA = ['novo', 'qualificado', 'atendimento', 'visita', 'proposta', 'fechado']
+const SEQUENCIA = ['lead', 'atendimento', 'agendamento', 'visita', 'proposta', 'venda']
 
 const URGENCIA_COR = {
   alta: '#EF4444',
@@ -269,7 +269,7 @@ export default function Kanban() {
 function LeadCard({ lead, atualizando, followUp, onDetalhes, onAvancar, onPerdido, onFollowUp, onConversa }) {
   const proximo = proximoStatus(lead.status)
   const podeAvancar = !!proximo
-  const podePerdido = lead.status !== 'fechado' && lead.status !== 'perdido'
+  const podePerdido = lead.status !== 'venda' && lead.status !== 'perdido'
   const tempo = lead.atualizadoEm ? tempoNaEtapa(lead.atualizadoEm) : null
   const fuInfo = followUp ? formatarFollowUp(followUp.dataHora) : null
 
@@ -618,8 +618,8 @@ const QUALIFICACAO_LABELS = {
 }
 
 const STATUS_COR_MODAL = {
-  novo: '#3B82F6', qualificado: '#8B5CF6', atendimento: '#F59E0B',
-  visita: '#f97316', proposta: '#6366f1', fechado: '#10B981', perdido: '#EF4444',
+  lead: '#3B82F6', atendimento: '#6366f1', agendamento: '#8B5CF6',
+  visita: '#F59E0B', proposta: '#f97316', venda: '#10B981', perdido: '#EF4444',
 }
 
 function ModalDetalhes({ lead, onClose, onSalvo }) {

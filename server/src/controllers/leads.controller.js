@@ -127,6 +127,7 @@ async function criar(req, res) {
         nome,
         telefone,
         whatsappJid: whatsappJid || `${telefone}@s.whatsapp.net`,
+        status: 'lead',
         observacoes: observacoes || null,
         corretorId: corretorId || null,
         imobiliariaId: req.imobiliariaId,

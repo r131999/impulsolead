@@ -47,13 +47,13 @@ async function getDashboard(req, res) {
     prisma.lead.count({ where: { imobiliariaId, criadoEm: { gte: hojeInicio, lte: hojeToday } } }),
     prisma.lead.count({ where: { imobiliariaId, criadoEm: { gte: ontemInicio, lte: ontemFim } } }),
     prisma.lead.count({ where: { imobiliariaId, status: 'atendimento' } }),
-    prisma.lead.count({ where: { imobiliariaId, status: 'visita' } }),
-    prisma.lead.count({ where: { imobiliariaId, status: 'fechado', criadoEm: { gte: mesInicio } } }),
-    prisma.lead.count({ where: { imobiliariaId, status: 'fechado', criadoEm: { gte: mesPassadoInicio, lte: mesPassadoFim } } }),
+    prisma.lead.count({ where: { imobiliariaId, status: 'agendamento' } }),
+    prisma.lead.count({ where: { imobiliariaId, status: 'venda', criadoEm: { gte: mesInicio } } }),
+    prisma.lead.count({ where: { imobiliariaId, status: 'venda', criadoEm: { gte: mesPassadoInicio, lte: mesPassadoFim } } }),
     prisma.lead.count({ where: { imobiliariaId, status: { not: 'perdido' }, criadoEm: { gte: mesInicio } } }),
     prisma.lead.count({ where: { imobiliariaId, status: { not: 'perdido' }, criadoEm: { gte: mesPassadoInicio, lte: mesPassadoFim } } }),
     prisma.corretor.count({ where: { imobiliariaId, ativo: true, disponivel: true } }),
-    prisma.lead.count({ where: { imobiliariaId, status: { in: ['novo', 'qualificado'] }, corretorId: null } }),
+    prisma.lead.count({ where: { imobiliariaId, status: 'lead', corretorId: null } }),
     prisma.lead.findMany({
       where: { imobiliariaId },
       orderBy: { criadoEm: 'desc' },
@@ -68,7 +68,7 @@ async function getDashboard(req, res) {
       where: {
         imobiliariaId,
         corretorId: { not: null },
-        status: { not: 'novo' },
+        status: { not: 'lead' },
       },
       select: { criadoEm: true, atualizadoEm: true },
       take: 100,
@@ -138,8 +138,8 @@ async function getDashboardCorretor(req, res) {
     prisma.lead.count({ where: { imobiliariaId, corretorId } }),
     prisma.lead.count({ where: { imobiliariaId, corretorId, criadoEm: { gte: hojeInicio, lte: hojeFim } } }),
     prisma.lead.count({ where: { imobiliariaId, corretorId, status: 'atendimento' } }),
-    prisma.lead.count({ where: { imobiliariaId, corretorId, status: 'visita' } }),
-    prisma.lead.count({ where: { imobiliariaId, corretorId, status: 'fechado', criadoEm: { gte: mesInicio } } }),
+    prisma.lead.count({ where: { imobiliariaId, corretorId, status: 'agendamento' } }),
+    prisma.lead.count({ where: { imobiliariaId, corretorId, status: 'venda', criadoEm: { gte: mesInicio } } }),
     prisma.lead.count({ where: { imobiliariaId, corretorId, status: { not: 'perdido' } } }),
     prisma.lead.findMany({
       where: { imobiliariaId, corretorId },
@@ -212,8 +212,8 @@ async function getDashboardGerente(req, res) {
   ] = await prisma.$transaction([
     prisma.lead.count({ where: { ...whereEquipe, criadoEm: { gte: hojeInicio, lte: hojeFim } } }),
     prisma.lead.count({ where: { ...whereEquipe, status: 'atendimento' } }),
-    prisma.lead.count({ where: { ...whereEquipe, status: 'visita' } }),
-    prisma.lead.count({ where: { ...whereEquipe, status: 'fechado', criadoEm: { gte: mesInicio } } }),
+    prisma.lead.count({ where: { ...whereEquipe, status: 'agendamento' } }),
+    prisma.lead.count({ where: { ...whereEquipe, status: 'venda', criadoEm: { gte: mesInicio } } }),
     prisma.lead.count({ where: { ...whereEquipe, status: { not: 'perdido' } } }),
     prisma.lead.findMany({
       where: whereEquipe,
@@ -238,7 +238,7 @@ async function getDashboardGerente(req, res) {
     return {
       nome: c.nome,
       leads: leadsC.length,
-      fechamentos: leadsC.filter((l) => l.status === 'fechado').length,
+      fechamentos: leadsC.filter((l) => l.status === 'venda').length,
     };
   }).sort((a, b) => b.fechamentos - a.fechamentos || b.leads - a.leads);
 
@@ -267,7 +267,7 @@ async function getFunil(req, res) {
   const mapa = {};
   for (const c of contagens) mapa[c.status] = c._count.id;
 
-  const etapas = ['novo', 'qualificado', 'atendimento', 'visita', 'proposta', 'fechado'];
+  const etapas = ['lead', 'atendimento', 'agendamento', 'visita', 'proposta', 'venda'];
   const funil = etapas.map((s) => ({ status: s, total: mapa[s] || 0 }));
 
   res.json({ funil, perdidos: mapa['perdido'] || 0 });

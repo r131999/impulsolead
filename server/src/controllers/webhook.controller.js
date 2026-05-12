@@ -54,13 +54,13 @@ async function receberLead(req, res) {
   const faixaValorSan        = sanitizarTexto(faixaValor);
 
   const result = await prisma.$transaction(async (tx) => {
-    // 1. Cria o lead com status qualificado
+    // 1. Cria o lead com status lead
     const lead = await tx.lead.create({
       data: {
         nome: nomeSanitizado,
         telefone: telefoneSanitizado,
         whatsappJid: whatsappJid || `${telefoneSanitizado}@s.whatsapp.net`,
-        status: 'qualificado',
+        status: 'lead',
         primeiroImovel: primeiroImovelSan,
         tipoRenda: tipoRendaSan,
         rendaMensal: rendaMensalSan,

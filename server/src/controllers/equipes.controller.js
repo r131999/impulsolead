@@ -36,14 +36,14 @@ async function listar(req, res) {
   const result = equipes.map((equipe) => {
     const corretoresComMetricas = equipe.corretores.map((c) => {
       const leads = leadsPorCorretor[c.id] || [];
-      const fechamentos = leads.filter((l) => l.status === 'fechado').length;
+      const fechamentos = leads.filter((l) => l.status === 'venda').length;
       return {
         id: c.id,
         nome: c.nome,
         leadsRecebidos: c.leadsRecebidos,
         leads: leads.length,
         emAtendimento: leads.filter((l) => l.status === 'atendimento').length,
-        visitasAgendadas: leads.filter((l) => l.status === 'visita').length,
+        visitasAgendadas: leads.filter((l) => l.status === 'agendamento').length,
         fechamentos,
         taxaConversao: leads.length === 0 ? 0 : Math.round((fechamentos / leads.length) * 100),
       };
@@ -51,7 +51,7 @@ async function listar(req, res) {
 
     const todosLeads = equipe.corretores.flatMap((c) => leadsPorCorretor[c.id] || []);
     const totalLeads = todosLeads.length;
-    const fechamentos = todosLeads.filter((l) => l.status === 'fechado').length;
+    const fechamentos = todosLeads.filter((l) => l.status === 'venda').length;
     const naoPercidos = todosLeads.filter((l) => l.status !== 'perdido').length;
 
     return {

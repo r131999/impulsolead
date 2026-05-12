@@ -2,7 +2,7 @@ const { PrismaClient } = require('@prisma/client');
 
 const prisma = new PrismaClient();
 
-const STATUS_VALIDOS = ['novo', 'qualificado', 'atendimento', 'visita', 'proposta', 'fechado', 'perdido'];
+const STATUS_VALIDOS = ['lead', 'atendimento', 'agendamento', 'visita', 'proposta', 'venda', 'perdido'];
 
 async function proximoCorretor(imobiliariaId) {
   return prisma.$transaction(async (tx) => {

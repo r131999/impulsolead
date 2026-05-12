@@ -3,7 +3,7 @@ const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
 const PERIODOS_VALIDOS = [7, 30, 90];
-const STATUS_ORDEM = ['novo', 'qualificado', 'atendimento', 'visita', 'proposta', 'fechado', 'perdido'];
+const STATUS_ORDEM = ['lead', 'atendimento', 'agendamento', 'visita', 'proposta', 'venda', 'perdido'];
 
 async function getRelatorios(req, res) {
   const periodo = parseInt(req.query.periodo) || 30;
@@ -59,7 +59,7 @@ async function getRelatorios(req, res) {
 
   // Taxa de conversão
   const naoPercidos = leads.filter((l) => l.status !== 'perdido').length;
-  const fechados = leads.filter((l) => l.status === 'fechado').length;
+  const fechados = leads.filter((l) => l.status === 'venda').length;
   const taxaConversao = naoPercidos === 0 ? 0 : Math.round((fechados / naoPercidos) * 100);
 
   // Motivos de perda
@@ -73,7 +73,7 @@ async function getRelatorios(req, res) {
   // Leads por corretor
   const porCorretor = corretores.map((c) => {
     const leadsCorretor = leads.filter((l) => l.corretor?.id === c.id);
-    const fechadosCorretor = leadsCorretor.filter((l) => l.status === 'fechado').length;
+    const fechadosCorretor = leadsCorretor.filter((l) => l.status === 'venda').length;
     return {
       id: c.id,
       nome: c.nome,
@@ -112,7 +112,7 @@ async function getRelatorios(req, res) {
     .map(([regiao, total]) => ({ regiao, total }));
 
   // Tempo médio de resposta em minutos
-  const leadsRespondidos = leads.filter((l) => l.status !== 'novo' && l.corretor);
+  const leadsRespondidos = leads.filter((l) => l.status !== 'lead' && l.corretor);
   const tempoMedioResposta = leadsRespondidos.length === 0 ? 0 : Math.round(
     leadsRespondidos.reduce((acc, l) => {
       return acc + (new Date(l.atualizadoEm) - new Date(l.criadoEm)) / 60000;
@@ -186,7 +186,7 @@ async function getRelatoriosEquipes(req, res) {
         id: c.id,
         nome: c.nome,
         leads: cLeads.length,
-        fechamentos: cLeads.filter((l) => l.status === 'fechado').length,
+        fechamentos: cLeads.filter((l) => l.status === 'venda').length,
       };
     }).sort((a, b) => b.fechamentos - a.fechamentos || b.leads - a.leads);
 
@@ -274,7 +274,7 @@ async function getRelatoriosGerente(req, res) {
   }, {});
 
   const naoPercidos = leads.filter((l) => l.status !== 'perdido').length;
-  const fechados = leads.filter((l) => l.status === 'fechado').length;
+  const fechados = leads.filter((l) => l.status === 'venda').length;
   const taxaConversao = naoPercidos === 0 ? 0 : Math.round((fechados / naoPercidos) * 100);
 
   const perdidos = leads.filter((l) => l.status === 'perdido' && l.motivoPerda);
@@ -286,7 +286,7 @@ async function getRelatoriosGerente(req, res) {
 
   const porCorretor = equipe.corretores.map((c) => {
     const leadsC = leads.filter((l) => l.corretor?.id === c.id);
-    const fechadosC = leadsC.filter((l) => l.status === 'fechado').length;
+    const fechadosC = leadsC.filter((l) => l.status === 'venda').length;
     return {
       id: c.id,
       nome: c.nome,
@@ -357,7 +357,7 @@ async function getRelatoriosOrigem(req, res) {
     const key = l.origem || 'Não informado';
     if (!grupos[key]) grupos[key] = { total: 0, fechados: 0 };
     grupos[key].total++;
-    if (l.status === 'fechado') grupos[key].fechados++;
+    if (l.status === 'venda') grupos[key].fechados++;
   });
 
   const origens = Object.entries(grupos)
