@@ -370,7 +370,20 @@ async function detalhes(req, res) {
     data.nomeEditado = nomeTrimmed;
   }
   if (origem !== undefined) data.origem = origem || null;
-  if (observacoes !== undefined) data.observacoes = observacoes ? observacoes.trim() || null : null;
+  if (observacoes !== undefined) {
+    const textoBase = observacoes ? observacoes.trim() : null;
+    if (!textoBase) {
+      data.observacoes = null;
+    } else {
+      const agora = new Date();
+      const pad = (n) => String(n).padStart(2, '0');
+      const dataStr = `${pad(agora.getDate())}/${pad(agora.getMonth() + 1)}/${agora.getFullYear()}`;
+      const horaStr = `${pad(agora.getHours())}:${pad(agora.getMinutes())}`;
+      const marcador = `— Atualizado em ${dataStr} às ${horaStr}`;
+      const semTimestamp = textoBase.replace(/\n\n— Atualizado em \d{2}\/\d{2}\/\d{4} às \d{2}:\d{2}$/, '').trimEnd();
+      data.observacoes = `${semTimestamp}\n\n${marcador}`;
+    }
+  }
 
   const atualizado = await prisma.lead.update({
     where: { id },

@@ -101,6 +101,31 @@ async function notificarCorretor(corretor, lead, imobiliaria) {
   }
 }
 
+async function notificarGestorPendencia(telefoneGestor, nomeCorretor) {
+  const apiUrl    = process.env.EVOLUTION_API_URL;
+  const apiKey    = process.env.EVOLUTION_API_KEY;
+  const instancia = process.env.EVOLUTION_INSTANCE_NAME;
+
+  if (!apiUrl || !apiKey || !instancia) {
+    console.log('[notificacao] Evolution API não configurada — notificação de pendência ignorada');
+    return { enviado: false };
+  }
+
+  const numero = formatarNumero(telefoneGestor);
+  const texto  = `⚠️ *${nomeCorretor}* foi pulado na fila.\nMotivo: lead parado há mais de 24h sem observação.`;
+  const url    = `${apiUrl}/message/sendText/${instancia}`;
+  const body   = JSON.stringify({ number: numero, text: texto });
+
+  try {
+    await httpPost(url, body, { apikey: apiKey });
+    console.log(`[notificacao] Pendência notificada ao gestor sobre ${nomeCorretor}`);
+    return { enviado: true };
+  } catch (err) {
+    console.error('[notificacao] Falha ao notificar gestor sobre pendência:', err.message);
+    return { enviado: false };
+  }
+}
+
 function httpPost(url, body, extraHeaders = {}) {
   return new Promise((resolve, reject) => {
     const parsed = new URL(url);
@@ -138,4 +163,4 @@ function httpPost(url, body, extraHeaders = {}) {
   });
 }
 
-module.exports = { notificarCorretor };
+module.exports = { notificarCorretor, notificarGestorPendencia };
