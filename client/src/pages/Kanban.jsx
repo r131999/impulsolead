@@ -68,6 +68,11 @@ function proximoStatus(status) {
   return idx >= 0 && idx < SEQUENCIA.length - 1 ? SEQUENCIA[idx + 1] : null
 }
 
+function statusAnterior(status) {
+  const idx = SEQUENCIA.indexOf(status)
+  return idx > 0 ? SEQUENCIA[idx - 1] : null
+}
+
 function agrupar(leads) {
   const grupos = {}
   COLUNAS.forEach((c) => (grupos[c.id] = []))
@@ -116,6 +121,18 @@ export default function Kanban() {
     setAtualizando(lead.id)
     try {
       await leadsApi.mudarStatus(lead.id, { status: proximo })
+      carregar()
+    } finally {
+      setAtualizando(null)
+    }
+  }
+
+  const voltar = async (lead) => {
+    const anterior = statusAnterior(lead.status)
+    if (!anterior) return
+    setAtualizando(lead.id)
+    try {
+      await leadsApi.mudarStatus(lead.id, { status: anterior })
       carregar()
     } finally {
       setAtualizando(null)
@@ -212,8 +229,10 @@ export default function Kanban() {
                     lead={lead}
                     atualizando={atualizando === lead.id}
                     followUp={followUpsMap[lead.id] || null}
+                    podeGerenciar={!isCorretor}
                     onDetalhes={() => setModalDetalhes(lead)}
                     onAvancar={() => avancar(lead)}
+                    onVoltar={() => voltar(lead)}
                     onPerdido={() => abrirPerda(lead)}
                     onFollowUp={() => setModalFU({ lead, followUp: followUpsMap[lead.id] || null })}
                     onConversa={lead.temConversa ? () => setModalConversa(lead) : null}
@@ -266,10 +285,11 @@ export default function Kanban() {
   )
 }
 
-function LeadCard({ lead, atualizando, followUp, onDetalhes, onAvancar, onPerdido, onFollowUp, onConversa }) {
+function LeadCard({ lead, atualizando, followUp, podeGerenciar, onDetalhes, onAvancar, onVoltar, onPerdido, onFollowUp, onConversa }) {
   const proximo = proximoStatus(lead.status)
   const podeAvancar = !!proximo
   const podePerdido = lead.status !== 'venda' && lead.status !== 'perdido'
+  const podeVoltar = podeGerenciar && !!statusAnterior(lead.status) && lead.status !== 'venda'
   const tempo = lead.atualizadoEm ? tempoNaEtapa(lead.atualizadoEm) : null
   const fuInfo = followUp ? formatarFollowUp(followUp.dataHora) : null
 
@@ -333,8 +353,20 @@ function LeadCard({ lead, atualizando, followUp, onDetalhes, onAvancar, onPerdid
       )}
 
       <div className="mt-2.5 pt-2" style={{ borderTop: '1px solid #1E293B' }}>
-        {(podeAvancar || podePerdido) && (
+        {(podeAvancar || podePerdido || podeVoltar) && (
           <div className="flex gap-1.5 mb-1.5">
+            {podeVoltar && (
+              <button
+                onClick={onVoltar}
+                disabled={atualizando}
+                className="text-xs font-medium px-2.5 rounded-md transition-colors disabled:opacity-50 flex items-center justify-center"
+                style={{ backgroundColor: 'rgba(100,116,139,0.12)', color: '#64748B', minHeight: 36 }}
+                onMouseEnter={(e) => { if (!atualizando) e.currentTarget.style.backgroundColor = 'rgba(100,116,139,0.22)' }}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'rgba(100,116,139,0.12)'}
+              >
+                ← Voltar
+              </button>
+            )}
             {podeAvancar && (
               <button
                 onClick={onAvancar}
