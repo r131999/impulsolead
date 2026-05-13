@@ -27,6 +27,7 @@ model Imobiliaria {
   contatosImportados ContatoImportado[]
   modelosMensagem    ModeloMensagem[]
   contatosPessoais   ContatoPessoal[]
+  imoveis            Imovel[]
 }
 
 model Usuario {
@@ -197,6 +198,25 @@ model ContatoPessoal {
 
   criadoEm     DateTime @default(now())
   atualizadoEm DateTime @updatedAt
+}
+
+model Imovel {
+  id            String   @id @default(uuid())
+  nome          String
+  descricao     String
+  tipo          String
+  localizacao   String
+  valorMin      Float?
+  valorMax      Float?
+  quartos       Int?
+  area          String?
+  status        String   @default("disponivel")
+  destaque      Boolean  @default(false)
+  criadoEm     DateTime @default(now())
+  atualizadoEm  DateTime @updatedAt
+
+  imobiliariaId String
+  imobiliaria   Imobiliaria @relation(fields: [imobiliariaId], references: [id])
 }
 
 model ConfigAgente {

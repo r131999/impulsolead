@@ -10,13 +10,16 @@ const NAV_GESTOR = [
   { to: '/corretores', label: 'Corretores',    icon: HomeIcon },
   { to: '/equipes',    label: 'Equipes',       icon: EquipeIcon },
   { to: '/relatorios', label: 'Relatórios',    icon: BarChartIcon },
+  { to: '/imoveis',    label: 'Imóveis',       icon: BuildingIcon },
   { to: '/config',     label: 'Agente IA',     icon: BotIcon },
+  { to: '/chat',       label: 'Assistente IA', icon: ChatIAIcon },
 ]
 
 const NAV_CORRETOR = [
   { to: '/meus-leads',     label: 'Meus Leads',     icon: KanbanIcon },
   { to: '/meu-desempenho', label: 'Meu Desempenho', icon: ChartIcon },
   { to: '/meus-contatos',  label: 'Meus Contatos',  icon: ContactIcon },
+  { to: '/chat',           label: 'Assistente IA',  icon: ChatIAIcon },
 ]
 
 const NAV_GERENTE = [
@@ -24,7 +27,9 @@ const NAV_GERENTE = [
   { to: '/gerente/leads',        label: 'Leads da Equipe',     icon: KanbanIcon },
   { to: '/gerente/minha-equipe', label: 'Minha Equipe',        icon: UsersIcon },
   { to: '/gerente/relatorios',   label: 'Relatório da Equipe', icon: BarChartIcon },
+  { to: '/imoveis',              label: 'Imóveis',             icon: BuildingIcon },
   { to: '/meus-contatos',        label: 'Meus Contatos',       icon: ContactIcon },
+  { to: '/chat',                 label: 'Assistente IA',       icon: ChatIAIcon },
 ]
 
 export default function Layout() {
@@ -196,6 +201,22 @@ function ContactIcon({ className }) {
   return (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+    </svg>
+  )
+}
+
+function BuildingIcon({ className }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 21h19.5m-18-18v18m10.5-18v18m6-13.5V21M6.75 6.75h.75m-.75 3h.75m-.75 3h.75m3-6h.75m-.75 3h.75m-.75 3h.75M6.75 21v-3.375c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21M3 3h12m-.75 4.5H21m-3.75 3.75h.008v.008h-.008v-.008zm0 3h.008v.008h-.008v-.008zm0 3h.008v.008h-.008v-.008z" />
+    </svg>
+  )
+}
+
+function ChatIAIcon({ className }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
     </svg>
   )
 }

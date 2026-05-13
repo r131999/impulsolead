@@ -15,6 +15,8 @@ import DashboardGerente from './pages/DashboardGerente'
 import MinhaEquipe from './pages/MinhaEquipe'
 import RelatoriosGerente from './pages/RelatoriosGerente'
 import MeusContatos from './pages/MeusContatos'
+import Chat from './pages/Chat'
+import Imoveis from './pages/Imoveis'
 
 function HomeRedirect() {
   const { usuario } = useAuth()
@@ -47,6 +49,10 @@ export default function App() {
             <Route path="equipes" element={<Equipes />} />
             <Route path="relatorios" element={<Relatorios />} />
             <Route path="config" element={<ConfigAgente />} />
+
+            {/* Rotas compartilhadas */}
+            <Route path="chat" element={<Chat />} />
+            <Route path="imoveis" element={<Imoveis />} />
 
             {/* Rotas do corretor */}
             <Route path="meus-leads" element={<Kanban />} />

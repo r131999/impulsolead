@@ -17,6 +17,8 @@ const usuariosRoutes = require('./routes/usuarios.routes');
 const webhookRoutes = require('./routes/webhook.routes');
 const followupsRoutes = require('./routes/followups.routes');
 const contatosPessoaisRoutes = require('./routes/contatos-pessoais.routes');
+const imoveisRoutes = require('./routes/imoveis.routes');
+const chatRoutes = require('./routes/chat.routes');
 
 const app = express();
 
@@ -49,6 +51,8 @@ app.use('/api/usuarios', usuariosRoutes);
 app.use('/api/webhook', webhookRoutes);
 app.use('/api/followups', followupsRoutes);
 app.use('/api/contatos-pessoais', contatosPessoaisRoutes);
+app.use('/api/imoveis', imoveisRoutes);
+app.use('/api/chat', chatRoutes);
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
