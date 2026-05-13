@@ -82,6 +82,20 @@ function agrupar(leads) {
   return grupos
 }
 
+function temPendenciaLocal(lead) {
+  if (lead.status === 'venda' || lead.status === 'perdido') return false
+  if (!lead.atualizadoEm) return false
+  const diffMs = Date.now() - new Date(lead.atualizadoEm).getTime()
+  return diffMs > 24 * 60 * 60 * 1000 && !lead.observacoes
+}
+
+function extrairTimestamp(texto) {
+  if (!texto) return { conteudo: '', timestamp: null }
+  const match = texto.match(/\n\n— Atualizado em (\d{2}\/\d{2}\/\d{4} às \d{2}:\d{2})$/)
+  if (!match) return { conteudo: texto, timestamp: null }
+  return { conteudo: texto.slice(0, texto.length - match[0].length).trimEnd(), timestamp: match[1] }
+}
+
 export default function Kanban() {
   const { isCorretor, isGerente } = useAuth()
   const [grupos, setGrupos] = useState(() => agrupar([]))
@@ -290,6 +304,7 @@ function LeadCard({ lead, atualizando, followUp, podeGerenciar, onDetalhes, onAv
   const podeAvancar = !!proximo
   const podePerdido = lead.status !== 'venda' && lead.status !== 'perdido'
   const podeVoltar = podeGerenciar && !!statusAnterior(lead.status) && lead.status !== 'venda'
+  const pendente = podeGerenciar && temPendenciaLocal(lead)
   const tempo = lead.atualizadoEm ? tempoNaEtapa(lead.atualizadoEm) : null
   const fuInfo = followUp ? formatarFollowUp(followUp.dataHora) : null
 
@@ -298,7 +313,7 @@ function LeadCard({ lead, atualizando, followUp, podeGerenciar, onDetalhes, onAv
       className="rounded-lg p-3 transition-shadow"
       style={{
         backgroundColor: '#111827',
-        border: fuInfo?.cor === '#EF4444' ? '1px solid rgba(239,68,68,0.35)' : '1px solid #1E293B',
+        border: pendente ? '1px solid rgba(239,68,68,0.4)' : fuInfo?.cor === '#EF4444' ? '1px solid rgba(239,68,68,0.35)' : '1px solid #1E293B',
         boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
         opacity: atualizando ? 0.6 : 1,
       }}
@@ -312,18 +327,29 @@ function LeadCard({ lead, atualizando, followUp, podeGerenciar, onDetalhes, onAv
         >
           {lead.nome}
         </button>
-        {onConversa && (
-          <button
-            onClick={onConversa}
-            className="flex-shrink-0 text-sm leading-none flex items-center justify-center rounded transition-colors"
-            style={{ color: '#64748B', minWidth: 36, minHeight: 36 }}
-            onMouseEnter={(e) => { e.currentTarget.style.color = '#94A3B8'; e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.06)' }}
-            onMouseLeave={(e) => { e.currentTarget.style.color = '#64748B'; e.currentTarget.style.backgroundColor = 'transparent' }}
-            title="Ver conversa com agente"
-          >
-            💬
-          </button>
-        )}
+        <div className="flex items-center gap-1 flex-shrink-0">
+          {pendente && (
+            <span
+              className="text-xs font-bold rounded px-1.5 py-0.5"
+              style={{ backgroundColor: 'rgba(239,68,68,0.15)', color: '#EF4444', fontSize: 10, lineHeight: '16px' }}
+              title="Lead parado há mais de 24h sem observação"
+            >
+              ⚠️ Pendente
+            </span>
+          )}
+          {onConversa && (
+            <button
+              onClick={onConversa}
+              className="text-sm leading-none flex items-center justify-center rounded transition-colors"
+              style={{ color: '#64748B', minWidth: 36, minHeight: 36 }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = '#94A3B8'; e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.06)' }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = '#64748B'; e.currentTarget.style.backgroundColor = 'transparent' }}
+              title="Ver conversa com agente"
+            >
+              💬
+            </button>
+          )}
+        </div>
       </div>
       <p className="text-xs mt-0.5" style={{ color: '#64748B' }}>{lead.telefone}</p>
       {tempo && (
@@ -655,9 +681,11 @@ const STATUS_COR_MODAL = {
 }
 
 function ModalDetalhes({ lead, onClose, onSalvo }) {
+  const { conteudo: conteudoInicial, timestamp: tsInicial } = extrairTimestamp(lead.observacoes || '')
   const [nome, setNome] = useState(lead.nome)
   const [origem, setOrigem] = useState(lead.origem || '')
-  const [observacoes, setObservacoes] = useState(lead.observacoes || '')
+  const [observacoes, setObservacoes] = useState(conteudoInicial)
+  const [ultimaAtualizacao] = useState(tsInicial)
   const [salvando, setSalvando] = useState(false)
   const [erro, setErro] = useState('')
   const [copiado, setCopiado] = useState(false)
@@ -783,8 +811,13 @@ function ModalDetalhes({ lead, onClose, onSalvo }) {
               rows={3}
               value={observacoes}
               onChange={(e) => setObservacoes(e.target.value)}
-              placeholder="Adicione observações sobre este lead..."
+              placeholder="Registre o status do atendimento... (obrigatório para leads parados há mais de 24h)"
             />
+            {ultimaAtualizacao && (
+              <p className="text-xs mt-1" style={{ color: '#475569' }}>
+                Última atualização: {ultimaAtualizacao}
+              </p>
+            )}
           </div>
         </div>
 
