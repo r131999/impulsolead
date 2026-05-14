@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate, Navigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { register as registerApi } from '../api/auth'
@@ -19,6 +19,15 @@ export default function Login() {
   const [erro, setErro] = useState('')
   const [loading, setLoading] = useState(false)
   const [mostrarSenha, setMostrarSenha] = useState(false)
+  const [suspendedMsg, setSuspendedMsg] = useState('')
+
+  useEffect(() => {
+    const msg = localStorage.getItem('suspended_msg')
+    if (msg) {
+      setSuspendedMsg(msg)
+      localStorage.removeItem('suspended_msg')
+    }
+  }, [])
 
   if (usuario) {
     return <Navigate to={usuario.role === 'corretor' ? '/meus-leads' : '/dashboard'} replace />
@@ -65,6 +74,16 @@ export default function Login() {
           <img src="/logo-colorida.png" alt="ImpulsoLead" style={{ height: '48px', display: 'block' }} />
           <p className="text-indigo-300 mt-1 text-sm">CRM para imobiliárias</p>
         </div>
+
+        {suspendedMsg && (
+          <div
+            className="flex items-start gap-3 rounded-xl px-4 py-3 mb-4 text-sm"
+            style={{ backgroundColor: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.35)', color: '#fca5a5' }}
+          >
+            <span className="mt-0.5 shrink-0">⚠️</span>
+            <span>{suspendedMsg}</span>
+          </div>
+        )}
 
         <div className="rounded-2xl shadow-2xl p-8" style={{ backgroundColor: '#111827', border: '1px solid #1E293B' }}>
           {/* Tabs gestor/corretor/registrar */}
