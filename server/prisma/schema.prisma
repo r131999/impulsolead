@@ -219,6 +219,16 @@ model Imovel {
   imobiliaria   Imobiliaria @relation(fields: [imobiliariaId], references: [id])
 }
 
+model UsuarioSupremo {
+  id           String   @id @default(uuid())
+  nome         String
+  email        String   @unique
+  senhaHash    String
+  ativo        Boolean  @default(true)
+  criadoEm    DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+}
+
 model ConfigAgente {
   id                 String  @id @default(uuid())
   mensagemBoasVindas String  @default("Olá! Tudo bem? Aqui é a Lia, assistente virtual. Que bom que você entrou em contato! Como posso te chamar?")

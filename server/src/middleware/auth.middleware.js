@@ -15,7 +15,18 @@ async function authMiddleware(req, res, next) {
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    if (decoded.corretorId) {
+    if (decoded.role === 'supremo') {
+      const supremo = await prisma.usuarioSupremo.findUnique({
+        where: { id: decoded.userId },
+      });
+
+      if (!supremo || !supremo.ativo) {
+        return res.status(401).json({ error: 'Usuário supremo não encontrado ou inativo' });
+      }
+
+      req.role = 'supremo';
+      req.usuario = { id: supremo.id, nome: supremo.nome, email: supremo.email, role: 'supremo' };
+    } else if (decoded.corretorId) {
       const corretor = await prisma.corretor.findUnique({
         where: { id: decoded.corretorId },
         include: {
