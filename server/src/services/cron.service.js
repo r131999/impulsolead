@@ -4,6 +4,23 @@ const { enviarWhatsApp } = require('./notificacao.service');
 
 const prisma = new PrismaClient();
 
+// Brasília = UTC-3. Midnight Brasília = 03:00 UTC.
+function inicioDiaBrasilia(agora) {
+  const d = new Date(agora);
+  d.setUTCHours(3, 0, 0, 0);
+  if (agora.getUTCHours() < 3) {
+    d.setUTCDate(d.getUTCDate() - 1);
+  }
+  return d;
+}
+
+function fmtDataBrasilia(d) {
+  const br = new Date(d.getTime() - 3 * 60 * 60 * 1000);
+  const dd = String(br.getUTCDate()).padStart(2, '0');
+  const mm = String(br.getUTCMonth() + 1).padStart(2, '0');
+  return `${dd}/${mm}`;
+}
+
 const STATUS_LABEL = {
   lead:        'Novo lead',
   atendimento: 'Em atendimento',
@@ -18,8 +35,7 @@ async function verificarLeadsParados() {
   console.log('[cron] Verificando leads parados...');
 
   const limite48h = new Date(Date.now() - 48 * 60 * 60 * 1000);
-  const inicioDia = new Date();
-  inicioDia.setHours(0, 0, 0, 0);
+  const inicioDia = inicioDiaBrasilia(new Date());
 
   const leads = await prisma.lead.findMany({
     where: {
@@ -86,9 +102,7 @@ async function enviarRelatorioSemanal() {
   console.log('[cron] Enviando relatórios semanais...');
 
   const agora = new Date();
-  const seteDiasAtras = new Date(agora.getTime() - 7 * 24 * 60 * 60 * 1000);
-
-  const fmt = (d) => d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+  const seteDiasAtras = new Date(inicioDiaBrasilia(agora).getTime() - 7 * 24 * 60 * 60 * 1000);
 
   const imobiliarias = await prisma.imobiliaria.findMany({
     where: { plano: { not: 'cancelado' } },
@@ -147,7 +161,7 @@ async function enviarRelatorioSemanal() {
       const texto = [
         `📊 Relatório semanal — ${imob.nome}`,
         ``,
-        `Semana de ${fmt(seteDiasAtras)} a ${fmt(agora)}`,
+        `Semana de ${fmtDataBrasilia(seteDiasAtras)} a ${fmtDataBrasilia(agora)}`,
         ``,
         `📥 Leads recebidos: ${leadsRecebidos}`,
         `✅ Vendas fechadas: ${vendasFechadas}`,
