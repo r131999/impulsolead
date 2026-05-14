@@ -2,10 +2,16 @@ const { PrismaClient } = require('@prisma/client');
 
 const prisma = new PrismaClient();
 
+// Primeiro dia do mês corrente em Brasília (UTC-3) às 03:00 UTC = meia-noite local
+function mesInicioBrasilia(agora) {
+  const br = new Date(agora.getTime() - 3 * 60 * 60 * 1000);
+  return new Date(Date.UTC(br.getUTCFullYear(), br.getUTCMonth(), 1, 3, 0, 0, 0));
+}
+
 async function listar(req, res) {
   const imobiliariaId = req.imobiliariaId;
   const agora = new Date();
-  const mesInicio = new Date(agora.getFullYear(), agora.getMonth(), 1);
+  const mesInicio = mesInicioBrasilia(agora);
 
   const [equipes, leadsDoMes] = await prisma.$transaction([
     prisma.equipe.findMany({
