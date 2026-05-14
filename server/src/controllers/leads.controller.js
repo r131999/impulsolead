@@ -378,8 +378,10 @@ async function detalhes(req, res) {
     } else {
       const agora = new Date();
       const pad = (n) => String(n).padStart(2, '0');
-      const dataStr = `${pad(agora.getDate())}/${pad(agora.getMonth() + 1)}/${agora.getFullYear()}`;
-      const horaStr = `${pad(agora.getHours())}:${pad(agora.getMinutes())}`;
+      // Converte para Brasília (UTC-3) antes de formatar
+      const agoraBr = new Date(agora.getTime() - 3 * 60 * 60 * 1000);
+      const dataStr = `${pad(agoraBr.getUTCDate())}/${pad(agoraBr.getUTCMonth() + 1)}/${agoraBr.getUTCFullYear()}`;
+      const horaStr = `${pad(agoraBr.getUTCHours())}:${pad(agoraBr.getUTCMinutes())}`;
       const marcador = `— Atualizado em ${dataStr} às ${horaStr}`;
       const semTimestamp = textoBase.replace(/\n\n— Atualizado em \d{2}\/\d{2}\/\d{4} às \d{2}:\d{2}$/, '').trimEnd();
       data.observacoes = `${semTimestamp}\n\n${marcador}`;
