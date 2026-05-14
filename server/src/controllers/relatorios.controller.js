@@ -5,6 +5,22 @@ const prisma = new PrismaClient();
 const PERIODOS_VALIDOS = [7, 30, 90];
 const STATUS_ORDEM = ['lead', 'atendimento', 'agendamento', 'visita', 'proposta', 'venda', 'perdido'];
 
+// Brasília = UTC-3. Midnight Brasília = 03:00 UTC.
+
+function inicioDiaBrasilia(agora) {
+  const d = new Date(agora);
+  d.setUTCHours(3, 0, 0, 0);
+  if (agora.getUTCHours() < 3) {
+    d.setUTCDate(d.getUTCDate() - 1);
+  }
+  return d;
+}
+
+// Converte um timestamp UTC para a string de data no calendário Brasília (YYYY-MM-DD)
+function utcParaDataBrasilia(ts) {
+  return new Date(new Date(ts).getTime() - 3 * 60 * 60 * 1000).toISOString().split('T')[0];
+}
+
 async function getRelatorios(req, res) {
   const periodo = parseInt(req.query.periodo) || 30;
 
@@ -14,12 +30,8 @@ async function getRelatorios(req, res) {
 
   const imobiliariaId = req.imobiliariaId;
   const agora = new Date();
-  const dataInicio = new Date(agora);
-  dataInicio.setDate(dataInicio.getDate() - periodo);
-  dataInicio.setHours(0, 0, 0, 0);
-
-  const periodoAnteriorInicio = new Date(dataInicio);
-  periodoAnteriorInicio.setDate(periodoAnteriorInicio.getDate() - periodo);
+  const dataInicio = new Date(inicioDiaBrasilia(agora).getTime() - periodo * 24 * 60 * 60 * 1000);
+  const periodoAnteriorInicio = new Date(dataInicio.getTime() - periodo * 24 * 60 * 60 * 1000);
 
   const where = { imobiliariaId, criadoEm: { gte: dataInicio } };
   const whereAnterior = { imobiliariaId, criadoEm: { gte: periodoAnteriorInicio, lt: dataInicio } };
@@ -85,19 +97,17 @@ async function getRelatorios(req, res) {
     };
   }).sort((a, b) => b.totalLeads - a.totalLeads);
 
-  // Leads por dia (série temporal)
+  // Leads por dia (série temporal) — agrupado por data no calendário Brasília
   const leadsPorDia = {};
   leads.forEach((l) => {
-    const dia = new Date(l.criadoEm).toISOString().split('T')[0];
+    const dia = utcParaDataBrasilia(l.criadoEm);
     leadsPorDia[dia] = (leadsPorDia[dia] || 0) + 1;
   });
 
-  // Preenche dias sem leads com 0
+  // Preenche dias sem leads com 0, usando datas do calendário Brasília
   const serie = [];
   for (let i = periodo - 1; i >= 0; i--) {
-    const d = new Date(agora);
-    d.setDate(d.getDate() - i);
-    const chave = d.toISOString().split('T')[0];
+    const chave = utcParaDataBrasilia(agora.getTime() - i * 24 * 60 * 60 * 1000);
     serie.push({ data: chave, leads: leadsPorDia[chave] || 0 });
   }
 
@@ -149,9 +159,7 @@ async function getRelatoriosEquipes(req, res) {
 
   const imobiliariaId = req.imobiliariaId;
   const agora = new Date();
-  const dataInicio = new Date(agora);
-  dataInicio.setDate(dataInicio.getDate() - periodo);
-  dataInicio.setHours(0, 0, 0, 0);
+  const dataInicio = new Date(inicioDiaBrasilia(agora).getTime() - periodo * 24 * 60 * 60 * 1000);
 
   const [equipes, leads] = await prisma.$transaction([
     prisma.equipe.findMany({
@@ -227,12 +235,8 @@ async function getRelatoriosGerente(req, res) {
   }
 
   const agora = new Date();
-  const dataInicio = new Date(agora);
-  dataInicio.setDate(dataInicio.getDate() - periodo);
-  dataInicio.setHours(0, 0, 0, 0);
-
-  const periodoAnteriorInicio = new Date(dataInicio);
-  periodoAnteriorInicio.setDate(periodoAnteriorInicio.getDate() - periodo);
+  const dataInicio = new Date(inicioDiaBrasilia(agora).getTime() - periodo * 24 * 60 * 60 * 1000);
+  const periodoAnteriorInicio = new Date(dataInicio.getTime() - periodo * 24 * 60 * 60 * 1000);
 
   const equipe = await prisma.equipe.findUnique({
     where: { id: equipeId },
@@ -296,17 +300,16 @@ async function getRelatoriosGerente(req, res) {
     };
   }).sort((a, b) => b.totalLeads - a.totalLeads);
 
+  // Leads por dia — agrupado por data no calendário Brasília
   const leadsPorDia = {};
   leads.forEach((l) => {
-    const dia = new Date(l.criadoEm).toISOString().split('T')[0];
+    const dia = utcParaDataBrasilia(l.criadoEm);
     leadsPorDia[dia] = (leadsPorDia[dia] || 0) + 1;
   });
 
   const serie = [];
   for (let i = periodo - 1; i >= 0; i--) {
-    const d = new Date(agora);
-    d.setDate(d.getDate() - i);
-    const chave = d.toISOString().split('T')[0];
+    const chave = utcParaDataBrasilia(agora.getTime() - i * 24 * 60 * 60 * 1000);
     serie.push({ data: chave, leads: leadsPorDia[chave] || 0 });
   }
 
@@ -343,9 +346,7 @@ async function getRelatoriosOrigem(req, res) {
 
   const imobiliariaId = req.imobiliariaId;
   const agora = new Date();
-  const dataInicio = new Date(agora);
-  dataInicio.setDate(dataInicio.getDate() - periodo);
-  dataInicio.setHours(0, 0, 0, 0);
+  const dataInicio = new Date(inicioDiaBrasilia(agora).getTime() - periodo * 24 * 60 * 60 * 1000);
 
   const leads = await prisma.lead.findMany({
     where: { imobiliariaId, criadoEm: { gte: dataInicio } },
