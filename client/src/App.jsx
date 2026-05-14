@@ -1,6 +1,8 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
+import { AdminAuthProvider } from './context/AdminAuthContext'
 import ProtectedRoute from './components/ProtectedRoute'
+import AdminProtectedRoute from './components/AdminProtectedRoute'
 import Layout from './components/Layout'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
@@ -17,6 +19,8 @@ import RelatoriosGerente from './pages/RelatoriosGerente'
 import MeusContatos from './pages/MeusContatos'
 import Chat from './pages/Chat'
 import Imoveis from './pages/Imoveis'
+import AdminLogin from './pages/admin/AdminLogin'
+import AdminDashboard from './pages/admin/AdminDashboard'
 
 function HomeRedirect() {
   const { usuario } = useAuth()
@@ -65,6 +69,27 @@ export default function App() {
             <Route path="gerente/minha-equipe" element={<MinhaEquipe />} />
             <Route path="gerente/relatorios" element={<RelatoriosGerente />} />
           </Route>
+          {/* Rotas do painel admin — completamente separadas do CRM */}
+          <Route
+            path="/admin"
+            element={
+              <AdminAuthProvider>
+                <Outlet />
+              </AdminAuthProvider>
+            }
+          >
+            <Route index element={<Navigate to="dashboard" replace />} />
+            <Route path="login" element={<AdminLogin />} />
+            <Route
+              path="dashboard"
+              element={
+                <AdminProtectedRoute>
+                  <AdminDashboard />
+                </AdminProtectedRoute>
+              }
+            />
+          </Route>
+
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </AuthProvider>
