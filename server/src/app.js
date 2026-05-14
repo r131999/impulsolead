@@ -20,6 +20,7 @@ const contatosPessoaisRoutes = require('./routes/contatos-pessoais.routes');
 const imoveisRoutes = require('./routes/imoveis.routes');
 const chatRoutes = require('./routes/chat.routes');
 const adminRoutes = require('./routes/admin.routes');
+const { iniciarCrons } = require('./services/cron.service');
 
 const app = express();
 
@@ -72,6 +73,7 @@ app.use((err, req, res, next) => {
 const PORT = process.env.PORT || 3002;
 app.listen(PORT, () => {
   console.log(`ImpulsoLead API rodando na porta ${PORT}`);
+  iniciarCrons();
 });
 
 module.exports = app;

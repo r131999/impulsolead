@@ -106,6 +106,8 @@ model Lead {
   historico HistoricoLead[]
   followUps FollowUp[]
 
+  ultimaNotificacaoGestor DateTime?
+
   criadoEm    DateTime @default(now())
   atualizadoEm DateTime @updatedAt
 }
