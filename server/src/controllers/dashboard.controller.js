@@ -2,33 +2,48 @@ const { PrismaClient } = require('@prisma/client');
 
 const prisma = new PrismaClient();
 
-function inicioDia(date) {
-  const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
+// Brasília = UTC-3. Midnight Brasília = 03:00 UTC.
+// All day/month boundaries are calculated in UTC to avoid server timezone dependency.
+
+function inicioDiaBrasilia(agora) {
+  const d = new Date(agora);
+  d.setUTCHours(3, 0, 0, 0);
+  if (agora.getUTCHours() < 3) {
+    d.setUTCDate(d.getUTCDate() - 1);
+  }
   return d;
 }
 
-function fimDia(date) {
-  const d = new Date(date);
-  d.setHours(23, 59, 59, 999);
-  return d;
+function fimDiaBrasilia(agora) {
+  const inicio = inicioDiaBrasilia(agora);
+  return new Date(inicio.getTime() + 24 * 60 * 60 * 1000 - 1);
+}
+
+function mesInicioBrasilia(agora) {
+  // Shift to Brasília calendar date, then get first of month at 03:00 UTC (= midnight Brasília)
+  const br = new Date(agora.getTime() - 3 * 60 * 60 * 1000);
+  return new Date(Date.UTC(br.getUTCFullYear(), br.getUTCMonth(), 1, 3, 0, 0, 0));
+}
+
+function mesAnteriorInicioBrasilia(agora) {
+  const br = new Date(agora.getTime() - 3 * 60 * 60 * 1000);
+  return new Date(Date.UTC(br.getUTCFullYear(), br.getUTCMonth() - 1, 1, 3, 0, 0, 0));
 }
 
 async function getDashboard(req, res) {
   const imobiliariaId = req.imobiliariaId;
   const agora = new Date();
 
-  const hojeInicio = inicioDia(agora);
-  const hojeToday = fimDia(agora);
+  const hojeInicio = inicioDiaBrasilia(agora);
+  const hojeToday = fimDiaBrasilia(agora);
 
-  const ontem = new Date(agora);
-  ontem.setDate(ontem.getDate() - 1);
-  const ontemInicio = inicioDia(ontem);
-  const ontemFim = fimDia(ontem);
+  const ontemAgora = new Date(agora.getTime() - 24 * 60 * 60 * 1000);
+  const ontemInicio = inicioDiaBrasilia(ontemAgora);
+  const ontemFim = fimDiaBrasilia(ontemAgora);
 
-  const mesInicio = new Date(agora.getFullYear(), agora.getMonth(), 1);
-  const mesPassadoInicio = new Date(agora.getFullYear(), agora.getMonth() - 1, 1);
-  const mesPassadoFim = new Date(agora.getFullYear(), agora.getMonth(), 0, 23, 59, 59, 999);
+  const mesInicio = mesInicioBrasilia(agora);
+  const mesPassadoInicio = mesAnteriorInicioBrasilia(agora);
+  const mesPassadoFim = new Date(mesInicio.getTime() - 1);
 
   const [
     leadsHoje,
@@ -121,9 +136,9 @@ async function getDashboardCorretor(req, res) {
   const corretorId = req.corretorId;
   const imobiliariaId = req.imobiliariaId;
   const agora = new Date();
-  const mesInicio = new Date(agora.getFullYear(), agora.getMonth(), 1);
-  const hojeInicio = inicioDia(agora);
-  const hojeFim = fimDia(agora);
+  const mesInicio = mesInicioBrasilia(agora);
+  const hojeInicio = inicioDiaBrasilia(agora);
+  const hojeFim = fimDiaBrasilia(agora);
 
   const [
     leadsAtribuidos,
@@ -184,9 +199,9 @@ async function getDashboardGerente(req, res) {
   }
 
   const agora = new Date();
-  const mesInicio = new Date(agora.getFullYear(), agora.getMonth(), 1);
-  const hojeInicio = inicioDia(agora);
-  const hojeFim = fimDia(agora);
+  const mesInicio = mesInicioBrasilia(agora);
+  const hojeInicio = inicioDiaBrasilia(agora);
+  const hojeFim = fimDiaBrasilia(agora);
 
   const equipe = await prisma.equipe.findUnique({
     where: { id: equipeId },
