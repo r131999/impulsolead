@@ -3,6 +3,20 @@ const { PrismaClient } = require('@prisma/client');
 
 const prisma = new PrismaClient();
 
+function verificarPlano(imobiliaria) {
+  if (imobiliaria.plano === 'cancelado') {
+    return { error: 'Plano cancelado. Entre em contato com o suporte.' };
+  }
+  if (
+    imobiliaria.plano === 'trial' &&
+    imobiliaria.trialExpiraEm &&
+    new Date() > new Date(imobiliaria.trialExpiraEm)
+  ) {
+    return { error: 'Período de teste expirado. Entre em contato com o suporte.' };
+  }
+  return null;
+}
+
 async function authMiddleware(req, res, next) {
   const authHeader = req.headers.authorization;
 
@@ -40,13 +54,8 @@ async function authMiddleware(req, res, next) {
         return res.status(401).json({ error: 'Corretor não encontrado ou sem acesso ativo' });
       }
 
-      if (
-        corretor.imobiliaria.plano === 'trial' &&
-        corretor.imobiliaria.trialExpiraEm &&
-        new Date() > new Date(corretor.imobiliaria.trialExpiraEm)
-      ) {
-        return res.status(403).json({ error: 'Período de trial expirado. Entre em contato para contratar o plano.' });
-      }
+      const erroPlanoCorretor = verificarPlano(corretor.imobiliaria);
+      if (erroPlanoCorretor) return res.status(403).json(erroPlanoCorretor);
 
       req.role = corretor.role || 'corretor';
       req.corretorId = corretor.id;
@@ -68,13 +77,8 @@ async function authMiddleware(req, res, next) {
         return res.status(401).json({ error: 'Usuário não encontrado ou inativo' });
       }
 
-      if (
-        usuario.imobiliaria.plano === 'trial' &&
-        usuario.imobiliaria.trialExpiraEm &&
-        new Date() > new Date(usuario.imobiliaria.trialExpiraEm)
-      ) {
-        return res.status(403).json({ error: 'Período de trial expirado. Entre em contato para contratar o plano.' });
-      }
+      const erroPlanoUsuario = verificarPlano(usuario.imobiliaria);
+      if (erroPlanoUsuario) return res.status(403).json(erroPlanoUsuario);
 
       req.role = usuario.role;
       req.imobiliariaId = usuario.imobiliariaId;
