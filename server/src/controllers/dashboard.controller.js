@@ -153,6 +153,8 @@ async function getDashboardCorretor(req, res) {
     }),
   ]);
 
+  if (!corretor) return res.status(404).json({ error: 'Corretor não encontrado' });
+
   const taxaConversaoPessoal = totalAtivos === 0 ? 0 : Math.round((fechadosMes / totalAtivos) * 100);
 
   const corretoresAFrente = await prisma.corretor.count({

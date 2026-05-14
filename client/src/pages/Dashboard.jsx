@@ -28,6 +28,7 @@ export default function Dashboard() {
   const [funil, setFunil] = useState(null)
   const [followUps, setFollowUps] = useState([])
   const [loading, setLoading] = useState(true)
+  const [erro, setErro] = useState(false)
   const navigate = useNavigate()
 
   const carregarFollowUps = () => {
@@ -42,6 +43,7 @@ export default function Dashboard() {
         setDados(kpi.data)
         setFunil(f.data)
       })
+      .catch(() => setErro(true))
       .finally(() => setLoading(false))
     carregarFollowUps()
   }, [])
@@ -52,6 +54,11 @@ export default function Dashboard() {
   }
 
   if (loading) return <PageLoading />
+  if (erro || !dados) return (
+    <div className="flex items-center justify-center h-full">
+      <p className="text-sm" style={{ color: '#EF4444' }}>Erro ao carregar dashboard. Recarregue a página.</p>
+    </div>
+  )
 
   const {
     leadsHoje,

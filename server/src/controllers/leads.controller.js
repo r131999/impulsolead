@@ -334,6 +334,7 @@ async function remover(req, res) {
   if (!lead) return res.status(404).json({ error: 'Lead não encontrado' });
 
   await prisma.$transaction([
+    prisma.followUp.deleteMany({ where: { leadId: id } }),
     prisma.historicoLead.deleteMany({ where: { leadId: id } }),
     prisma.lead.delete({ where: { id } }),
   ]);

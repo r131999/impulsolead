@@ -58,9 +58,9 @@ async function getRelatorios(req, res) {
   }, {});
 
   // Taxa de conversão
-  const naoPercidos = leads.filter((l) => l.status !== 'perdido').length;
+  const naoPerdidos = leads.filter((l) => l.status !== 'perdido').length;
   const fechados = leads.filter((l) => l.status === 'venda').length;
-  const taxaConversao = naoPercidos === 0 ? 0 : Math.round((fechados / naoPercidos) * 100);
+  const taxaConversao = naoPerdidos === 0 ? 0 : Math.round((fechados / naoPerdidos) * 100);
 
   // Motivos de perda
   const perdidos = leads.filter((l) => l.status === 'perdido' && l.motivoPerda);
@@ -273,9 +273,9 @@ async function getRelatoriosGerente(req, res) {
     return acc;
   }, {});
 
-  const naoPercidos = leads.filter((l) => l.status !== 'perdido').length;
+  const naoPerdidos = leads.filter((l) => l.status !== 'perdido').length;
   const fechados = leads.filter((l) => l.status === 'venda').length;
-  const taxaConversao = naoPercidos === 0 ? 0 : Math.round((fechados / naoPercidos) * 100);
+  const taxaConversao = naoPerdidos === 0 ? 0 : Math.round((fechados / naoPerdidos) * 100);
 
   const perdidos = leads.filter((l) => l.status === 'perdido' && l.motivoPerda);
   const motivosPerda = perdidos.reduce((acc, l) => {

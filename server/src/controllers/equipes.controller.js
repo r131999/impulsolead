@@ -52,7 +52,7 @@ async function listar(req, res) {
     const todosLeads = equipe.corretores.flatMap((c) => leadsPorCorretor[c.id] || []);
     const totalLeads = todosLeads.length;
     const fechamentos = todosLeads.filter((l) => l.status === 'venda').length;
-    const naoPercidos = todosLeads.filter((l) => l.status !== 'perdido').length;
+    const naoPerdidos = todosLeads.filter((l) => l.status !== 'perdido').length;
 
     return {
       id: equipe.id,
@@ -65,7 +65,7 @@ async function listar(req, res) {
         totalLeads,
         emAtendimento: todosLeads.filter((l) => l.status === 'atendimento').length,
         fechamentos,
-        taxaConversao: naoPercidos === 0 ? 0 : Math.round((fechamentos / naoPercidos) * 100),
+        taxaConversao: naoPerdidos === 0 ? 0 : Math.round((fechamentos / naoPerdidos) * 100),
       },
     };
   });
