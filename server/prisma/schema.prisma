@@ -28,6 +28,7 @@ model Imobiliaria {
   modelosMensagem    ModeloMensagem[]
   contatosPessoais   ContatoPessoal[]
   imoveis            Imovel[]
+  sessoesAgente      SessaoAgente[]
 }
 
 model Usuario {
@@ -229,6 +230,22 @@ model UsuarioSupremo {
   ativo        Boolean  @default(true)
   criadoEm    DateTime @default(now())
   atualizadoEm DateTime @updatedAt
+}
+
+model SessaoAgente {
+  id            String   @id @default(uuid())
+  telefone      String
+  nome          String?
+  etapaAtual    Int      @default(0)
+  respostas     Json     @default("{}")
+  status        String   @default("em_andamento") // "em_andamento" | "finalizado"
+  instancia     String
+  imobiliariaId String
+  imobiliaria   Imobiliaria @relation(fields: [imobiliariaId], references: [id])
+  criadoEm     DateTime @default(now())
+  atualizadoEm  DateTime @updatedAt
+
+  @@unique([telefone, imobiliariaId])
 }
 
 model ConfigAgente {

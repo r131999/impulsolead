@@ -20,6 +20,7 @@ const contatosPessoaisRoutes = require('./routes/contatos-pessoais.routes');
 const imoveisRoutes = require('./routes/imoveis.routes');
 const chatRoutes = require('./routes/chat.routes');
 const adminRoutes = require('./routes/admin.routes');
+const agenteRoutes = require('./routes/agente.routes');
 const { iniciarCrons } = require('./services/cron.service');
 
 const app = express();
@@ -56,6 +57,7 @@ app.use('/api/contatos-pessoais', contatosPessoaisRoutes);
 app.use('/api/imoveis', imoveisRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/agente', agenteRoutes);
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
