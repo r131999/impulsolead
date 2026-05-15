@@ -1,4 +1,5 @@
 const { PrismaClient } = require('@prisma/client');
+const axios = require('axios');
 const https = require('https');
 const http = require('http');
 
@@ -13,9 +14,8 @@ const MENSAGENS = [
   '[Nome], que ótimo! Me conta, o que mais te motivou a buscar um imóvel?\n(Morar melhor, sair do aluguel, investir, conquistar o primeiro imóvel…)',
   // 2 — Região
   'Em qual região ou bairro você sonha em morar? 🏡',
-  // 3 — Composição familiar
+  // 3 e 4 — versões genéricas (usadas como fallback se genero não disponível)
   'Você pretende morar sozinho(a), com companheiro(a) ou com a família? 😊',
-  // 4 — Tipo de renda
   'Hoje você trabalha registrado(a), é autônomo(a), empresário(a) ou possui outra fonte de renda?',
   // 5 — Renda mensal
   'Pra eu conseguir te orientar da melhor forma sobre valores, parcelas e até possíveis subsídios do governo, qual é aproximadamente a renda familiar mensal de vocês? 💰',
@@ -23,7 +23,30 @@ const MENSAGENS = [
   'Perfeito 😊 Com essas informações vai ficar muito mais fácil encontrar o imóvel ideal pra você 💚 Em breve um corretor especialista vai entrar em contato com as melhores oportunidades!',
 ];
 
-// Palavras que indicam pergunta fora do escopo da qualificação
+// Variantes genderizadas para etapas 3 e 4
+const MENSAGENS_GENERO = {
+  M: {
+    3: 'Você pretende morar sozinho, com companheiro(a) ou com a família? 😊',
+    4: 'Hoje você trabalha registrado, é autônomo, empresário ou possui outra fonte de renda?',
+  },
+  F: {
+    3: 'Você pretende morar sozinha, com companheiro(a) ou com a família? 😊',
+    4: 'Hoje você trabalha registrada, é autônoma, empresária ou possui outra fonte de renda?',
+  },
+};
+
+function getMensagem(etapa, nome, genero) {
+  let msg;
+  if ((etapa === 3 || etapa === 4) && genero && MENSAGENS_GENERO[genero]) {
+    msg = MENSAGENS_GENERO[genero][etapa];
+  } else {
+    msg = MENSAGENS[etapa] || '';
+  }
+  return msg.replace('[Nome]', nome || '');
+}
+
+// ─── Palavras que indicam pergunta fora do escopo da qualificação ─────────────
+
 const PALAVRAS_FORA_ESCOPO = [
   'onde', 'quanto', 'como', 'qual', 'tem', 'existe',
   'valor', 'preço', 'localização', 'endereço', 'disponível',
@@ -35,9 +58,33 @@ function isPerguntaForaEscopo(mensagem) {
   return PALAVRAS_FORA_ESCOPO.some((p) => texto.includes(p));
 }
 
-function getMensagem(etapa, nome) {
-  const msg = MENSAGENS[etapa] || '';
-  return msg.replace('[Nome]', nome || '');
+// ─── Detecção de gênero via OpenAI ───────────────────────────────────────────
+
+async function detectarGenero(nome) {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) return 'F';
+
+  try {
+    const response = await axios.post(
+      'https://api.openai.com/v1/chat/completions',
+      {
+        model: 'gpt-4o-mini',
+        messages: [{ role: 'user', content: `Dado o nome "${nome}", responda apenas M para masculino ou F para feminino.` }],
+        max_tokens: 2,
+        temperature: 0,
+      },
+      {
+        headers: { Authorization: `Bearer ${apiKey}` },
+        timeout: 5000,
+      },
+    );
+
+    const resultado = response.data.choices[0]?.message?.content?.trim().toUpperCase() || '';
+    return resultado.startsWith('M') ? 'M' : 'F';
+  } catch (err) {
+    console.warn('[agente] Falha ao detectar gênero — usando padrão F:', err.message);
+    return 'F';
+  }
 }
 
 // ─── Envio via Evolution API com instância dinâmica ──────────────────────────
@@ -106,7 +153,6 @@ async function criarLeadNoCRM(sessao, imobiliariaId) {
   const respostas = sessao.respostas || {};
   const telefone  = String(sessao.telefone).replace(/\D/g, '');
 
-  // Composição familiar vai para observacoes
   const composicao = respostas.etapa3
     ? `Composição familiar: ${respostas.etapa3}`
     : null;
@@ -209,7 +255,7 @@ async function receberMensagem(req, res) {
     });
 
     // Primeira mensagem do lead → envia boas-vindas (etapa 0)
-    await enviarMensagem(telefoneLimpo, getMensagem(0, null), instancia);
+    await enviarMensagem(telefoneLimpo, getMensagem(0, null, null), instancia);
     return res.json({ ok: true, etapa: 0 });
   }
 
@@ -219,10 +265,11 @@ async function receberMensagem(req, res) {
   }
 
   const etapaAtual = sessao.etapaAtual;
+  const generoSalvo = sessao.respostas?.genero || null;
 
   // 3. Pergunta fora do escopo → responde e repete a pergunta atual (não avança)
   if (isPerguntaForaEscopo(mensagem)) {
-    const perguntaAtual = getMensagem(etapaAtual, sessao.nome);
+    const perguntaAtual = getMensagem(etapaAtual, sessao.nome, generoSalvo);
     const resposta = `Essa informação o corretor vai te passar com todos os detalhes 😊 ${perguntaAtual}`;
     await enviarMensagem(telefoneLimpo, resposta, instancia);
     return res.json({ ok: true, etapa: etapaAtual, foraEscopo: true });
@@ -231,8 +278,15 @@ async function receberMensagem(req, res) {
   // 4. Salva resposta da etapa atual
   const respostasAtualizadas = { ...(sessao.respostas || {}), [`etapa${etapaAtual}`]: mensagem.trim() };
 
-  // 5. Etapa 0 → salva como nome
-  const nomeAtualizado = etapaAtual === 0 ? mensagem.trim() : sessao.nome;
+  // 5. Etapa 0 → salva como nome e detecta gênero
+  let nomeAtualizado = sessao.nome;
+  let generoAtualizado = generoSalvo;
+
+  if (etapaAtual === 0) {
+    nomeAtualizado = mensagem.trim();
+    generoAtualizado = await detectarGenero(nomeAtualizado);
+    respostasAtualizadas.genero = generoAtualizado;
+  }
 
   // 6. Avança etapa
   const proximaEtapa = etapaAtual + 1;
@@ -248,10 +302,10 @@ async function receberMensagem(req, res) {
   });
 
   // 7. Envia mensagem da próxima etapa
-  const textoProxima = getMensagem(proximaEtapa, nomeAtualizado);
+  const textoProxima = getMensagem(proximaEtapa, nomeAtualizado, generoAtualizado);
   await enviarMensagem(telefoneLimpo, textoProxima, instancia);
 
-  // 8. Se chegou na etapa 6 → cria lead no CRM
+  // 8. Se chegou na etapa 6 → cria lead no CRM (assíncrono, não bloqueia resposta)
   if (proximaEtapa >= 6) {
     const sessaoFinal = { ...sessao, respostas: respostasAtualizadas, nome: nomeAtualizado };
     criarLeadNoCRM(sessaoFinal, imobiliariaId).catch((err) => {
