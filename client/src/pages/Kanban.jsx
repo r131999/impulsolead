@@ -799,6 +799,14 @@ function ModalDetalhes({ lead, onClose, onSalvo }) {
             {lead.corretor && (
               <p className="text-xs mt-1.5" style={{ color: '#60A5FA' }}>👤 {lead.corretor.nome}</p>
             )}
+            {lead.campanha && (
+              <span
+                className="inline-block mt-1.5 text-xs font-medium px-2 py-0.5 rounded-full"
+                style={{ backgroundColor: 'rgba(59,130,246,0.15)', color: '#60A5FA' }}
+              >
+                📣 {lead.campanha}
+              </span>
+            )}
           </div>
           <button
             onClick={onClose}

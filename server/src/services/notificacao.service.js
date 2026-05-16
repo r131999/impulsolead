@@ -11,22 +11,11 @@ function formatarNumero(numero) {
 }
 
 function montarMensagem(corretor, lead) {
-  const campo = (label, valor) => valor ? `• *${label}:* ${valor}\n` : '';
-
   return (
     `🏠 *Novo lead atribuído para você!*\n\n` +
     `*Nome:* ${lead.nome}\n` +
     `*Telefone:* ${lead.telefone}\n` +
-    (lead.urgencia ? `*Urgência:* ${lead.urgencia}\n` : '') +
-    `\n*Perfil financeiro:*\n` +
-    campo('Primeiro imóvel', lead.primeiroImovel) +
-    campo('Tipo de renda', lead.tipoRenda) +
-    campo('Renda mensal', lead.rendaMensal) +
-    campo('Restrição CPF', lead.restricaoCpf) +
-    campo('Valor de entrada', lead.valorEntrada) +
-    `\n*Imóvel desejado:*\n` +
-    campo('Região', lead.regiao) +
-    campo('Faixa de valor', lead.faixaValor) +
+    (lead.campanha ? `*Campanha:* ${lead.campanha}\n` : '') +
     `\n_Acesse o CRM para ver mais detalhes._`
   );
 }

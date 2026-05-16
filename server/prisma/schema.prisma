@@ -91,6 +91,7 @@ model Lead {
   faixaValor     String?
 
   origem            String?
+  campanha          String?
   nomeEditado       String?
 
   status            String  @default("lead")

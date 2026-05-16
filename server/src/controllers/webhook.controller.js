@@ -26,7 +26,7 @@ async function receberLead(req, res) {
     nome, telefone, whatsappJid,
     primeiroImovel, tipoRenda, rendaMensal, restricaoCpf,
     valorEntrada, urgencia, regiao, faixaValor,
-    historico,
+    historico, campanha,
   } = req.body;
 
   if (!nome || !String(nome).trim()) {
@@ -52,6 +52,7 @@ async function receberLead(req, res) {
   const valorEntradaSan      = sanitizarTexto(valorEntrada);
   const urgenciaSan          = sanitizarTexto(urgencia);
   const faixaValorSan        = sanitizarTexto(faixaValor);
+  const campanhasSan         = sanitizarTexto(campanha);
 
   const configAgente = await prisma.configAgente.findUnique({
     where: { imobiliariaId: req.imobiliariaId },
@@ -77,6 +78,7 @@ async function receberLead(req, res) {
         faixaValor: faixaValorSan,
         historicoConversa: historicoProcessado,
         temConversa: !!historicoProcessado,
+        campanha: campanhasSan || null,
         imobiliariaId: req.imobiliariaId,
       },
     });
