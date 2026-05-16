@@ -48,4 +48,27 @@ async function atualizarConfigAgente(req, res) {
   res.json({ config });
 }
 
-module.exports = { getConfigAgente, atualizarConfigAgente };
+async function atualizarDistribuicao(req, res) {
+  const { distribuicaoManual } = req.body;
+
+  if (typeof distribuicaoManual !== 'boolean') {
+    return res.status(400).json({ error: 'distribuicaoManual deve ser boolean' });
+  }
+
+  const config = await prisma.configAgente.upsert({
+    where: { imobiliariaId: req.imobiliariaId },
+    update: { distribuicaoManual },
+    create: {
+      imobiliariaId: req.imobiliariaId,
+      mensagemBoasVindas: 'Olá! Tudo bem? Aqui é a Lia, assistente virtual. Que bom que você entrou em contato! Como posso te chamar?',
+      perguntas: [],
+      nomeAgente: 'Lia',
+      tomAgente: 'profissional mas leve',
+      distribuicaoManual,
+    },
+  });
+
+  res.json({ ok: true, distribuicaoManual: config.distribuicaoManual });
+}
+
+module.exports = { getConfigAgente, atualizarConfigAgente, atualizarDistribuicao };

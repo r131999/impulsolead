@@ -1,5 +1,6 @@
 const { PrismaClient } = require('@prisma/client');
-const { STATUS_VALIDOS } = require('../services/fila.service');
+const { STATUS_VALIDOS, proximoCorretor } = require('../services/fila.service');
+const { notificarCorretor } = require('../services/notificacao.service');
 
 const prisma = new PrismaClient();
 
@@ -423,4 +424,59 @@ async function getHistoricoConversa(req, res) {
   res.json({ historico, nome: lead.nome });
 }
 
-module.exports = { listar, buscarPorId, criar, atualizar, mudarStatus, remover, detalhes, getHistoricoConversa };
+async function distribuir(req, res) {
+  const { id } = req.params;
+  const { corretorId } = req.body;
+
+  const lead = await prisma.lead.findFirst({
+    where: { id, imobiliariaId: req.imobiliariaId },
+  });
+  if (!lead) return res.status(404).json({ error: 'Lead não encontrado' });
+
+  let corretorEscolhido;
+
+  if (corretorId) {
+    corretorEscolhido = await prisma.corretor.findFirst({
+      where: { id: corretorId, imobiliariaId: req.imobiliariaId, ativo: true },
+    });
+    if (!corretorEscolhido) return res.status(400).json({ error: 'Corretor não encontrado ou inativo' });
+
+    // Move o corretor escolhido para o final da fila
+    const ultimo = await prisma.corretor.findFirst({
+      where: { imobiliariaId: req.imobiliariaId, ativo: true },
+      orderBy: { posicaoFila: 'desc' },
+      select: { posicaoFila: true },
+    });
+    await prisma.corretor.update({
+      where: { id: corretorId },
+      data: { leadsRecebidos: { increment: 1 }, posicaoFila: (ultimo?.posicaoFila ?? 0) + 1 },
+    });
+  } else {
+    corretorEscolhido = await proximoCorretor(req.imobiliariaId);
+    if (!corretorEscolhido) return res.status(400).json({ error: 'Nenhum corretor disponível na fila' });
+  }
+
+  const leadAtualizado = await prisma.$transaction(async (tx) => {
+    const result = await tx.lead.update({
+      where: { id },
+      data: { corretorId: corretorEscolhido.id },
+      include: { corretor: { select: { id: true, nome: true, whatsapp: true, telefone: true } } },
+    });
+
+    await tx.historicoLead.create({
+      data: {
+        leadId: id,
+        acao: 'Lead distribuído manualmente',
+        detalhes: `Corretor: ${corretorEscolhido.nome}${!corretorId ? ' (via fila automática)' : ''}`,
+      },
+    });
+
+    return result;
+  });
+
+  notificarCorretor(corretorEscolhido, leadAtualizado, req.imobiliaria).catch(() => {});
+
+  res.json({ lead: leadAtualizado });
+}
+
+module.exports = { listar, buscarPorId, criar, atualizar, mudarStatus, remover, detalhes, getHistoricoConversa, distribuir };

@@ -53,6 +53,12 @@ async function receberLead(req, res) {
   const urgenciaSan          = sanitizarTexto(urgencia);
   const faixaValorSan        = sanitizarTexto(faixaValor);
 
+  const configAgente = await prisma.configAgente.findUnique({
+    where: { imobiliariaId: req.imobiliariaId },
+    select: { distribuicaoManual: true },
+  });
+  const modoManual = configAgente?.distribuicaoManual ?? false;
+
   const result = await prisma.$transaction(async (tx) => {
     // 1. Cria o lead com status lead
     const lead = await tx.lead.create({
@@ -75,7 +81,19 @@ async function receberLead(req, res) {
       },
     });
 
-    // 2. Busca próximo corretor via round-robin (dentro da transação)
+    // 2. Modo manual: sem round-robin, aguarda distribuição pelo gestor
+    if (modoManual) {
+      await tx.historicoLead.create({
+        data: {
+          leadId: lead.id,
+          acao: 'Lead recebido via webhook — aguardando distribuição manual',
+          detalhes: 'Distribuição manual ativa: corretor deve ser atribuído pelo gestor',
+        },
+      });
+      return { lead, corretor: null };
+    }
+
+    // 3. Busca próximo corretor via round-robin (dentro da transação)
     const corretores = await tx.corretor.findMany({
       where: { imobiliariaId: req.imobiliariaId, ativo: true, disponivel: true },
       orderBy: { posicaoFila: 'asc' },
@@ -87,7 +105,7 @@ async function receberLead(req, res) {
       const proximo = corretores[0];
       const maxPosicao = corretores[corretores.length - 1].posicaoFila;
 
-      // 3. Move corretor para o final da fila
+      // 4. Move corretor para o final da fila
       await tx.corretor.update({
         where: { id: proximo.id },
         data: {
@@ -96,7 +114,7 @@ async function receberLead(req, res) {
         },
       });
 
-      // 4. Atribui lead ao corretor
+      // 5. Atribui lead ao corretor
       await tx.lead.update({
         where: { id: lead.id },
         data: { corretorId: proximo.id },
@@ -112,7 +130,6 @@ async function receberLead(req, res) {
         },
       });
     } else {
-      // Nenhum corretor disponível
       await tx.historicoLead.create({
         data: {
           leadId: lead.id,
@@ -145,6 +162,7 @@ async function receberLead(req, res) {
       corretor: leadCompleto.corretor || null,
     },
     semCorretor: !result.corretor,
+    aguardandoDistribuicao: modoManual,
   });
 }
 

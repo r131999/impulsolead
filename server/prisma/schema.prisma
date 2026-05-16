@@ -256,6 +256,7 @@ model ConfigAgente {
   nomeAgente         String  @default("Lia")
   tomAgente          String  @default("profissional mas leve")
   ativo              Boolean @default(true)
+  distribuicaoManual Boolean @default(false)
   criadoEm          DateTime @default(now())
   atualizadoEm      DateTime @updatedAt
 
