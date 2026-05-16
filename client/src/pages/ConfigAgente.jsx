@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { getConfig, atualizarConfig } from '../api/config'
+import { getConfig, atualizarConfig, atualizarDistribuicao } from '../api/config'
 import { useAuth } from '../context/AuthContext'
 import * as modelosApi from '../api/modelos-mensagem'
 import * as usuariosApi from '../api/usuarios'
@@ -24,6 +24,7 @@ export default function ConfigAgente() {
   const [formUsuario, setFormUsuario] = useState({ nome: '', email: '', telefone: '', senha: '', novaSenha: '' })
   const [salvandoUsuario, setSalvandoUsuario] = useState(false)
   const [erroUsuario, setErroUsuario] = useState('')
+  const [salvandoDistribuicao, setSalvandoDistribuicao] = useState(false)
 
   useEffect(() => {
     getConfig()
@@ -35,6 +36,20 @@ export default function ConfigAgente() {
     modelosApi.listar().then((res) => setModelos(res.data))
     usuariosApi.listar().then((res) => setUsuarios(res.data.usuarios))
   }, [])
+
+  const toggleDistribuicao = async () => {
+    if (salvandoDistribuicao) return
+    const novo = !form.distribuicaoManual
+    setForm((f) => ({ ...f, distribuicaoManual: novo }))
+    setSalvandoDistribuicao(true)
+    try {
+      await atualizarDistribuicao(novo)
+    } catch {
+      setForm((f) => ({ ...f, distribuicaoManual: !novo }))
+    } finally {
+      setSalvandoDistribuicao(false)
+    }
+  }
 
   const set = (k) => (e) => {
     const val = e.target.type === 'checkbox' ? e.target.checked : e.target.value
@@ -209,6 +224,36 @@ export default function ConfigAgente() {
             </code>{' '}
             das requisições ao webhook.
           </p>
+        </div>
+      </div>
+
+      {/* Distribuição de leads */}
+      <div className="card mb-6">
+        <div className="flex items-center justify-between gap-4">
+          <div className="min-w-0">
+            <h2 className="font-semibold" style={{ color: '#F1F5F9' }}>Distribuição de leads</h2>
+            <p className="text-sm mt-1" style={{ color: form.distribuicaoManual ? '#F59E0B' : '#10B981' }}>
+              {form.distribuicaoManual
+                ? 'Manual — você escolhe para qual corretor cada lead vai'
+                : 'Automática — leads distribuídos automaticamente pela fila'}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={toggleDistribuicao}
+            disabled={salvandoDistribuicao}
+            className="relative flex-shrink-0 rounded-full transition-colors disabled:opacity-60"
+            style={{ width: 44, height: 24, backgroundColor: form.distribuicaoManual ? '#F59E0B' : '#10B981' }}
+            title={form.distribuicaoManual ? 'Mudar para automático' : 'Mudar para manual'}
+          >
+            <span
+              className="absolute top-1 rounded-full bg-white shadow transition-transform"
+              style={{
+                width: 16, height: 16, left: 4,
+                transform: form.distribuicaoManual ? 'translateX(20px)' : 'translateX(0)',
+              }}
+            />
+          </button>
         </div>
       </div>
 

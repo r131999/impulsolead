@@ -1,7 +1,9 @@
 import { useEffect, useState, useCallback } from 'react'
 import * as leadsApi from '../api/leads'
 import * as followupsApi from '../api/followups'
+import * as corretoresApi from '../api/corretores'
 import { useAuth } from '../context/AuthContext'
+import { Avatar } from '../components/Avatar'
 
 const COLUNAS = [
   { id: 'lead',        label: 'Lead',        dot: '#3B82F6' },
@@ -106,6 +108,8 @@ export default function Kanban() {
   const [modalFU, setModalFU] = useState(null) // { lead, followUp? }
   const [modalConversa, setModalConversa] = useState(null) // lead
   const [modalDetalhes, setModalDetalhes] = useState(null) // lead
+  const [modalDistribuir, setModalDistribuir] = useState(null) // lead
+  const [corretores, setCorretores] = useState([])
 
   const carregar = useCallback(() => {
     leadsApi
@@ -127,7 +131,18 @@ export default function Kanban() {
   useEffect(() => {
     carregar()
     carregarFollowUps()
-  }, [carregar, carregarFollowUps])
+    if (!isCorretor) {
+      corretoresApi.listar({ ativo: true })
+        .then((res) => setCorretores(res.data.corretores || res.data))
+        .catch(() => {})
+    }
+  }, [carregar, carregarFollowUps, isCorretor])
+
+  const confirmarDistribuicao = async (leadId, corretorId) => {
+    await leadsApi.distribuir(leadId, { corretorId: corretorId || null })
+    setModalDistribuir(null)
+    carregar()
+  }
 
   const avancar = async (lead) => {
     const proximo = proximoStatus(lead.status)
@@ -250,6 +265,7 @@ export default function Kanban() {
                     onPerdido={() => abrirPerda(lead)}
                     onFollowUp={() => setModalFU({ lead, followUp: followUpsMap[lead.id] || null })}
                     onConversa={lead.temConversa ? () => setModalConversa(lead) : null}
+                    onDistribuir={!isCorretor && !lead.corretor ? () => setModalDistribuir(lead) : null}
                   />
                 ))}
                 {grupos[col.id].length === 0 && (
@@ -295,11 +311,20 @@ export default function Kanban() {
           onSalvo={() => { carregar(); setModalDetalhes(null) }}
         />
       )}
+
+      {modalDistribuir && (
+        <ModalDistribuir
+          lead={modalDistribuir}
+          corretores={corretores}
+          onConfirmar={(corretorId) => confirmarDistribuicao(modalDistribuir.id, corretorId)}
+          onClose={() => setModalDistribuir(null)}
+        />
+      )}
     </div>
   )
 }
 
-function LeadCard({ lead, atualizando, followUp, podeGerenciar, onDetalhes, onAvancar, onVoltar, onPerdido, onFollowUp, onConversa }) {
+function LeadCard({ lead, atualizando, followUp, podeGerenciar, onDetalhes, onAvancar, onVoltar, onPerdido, onFollowUp, onConversa, onDistribuir }) {
   const proximo = proximoStatus(lead.status)
   const podeAvancar = !!proximo
   const podePerdido = lead.status !== 'venda' && lead.status !== 'perdido'
@@ -360,10 +385,30 @@ function LeadCard({ lead, atualizando, followUp, podeGerenciar, onDetalhes, onAv
       {fuInfo && (
         <p className="text-xs mt-1 font-medium" style={{ color: fuInfo.cor }}>{fuInfo.texto}</p>
       )}
-      {lead.corretor && (
+      {lead.corretor ? (
         <p className="text-xs mt-1 truncate" style={{ color: '#60A5FA' }}>
           👤 {lead.corretor.nome}
         </p>
+      ) : (
+        <div className="flex items-center justify-between mt-1 gap-2">
+          <span
+            className="text-xs font-medium px-1.5 py-0.5 rounded flex-shrink-0"
+            style={{ backgroundColor: 'rgba(245,158,11,0.15)', color: '#F59E0B', fontSize: 10, lineHeight: '16px' }}
+          >
+            ⏳ Aguardando
+          </span>
+          {onDistribuir && (
+            <button
+              onClick={onDistribuir}
+              className="text-xs font-medium px-2 py-0.5 rounded transition-colors flex-shrink-0"
+              style={{ backgroundColor: 'rgba(99,102,241,0.15)', color: '#818cf8' }}
+              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(99,102,241,0.28)' }}
+              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'rgba(99,102,241,0.15)' }}
+            >
+              Distribuir
+            </button>
+          )}
+        </div>
       )}
       {(lead.urgencia || lead.regiao) && (
         <div className="flex gap-2 mt-1.5 flex-wrap">
@@ -840,6 +885,94 @@ function ModalDetalhes({ lead, onClose, onSalvo }) {
               onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'rgba(99,102,241,0.2)'}
             >
               {salvando ? 'Salvando...' : 'Salvar alterações'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ModalDistribuir({ lead, corretores, onConfirmar, onClose }) {
+  const [selecionado, setSelecionado] = useState(undefined) // undefined = nada selecionado, null = fila, string = corretorId
+  const [distribuindo, setDistribuindo] = useState(false)
+  const [erro, setErro] = useState('')
+
+  const handleConfirmar = async () => {
+    if (selecionado === undefined) return
+    setDistribuindo(true)
+    setErro('')
+    try {
+      await onConfirmar(selecionado)
+    } catch (e) {
+      setErro(e.response?.data?.error || 'Erro ao distribuir')
+      setDistribuindo(false)
+    }
+  }
+
+  const itemStyle = (ativo) => ({
+    backgroundColor: ativo ? 'rgba(99,102,241,0.18)' : '#0B1120',
+    border: `1px solid ${ativo ? 'rgba(99,102,241,0.45)' : '#1E293B'}`,
+  })
+
+  return (
+    <div className="fixed inset-0 bg-black/60 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
+      <div
+        className="w-full rounded-t-2xl sm:rounded-2xl shadow-2xl sm:max-w-sm flex flex-col"
+        style={{ backgroundColor: '#111827', border: '1px solid #1E293B', maxHeight: '85vh' }}
+      >
+        <div className="flex items-center justify-between px-5 py-4 flex-shrink-0" style={{ borderBottom: '1px solid #1E293B' }}>
+          <div>
+            <h2 className="font-bold" style={{ color: '#F1F5F9' }}>Distribuir lead</h2>
+            <p className="text-xs mt-0.5" style={{ color: '#94A3B8' }}>{lead.nome}</p>
+          </div>
+          <button onClick={onClose} className="text-xl leading-none hover:opacity-80" style={{ color: '#64748B' }}>×</button>
+        </div>
+
+        <div className="overflow-y-auto flex-1 px-5 py-4 space-y-2">
+          <button
+            onClick={() => setSelecionado(null)}
+            className="w-full flex items-center gap-3 p-3 rounded-xl transition-colors text-left"
+            style={itemStyle(selecionado === null)}
+          >
+            <span className="flex items-center justify-center w-8 h-8 rounded-full text-base flex-shrink-0" style={{ backgroundColor: 'rgba(99,102,241,0.2)' }}>🔄</span>
+            <div>
+              <p className="text-sm font-semibold" style={{ color: '#818cf8' }}>Fila automática</p>
+              <p className="text-xs" style={{ color: '#64748B' }}>Próximo corretor disponível na fila</p>
+            </div>
+          </button>
+
+          {corretores.filter((c) => c.ativo).map((c) => (
+            <button
+              key={c.id}
+              onClick={() => setSelecionado(c.id)}
+              className="w-full flex items-center gap-3 p-3 rounded-xl transition-colors text-left"
+              style={itemStyle(selecionado === c.id)}
+            >
+              <Avatar nome={c.nome} fotoPerfil={c.fotoPerfil} size={32} />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium truncate" style={{ color: '#F1F5F9' }}>{c.nome}</p>
+                <p className="text-xs" style={{ color: c.disponivel ? '#10B981' : '#64748B' }}>
+                  {c.disponivel ? 'Disponível' : 'Indisponível'} · {c.leadsRecebidos} leads
+                </p>
+              </div>
+            </button>
+          ))}
+        </div>
+
+        <div className="px-5 pb-5 pt-3 flex-shrink-0" style={{ borderTop: '1px solid #1E293B' }}>
+          {erro && <p className="text-xs mb-2" style={{ color: '#EF4444' }}>{erro}</p>}
+          <div className="flex gap-2">
+            <button onClick={onClose} className="btn-secondary flex-1">Cancelar</button>
+            <button
+              onClick={handleConfirmar}
+              disabled={distribuindo || selecionado === undefined}
+              className="flex-1 text-sm font-medium py-2 rounded-lg disabled:opacity-50 transition-colors"
+              style={{ backgroundColor: 'rgba(99,102,241,0.2)', color: '#818cf8' }}
+              onMouseEnter={(e) => { if (!distribuindo) e.currentTarget.style.backgroundColor = 'rgba(99,102,241,0.3)' }}
+              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'rgba(99,102,241,0.2)' }}
+            >
+              {distribuindo ? 'Distribuindo...' : 'Confirmar'}
             </button>
           </div>
         </div>

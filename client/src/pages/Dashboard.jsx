@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { getDashboard, getFunil } from '../api/dashboard'
 import { pendentes as followUpsPendentes, atualizar as atualizarFollowUp } from '../api/followups'
+import { listar as listarLeads } from '../api/leads'
 import { useNavigate } from 'react-router-dom'
 
 const STATUS_BADGE = {
@@ -29,6 +30,7 @@ export default function Dashboard() {
   const [followUps, setFollowUps] = useState([])
   const [loading, setLoading] = useState(true)
   const [erro, setErro] = useState(false)
+  const [leadsAguardando, setLeadsAguardando] = useState(0)
   const navigate = useNavigate()
 
   const carregarFollowUps = () => {
@@ -46,6 +48,12 @@ export default function Dashboard() {
       .catch(() => setErro(true))
       .finally(() => setLoading(false))
     carregarFollowUps()
+    listarLeads({ limit: 500 })
+      .then((res) => {
+        const count = (res.data.leads || []).filter((l) => !l.corretor).length
+        setLeadsAguardando(count)
+      })
+      .catch(() => {})
   }, [])
 
   const realizarFollowUp = async (id) => {
@@ -102,6 +110,27 @@ export default function Dashboard() {
           <MetricCard key={m.titulo} {...m} />
         ))}
       </div>
+
+      {leadsAguardando > 0 && (
+        <div
+          className="flex items-center justify-between p-4 rounded-xl mb-6 cursor-pointer"
+          style={{ backgroundColor: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)' }}
+          onClick={() => navigate('/kanban')}
+        >
+          <div className="flex items-center gap-3">
+            <span className="text-2xl">⏳</span>
+            <div>
+              <p className="font-semibold" style={{ color: '#F59E0B' }}>
+                {leadsAguardando} lead{leadsAguardando > 1 ? 's' : ''} aguardando distribuição
+              </p>
+              <p className="text-xs mt-0.5" style={{ color: '#92400e' }}>
+                Clique para abrir o Kanban e distribuir
+              </p>
+            </div>
+          </div>
+          <span className="text-lg" style={{ color: '#F59E0B' }}>→</span>
+        </div>
+      )}
 
       {funil && <FunilVendas funil={funil.funil} perdidos={funil.perdidos} />}
 
