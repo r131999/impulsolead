@@ -220,6 +220,14 @@ async function criarLeadNoCRM(sessao, imobiliariaId) {
   return result;
 }
 
+// ─── Comparação de telefones normalizados ────────────────────────────────────
+
+function telefonesIguais(tel1, tel2) {
+  const a = String(tel1).replace(/\D/g, '');
+  const b = String(tel2).replace(/\D/g, '');
+  return a.slice(-11) === b.slice(-11) || a.slice(-10) === b.slice(-10);
+}
+
 // ─── Handler principal ────────────────────────────────────────────────────────
 
 async function receberMensagem(req, res) {
@@ -234,6 +242,20 @@ async function receberMensagem(req, res) {
 
   if (!telefoneLimpo || telefoneLimpo.length < 10) {
     return res.status(400).json({ error: 'Telefone inválido' });
+  }
+
+  // Ignora mensagens enviadas por corretores ou gestores da própria imobiliária
+  const corretoresDaImobiliaria = await prisma.corretor.findMany({
+    where: { imobiliariaId },
+    select: { telefone: true, whatsapp: true },
+  });
+
+  const ehCorretor = corretoresDaImobiliaria.some(
+    (c) => telefonesIguais(telefoneLimpo, c.telefone) || telefonesIguais(telefoneLimpo, c.whatsapp),
+  );
+
+  if (ehCorretor) {
+    return res.json({ ok: true, ignorado: 'corretor' });
   }
 
   // 1. Busca ou cria sessão
