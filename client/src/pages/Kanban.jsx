@@ -380,7 +380,8 @@ function LeadCard({ lead, atualizando, followUp, podeGerenciar, onDetalhes, onAv
       {lead.campanha && (
         <span
           className="inline-block text-xs font-medium px-1.5 py-0.5 rounded mt-1"
-          style={{ backgroundColor: 'rgba(245,158,11,0.15)', color: '#F59E0B', fontSize: 10, lineHeight: '16px' }}
+          style={{ backgroundColor: 'rgba(245,158,11,0.18)', color: '#F59E0B' }}
+          title={lead.campanha}
         >
           📣 Campanha
         </span>
