@@ -21,7 +21,7 @@ export default function ConfigAgente() {
   const [usuarios, setUsuarios] = useState([])
   const [modalUsuario, setModalUsuario] = useState(null) // null | 'criar' | 'editar' | 'senha'
   const [usuarioSel, setUsuarioSel] = useState(null)
-  const [formUsuario, setFormUsuario] = useState({ nome: '', email: '', senha: '', novaSenha: '' })
+  const [formUsuario, setFormUsuario] = useState({ nome: '', email: '', telefone: '', senha: '', novaSenha: '' })
   const [salvandoUsuario, setSalvandoUsuario] = useState(false)
   const [erroUsuario, setErroUsuario] = useState('')
 
@@ -86,19 +86,19 @@ export default function ConfigAgente() {
   }
 
   const abrirCriarUsuario = () => {
-    setFormUsuario({ nome: '', email: '', senha: '', novaSenha: '' })
+    setFormUsuario({ nome: '', email: '', telefone: '', senha: '', novaSenha: '' })
     setErroUsuario('')
     setUsuarioSel(null)
     setModalUsuario('criar')
   }
   const abrirEditarUsuario = (u) => {
-    setFormUsuario({ nome: u.nome, email: u.email, senha: '', novaSenha: '' })
+    setFormUsuario({ nome: u.nome, email: u.email, telefone: u.telefone || '', senha: '', novaSenha: '' })
     setErroUsuario('')
     setUsuarioSel(u)
     setModalUsuario('editar')
   }
   const abrirSenhaUsuario = (u) => {
-    setFormUsuario({ nome: '', email: '', senha: '', novaSenha: '' })
+    setFormUsuario({ nome: '', email: '', telefone: '', senha: '', novaSenha: '' })
     setErroUsuario('')
     setUsuarioSel(u)
     setModalUsuario('senha')
@@ -120,7 +120,7 @@ export default function ConfigAgente() {
         const res = await usuariosApi.criar({ nome: formUsuario.nome, email: formUsuario.email, senha: formUsuario.senha })
         setUsuarios((prev) => [...prev, res.data.usuario])
       } else if (modalUsuario === 'editar') {
-        const res = await usuariosApi.atualizar(usuarioSel.id, { nome: formUsuario.nome, email: formUsuario.email })
+        const res = await usuariosApi.atualizar(usuarioSel.id, { nome: formUsuario.nome, email: formUsuario.email, telefone: formUsuario.telefone })
         setUsuarios((prev) => prev.map((u) => u.id === usuarioSel.id ? res.data.usuario : u))
       } else {
         await usuariosApi.resetarSenha(usuarioSel.id, formUsuario.novaSenha)
@@ -419,6 +419,7 @@ export default function ConfigAgente() {
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium truncate" style={{ color: '#F1F5F9' }}>{u.nome}</p>
                       <p className="text-xs truncate" style={{ color: '#64748B' }}>{u.email}</p>
+                      {u.telefone && <p className="text-xs truncate" style={{ color: '#475569' }}>{u.telefone}</p>}
                     </div>
                     <p className="text-xs hidden sm:block flex-shrink-0" style={{ color: '#475569' }}>
                       {new Intl.DateTimeFormat('pt-BR').format(new Date(u.criadoEm))}
@@ -435,6 +436,7 @@ export default function ConfigAgente() {
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium truncate" style={{ color: '#F1F5F9' }}>{u.nome}</p>
                       <p className="text-xs truncate" style={{ color: '#64748B' }}>{u.email}</p>
+                      {u.telefone && <p className="text-xs truncate" style={{ color: '#475569' }}>{u.telefone}</p>}
                     </div>
                     <p className="text-xs hidden sm:block flex-shrink-0" style={{ color: '#475569' }}>
                       {new Intl.DateTimeFormat('pt-BR').format(new Date(u.criadoEm))}
@@ -509,6 +511,19 @@ export default function ConfigAgente() {
                       onChange={(e) => setFormUsuario((f) => ({ ...f, email: e.target.value }))}
                       placeholder="email@exemplo.com"
                     />
+                  </div>
+                  <div>
+                    <label className="label">WhatsApp para notificações</label>
+                    <input
+                      type="tel"
+                      className="input"
+                      value={formUsuario.telefone}
+                      onChange={(e) => setFormUsuario((f) => ({ ...f, telefone: e.target.value }))}
+                      placeholder="(98) 99999-9999"
+                    />
+                    <p className="text-xs mt-1" style={{ color: '#64748B' }}>
+                      Usado para receber alertas de leads parados e relatórios semanais.
+                    </p>
                   </div>
                 </>
               )}

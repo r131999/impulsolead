@@ -51,7 +51,18 @@ async function verificarLeadsParados() {
       nome: true,
       status: true,
       corretor: { select: { nome: true } },
-      imobiliaria: { select: { id: true, nome: true, telefone: true } },
+      imobiliaria: {
+        select: {
+          id: true,
+          nome: true,
+          usuarios: {
+            where: { role: 'gestor', telefone: { not: null } },
+            select: { telefone: true },
+            orderBy: { criadoEm: 'asc' },
+            take: 1,
+          },
+        },
+      },
     },
   });
 
@@ -71,8 +82,9 @@ async function verificarLeadsParados() {
   }
 
   for (const { imobiliaria, leads: grupo } of porImobiliaria.values()) {
-    if (!imobiliaria.telefone) {
-      console.log(`[cron] ${imobiliaria.nome} sem telefone — notificação pulada.`);
+    const telefoneGestor = imobiliaria.usuarios[0]?.telefone;
+    if (!telefoneGestor) {
+      console.log(`[cron] ${imobiliaria.nome} sem telefone de gestor — notificação pulada.`);
       continue;
     }
 
@@ -85,7 +97,7 @@ async function verificarLeadsParados() {
       `${linhas}\n\n` +
       `Acesse o CRM para verificar.`;
 
-    await enviarWhatsApp(imobiliaria.telefone, texto);
+    await enviarWhatsApp(telefoneGestor, texto);
 
     await prisma.lead.updateMany({
       where: { id: { in: grupo.map((l) => l.id) } },
@@ -106,12 +118,22 @@ async function enviarRelatorioSemanal() {
 
   const imobiliarias = await prisma.imobiliaria.findMany({
     where: { plano: { not: 'cancelado' } },
-    select: { id: true, nome: true, telefone: true },
+    select: {
+      id: true,
+      nome: true,
+      usuarios: {
+        where: { role: 'gestor', telefone: { not: null } },
+        select: { telefone: true },
+        orderBy: { criadoEm: 'asc' },
+        take: 1,
+      },
+    },
   });
 
   for (const imob of imobiliarias) {
-    if (!imob.telefone) {
-      console.log(`[cron] ${imob.nome} sem telefone — relatório pulado.`);
+    const telefoneGestor = imob.usuarios[0]?.telefone;
+    if (!telefoneGestor) {
+      console.log(`[cron] ${imob.nome} sem telefone de gestor — relatório pulado.`);
       continue;
     }
 
@@ -172,7 +194,7 @@ async function enviarRelatorioSemanal() {
         `Acesse o CRM para ver todos os detalhes.`,
       ].join('\n');
 
-      await enviarWhatsApp(imob.telefone, texto);
+      await enviarWhatsApp(telefoneGestor, texto);
       console.log(`[cron] Relatório semanal enviado para ${imob.nome}`);
     } catch (err) {
       console.error(`[cron] Erro no relatório de ${imob.nome}:`, err.message);

@@ -258,6 +258,19 @@ async function receberMensagem(req, res) {
     return res.json({ ok: true, ignorado: 'corretor' });
   }
 
+  const gestoresDaImobiliaria = await prisma.usuario.findMany({
+    where: { imobiliariaId, telefone: { not: null } },
+    select: { telefone: true },
+  });
+
+  const ehGestor = gestoresDaImobiliaria.some(
+    (u) => telefonesIguais(telefoneLimpo, u.telefone),
+  );
+
+  if (ehGestor) {
+    return res.json({ ok: true, ignorado: 'gestor' });
+  }
+
   // 1. Busca ou cria sessão
   let sessao = await prisma.sessaoAgente.findUnique({
     where: { telefone_imobiliariaId: { telefone: telefoneLimpo, imobiliariaId } },

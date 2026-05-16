@@ -38,6 +38,7 @@ model Usuario {
   senhaHash    String
   role         String   @default("gestor")
   ativo        Boolean  @default(true)
+  telefone     String?
   fotoPerfil   String?
   criadoEm    DateTime @default(now())
   atualizadoEm DateTime @updatedAt

@@ -5,7 +5,7 @@ const prisma = new PrismaClient();
 
 const SELECT_USUARIO = {
   id: true, nome: true, email: true, role: true,
-  ativo: true, fotoPerfil: true, criadoEm: true,
+  ativo: true, telefone: true, fotoPerfil: true, criadoEm: true,
 };
 
 async function buscarPrincipalId(imobiliariaId) {
@@ -52,10 +52,10 @@ async function criar(req, res) {
 
 async function atualizar(req, res) {
   const { id } = req.params;
-  const { nome, email } = req.body;
+  const { nome, email, telefone } = req.body;
 
-  if (!nome?.trim() && !email?.trim()) {
-    return res.status(400).json({ error: 'Informe ao menos nome ou email para atualizar' });
+  if (!nome?.trim() && !email?.trim() && telefone === undefined) {
+    return res.status(400).json({ error: 'Informe ao menos nome, email ou telefone para atualizar' });
   }
 
   const principalId = await buscarPrincipalId(req.imobiliariaId);
@@ -75,6 +75,7 @@ async function atualizar(req, res) {
   const data = {};
   if (nome?.trim()) data.nome = nome.trim();
   if (email?.trim()) data.email = email.trim();
+  if (telefone !== undefined) data.telefone = telefone?.trim() || null;
 
   const atualizado = await prisma.usuario.update({ where: { id }, data, select: SELECT_USUARIO });
   res.json({ usuario: atualizado });
