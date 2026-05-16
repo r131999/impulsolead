@@ -44,7 +44,9 @@ async function register(req, res) {
   const senhaHash = await bcrypt.hash(senha, 12);
   const trialExpiraEm = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
-  const result = await prisma.$transaction(async (tx) => {
+  let result;
+  try {
+  result = await prisma.$transaction(async (tx) => {
     const imobiliaria = await tx.imobiliaria.create({
       data: {
         nome: nomeImobiliaria,
@@ -95,6 +97,12 @@ async function register(req, res) {
 
     return { imobiliaria, usuario };
   });
+  } catch (err) {
+    if (err.code === 'P2002') {
+      return res.status(409).json({ error: 'Email já cadastrado' });
+    }
+    throw err;
+  }
 
   const token = jwt.sign(
     { userId: result.usuario.id, imobiliariaId: result.imobiliaria.id, role: 'gestor' },
@@ -305,6 +313,7 @@ async function alterarSenha(req, res) {
   }
 
   const usuario = await prisma.usuario.findUnique({ where: { id: req.usuario.id } });
+  if (!usuario) return res.status(404).json({ error: 'Usuário não encontrado' });
 
   const senhaValida = await bcrypt.compare(senhaAtual, usuario.senhaHash);
   if (!senhaValida) {

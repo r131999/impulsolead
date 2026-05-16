@@ -157,6 +157,12 @@ async function criarLeadNoCRM(sessao, imobiliariaId) {
     ? `Composição familiar: ${respostas.etapa3}`
     : null;
 
+  const configAgente = await prisma.configAgente.findUnique({
+    where: { imobiliariaId },
+    select: { distribuicaoManual: true },
+  });
+  const modoManual = configAgente?.distribuicaoManual ?? false;
+
   const result = await prisma.$transaction(async (tx) => {
     const lead = await tx.lead.create({
       data: {
@@ -173,6 +179,17 @@ async function criarLeadNoCRM(sessao, imobiliariaId) {
         imobiliariaId,
       },
     });
+
+    if (modoManual) {
+      await tx.historicoLead.create({
+        data: {
+          leadId:   lead.id,
+          acao:     'Lead qualificado pelo agente — aguardando distribuição manual',
+          detalhes: 'Distribuição manual ativa: corretor deve ser atribuído pelo gestor',
+        },
+      });
+      return { lead, corretor: null };
+    }
 
     const corretores = await tx.corretor.findMany({
       where: { imobiliariaId, ativo: true, disponivel: true },
@@ -277,21 +294,34 @@ async function receberMensagem(req, res) {
   });
 
   if (!sessao) {
-    sessao = await prisma.sessaoAgente.create({
-      data: {
-        telefone:     telefoneLimpo,
-        nome:         pushName || null,
-        etapaAtual:   0,
-        respostas:    {},
-        status:       'em_andamento',
-        instancia,
-        imobiliariaId,
-      },
-    });
+    let isNova = false;
+    try {
+      sessao = await prisma.sessaoAgente.create({
+        data: {
+          telefone:     telefoneLimpo,
+          nome:         pushName || null,
+          etapaAtual:   0,
+          respostas:    {},
+          status:       'em_andamento',
+          instancia,
+          imobiliariaId,
+        },
+      });
+      isNova = true;
+    } catch (err) {
+      if (err.code !== 'P2002') throw err;
+      // Criação concorrente: outro request já criou a sessão
+      sessao = await prisma.sessaoAgente.findUnique({
+        where: { telefone_imobiliariaId: { telefone: telefoneLimpo, imobiliariaId } },
+      });
+      if (!sessao) throw err;
+    }
 
-    // Primeira mensagem do lead → envia boas-vindas (etapa 0)
-    await enviarMensagem(telefoneLimpo, getMensagem(0, null, null), instancia);
-    return res.json({ ok: true, etapa: 0 });
+    if (isNova) {
+      // Primeira mensagem do lead → envia boas-vindas (etapa 0)
+      await enviarMensagem(telefoneLimpo, getMensagem(0, null, null), instancia);
+      return res.json({ ok: true, etapa: 0 });
+    }
   }
 
   // 2. Sessão já finalizada → ignora

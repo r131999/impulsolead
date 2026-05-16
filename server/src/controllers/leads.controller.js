@@ -440,23 +440,25 @@ async function distribuir(req, res) {
       where: { id: corretorId, imobiliariaId: req.imobiliariaId, ativo: true },
     });
     if (!corretorEscolhido) return res.status(400).json({ error: 'Corretor não encontrado ou inativo' });
-
-    // Move o corretor escolhido para o final da fila
-    const ultimo = await prisma.corretor.findFirst({
-      where: { imobiliariaId: req.imobiliariaId, ativo: true },
-      orderBy: { posicaoFila: 'desc' },
-      select: { posicaoFila: true },
-    });
-    await prisma.corretor.update({
-      where: { id: corretorId },
-      data: { leadsRecebidos: { increment: 1 }, posicaoFila: (ultimo?.posicaoFila ?? 0) + 1 },
-    });
   } else {
     corretorEscolhido = await proximoCorretor(req.imobiliariaId);
     if (!corretorEscolhido) return res.status(400).json({ error: 'Nenhum corretor disponível na fila' });
   }
 
   const leadAtualizado = await prisma.$transaction(async (tx) => {
+    if (corretorId) {
+      // Move o corretor para o final da fila dentro da transação para evitar race condition
+      const ultimo = await tx.corretor.findFirst({
+        where: { imobiliariaId: req.imobiliariaId, ativo: true },
+        orderBy: { posicaoFila: 'desc' },
+        select: { posicaoFila: true },
+      });
+      await tx.corretor.update({
+        where: { id: corretorId },
+        data: { leadsRecebidos: { increment: 1 }, posicaoFila: (ultimo?.posicaoFila ?? 0) + 1 },
+      });
+    }
+
     const result = await tx.lead.update({
       where: { id },
       data: { corretorId: corretorEscolhido.id },

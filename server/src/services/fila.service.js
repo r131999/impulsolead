@@ -27,9 +27,10 @@ async function proximoCorretor(imobiliariaId) {
 
   if (corretores.length === 0) return null;
 
-  const imobiliaria = await prisma.imobiliaria.findUnique({
-    where: { id: imobiliariaId },
+  const gestor = await prisma.usuario.findFirst({
+    where: { imobiliariaId, role: 'gestor', telefone: { not: null } },
     select: { telefone: true },
+    orderBy: { criadoEm: 'asc' },
   });
 
   let escolhido = null;
@@ -40,8 +41,8 @@ async function proximoCorretor(imobiliariaId) {
       break;
     }
     console.log(`[fila] ${corretor.nome} pulado por pendência de atendimento`);
-    if (imobiliaria?.telefone) {
-      notificarGestorPendencia(imobiliaria.telefone, corretor.nome).catch((err) => {
+    if (gestor?.telefone) {
+      notificarGestorPendencia(gestor.telefone, corretor.nome).catch((err) => {
         console.error('[fila] Falha ao notificar gestor:', err.message);
       });
     }
