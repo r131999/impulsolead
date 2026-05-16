@@ -148,4 +148,33 @@ async function receberLead(req, res) {
   });
 }
 
-module.exports = { receberLead };
+async function numerosBloqueados(req, res) {
+  const { imobiliariaId } = req;
+
+  const [corretores, usuarios] = await Promise.all([
+    prisma.corretor.findMany({
+      where: { imobiliariaId },
+      select: { telefone: true, whatsapp: true },
+    }),
+    prisma.usuario.findMany({
+      where: { imobiliariaId, telefone: { not: null } },
+      select: { telefone: true },
+    }),
+  ]);
+
+  const todos = [
+    ...corretores.flatMap((c) => [c.telefone, c.whatsapp]),
+    ...usuarios.map((u) => u.telefone),
+  ];
+
+  const telefones = [...new Set(
+    todos
+      .filter(Boolean)
+      .map((t) => String(t).replace(/\D/g, ''))
+      .filter((t) => t.length >= 10),
+  )];
+
+  res.json({ telefones });
+}
+
+module.exports = { receberLead, numerosBloqueados };
