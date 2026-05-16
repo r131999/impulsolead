@@ -42,7 +42,7 @@ async function getRelatorios(req, res) {
       where,
       select: {
         id: true, status: true, criadoEm: true, atualizadoEm: true,
-        motivoPerda: true, regiao: true, faixaValor: true, urgencia: true,
+        motivoPerda: true, regiao: true, faixaValor: true, urgencia: true, campanha: true,
         corretor: { select: { id: true, nome: true } },
       },
       orderBy: { criadoEm: 'asc' },
@@ -86,6 +86,7 @@ async function getRelatorios(req, res) {
   const porCorretor = corretores.map((c) => {
     const leadsCorretor = leads.filter((l) => l.corretor?.id === c.id);
     const fechadosCorretor = leadsCorretor.filter((l) => l.status === 'venda').length;
+    const leadsCampanha = leadsCorretor.filter((l) => l.campanha).length;
     return {
       id: c.id,
       nome: c.nome,
@@ -94,6 +95,10 @@ async function getRelatorios(req, res) {
       taxaConversao: leadsCorretor.length === 0
         ? 0
         : Math.round((fechadosCorretor / leadsCorretor.length) * 100),
+      leadsCampanha,
+      percentualCampanha: leadsCorretor.length === 0
+        ? 0
+        : Math.round((leadsCampanha / leadsCorretor.length) * 100),
     };
   }).sort((a, b) => b.totalLeads - a.totalLeads);
 
@@ -259,7 +264,7 @@ async function getRelatoriosGerente(req, res) {
       where,
       select: {
         id: true, status: true, criadoEm: true, atualizadoEm: true,
-        motivoPerda: true, regiao: true,
+        motivoPerda: true, regiao: true, campanha: true,
         corretor: { select: { id: true, nome: true } },
       },
       orderBy: { criadoEm: 'asc' },
@@ -291,12 +296,15 @@ async function getRelatoriosGerente(req, res) {
   const porCorretor = equipe.corretores.map((c) => {
     const leadsC = leads.filter((l) => l.corretor?.id === c.id);
     const fechadosC = leadsC.filter((l) => l.status === 'venda').length;
+    const leadsCampanha = leadsC.filter((l) => l.campanha).length;
     return {
       id: c.id,
       nome: c.nome,
       totalLeads: leadsC.length,
       fechados: fechadosC,
       taxaConversao: leadsC.length === 0 ? 0 : Math.round((fechadosC / leadsC.length) * 100),
+      leadsCampanha,
+      percentualCampanha: leadsC.length === 0 ? 0 : Math.round((leadsCampanha / leadsC.length) * 100),
     };
   }).sort((a, b) => b.totalLeads - a.totalLeads);
 

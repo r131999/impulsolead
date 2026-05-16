@@ -106,7 +106,7 @@ export default function RelatoriosGerente() {
                 <table className="w-full text-sm">
                   <thead style={{ backgroundColor: '#0B1120', borderBottom: '1px solid #1E293B' }}>
                     <tr>
-                      {['Corretor', 'Leads', 'Fechamentos', 'Conversão'].map((h) => (
+                      {['Corretor', 'Leads', 'Fechamentos', 'Conversão', '📣 Camp.'].map((h) => (
                         <th key={h} className="text-left px-4 py-3 font-medium text-xs uppercase tracking-wide" style={{ color: '#64748B' }}>{h}</th>
                       ))}
                     </tr>
@@ -130,6 +130,15 @@ export default function RelatoriosGerente() {
                           >
                             {c.taxaConversao}%
                           </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          {c.leadsCampanha > 0 ? (
+                            <span className="text-xs font-medium" style={{ color: '#F59E0B' }}>
+                              📣 {c.leadsCampanha} ({c.percentualCampanha}%)
+                            </span>
+                          ) : (
+                            <span style={{ color: '#475569' }}>—</span>
+                          )}
                         </td>
                       </tr>
                     ))}

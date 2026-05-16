@@ -207,6 +207,7 @@ export default function Relatorios() {
                           <th className="text-right py-2 font-medium text-xs" style={{ color: '#64748B' }}>Leads</th>
                           <th className="text-right py-2 font-medium text-xs" style={{ color: '#64748B' }}>Fechados</th>
                           <th className="text-right py-2 font-medium text-xs" style={{ color: '#64748B' }}>Conv.</th>
+                          <th className="text-right py-2 font-medium text-xs" style={{ color: '#64748B' }}>📣 Camp.</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -219,6 +220,15 @@ export default function Relatorios() {
                               <span className="badge" style={c.taxaConversao >= 50 ? { color: '#10B981', backgroundColor: 'rgba(16,185,129,0.15)' } : c.taxaConversao >= 20 ? { color: '#F59E0B', backgroundColor: 'rgba(245,158,11,0.15)' } : { color: '#EF4444', backgroundColor: 'rgba(239,68,68,0.15)' }}>
                                 {c.taxaConversao}%
                               </span>
+                            </td>
+                            <td className="py-2 text-right">
+                              {c.leadsCampanha > 0 ? (
+                                <span className="text-xs font-medium" style={{ color: '#F59E0B' }}>
+                                  📣 {c.leadsCampanha} ({c.percentualCampanha}%)
+                                </span>
+                              ) : (
+                                <span style={{ color: '#475569' }}>—</span>
+                              )}
                             </td>
                           </tr>
                         ))}

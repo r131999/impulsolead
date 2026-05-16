@@ -377,6 +377,14 @@ function LeadCard({ lead, atualizando, followUp, podeGerenciar, onDetalhes, onAv
         </div>
       </div>
       <p className="text-xs mt-0.5" style={{ color: '#64748B' }}>{lead.telefone}</p>
+      {lead.campanha && (
+        <span
+          className="inline-block text-xs font-medium px-1.5 py-0.5 rounded mt-1"
+          style={{ backgroundColor: 'rgba(245,158,11,0.15)', color: '#F59E0B', fontSize: 10, lineHeight: '16px' }}
+        >
+          📣 Campanha
+        </span>
+      )}
       {tempo && (
         <p className="text-xs mt-1" style={{ color: tempo.cor }}>
           ⏱ {tempo.texto}
