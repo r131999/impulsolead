@@ -140,6 +140,7 @@ async function handleMessage(msg) {
     console.log('[WhatsApp] Mensagem recebida:', JSON.stringify(msg, null, 2));
 
     // Filtros básicos
+    if (msg.messageStubType) return;  // mensagens de sistema (sync, sessão, notificações)
     if (key.fromMe) return;
     if (!key.remoteJid) return;
     if (key.remoteJid.endsWith('@g.us')) return;
@@ -206,7 +207,10 @@ async function handleMessage(msg) {
     }
 
     // Bloquear atendido nas últimas 24h
-    if (recentLeads.has(phone)) {
+    // Verifica tanto o phone extraído quanto o senderPn bruto para cobrir o caso
+    // em que o mesmo contato chegou antes como @s.whatsapp.net e agora como @lid
+    const senderPnRaw = (key.senderPn || msg.participant || '').split('@')[0].replace(/\D/g, '');
+    if (recentLeads.has(phone) || (senderPnRaw && recentLeads.has(senderPnRaw))) {
       tag(`Mensagem ignorada — lead recente (24h): ${phone}`);
       return;
     }
@@ -239,7 +243,9 @@ async function handleMessage(msg) {
       'x-api-key': CONFIG.apiKey,
     });
 
-    recentLeads.set(phone, Date.now());
+    const now = Date.now();
+    recentLeads.set(phone, now);
+    if (senderPnRaw && senderPnRaw !== phone) recentLeads.set(senderPnRaw, now);
     tag(`Lead enviado ao CRM — status: ${res.status}`);
   } catch (err) {
     tag(`Erro ao processar mensagem: ${err.message}`);
