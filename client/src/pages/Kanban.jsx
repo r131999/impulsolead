@@ -886,6 +886,26 @@ function ModalDetalhes({ lead, onClose, onSalvo }) {
         {/* Rodapé */}
         <div className="flex-shrink-0 px-5 pb-4 pt-3" style={{ borderTop: '1px solid #1E293B' }}>
           {erro && <p className="text-xs mb-2" style={{ color: '#EF4444' }}>{erro}</p>}
+          {lead.corretor && (
+            <button
+              onClick={() => window.dispatchEvent(new CustomEvent('abrir-chat-interno', {
+                detail: {
+                  destinatarioId: lead.corretor.id,
+                  destinatarioTipo: lead.corretor.role || 'corretor',
+                  destinatarioNome: lead.corretor.nome,
+                  destinatarioFoto: lead.corretor.fotoPerfil || null,
+                  leadId: lead.id,
+                  leadNome: lead.nome,
+                },
+              }))}
+              className="w-full text-sm font-medium py-2 rounded-lg mb-2 transition-colors"
+              style={{ backgroundColor: 'rgba(16,185,129,0.12)', color: '#10B981' }}
+              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(16,185,129,0.22)' }}
+              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'rgba(16,185,129,0.12)' }}
+            >
+              💬 Mensagem ao Corretor
+            </button>
+          )}
           <div className="flex gap-2">
             <button
               onClick={onClose}

@@ -250,6 +250,35 @@ model SessaoAgente {
   @@unique([telefone, imobiliariaId])
 }
 
+model ChatConversa {
+  id                String   @id @default(uuid())
+  participante1Id   String
+  participante1Tipo String
+  participante2Id   String
+  participante2Tipo String
+  imobiliariaId     String
+  criadoEm         DateTime @default(now())
+  atualizadoEm      DateTime @updatedAt
+
+  mensagens ChatMensagem[]
+
+  @@unique([participante1Id, participante2Id])
+}
+
+model ChatMensagem {
+  id            String      @id @default(uuid())
+  conversaId    String
+  conversa      ChatConversa @relation(fields: [conversaId], references: [id])
+  remetenteId   String
+  remetenteTipo String
+  remetenteNome String
+  conteudo      String
+  leadId        String?
+  leadNome      String?
+  lida          Boolean     @default(false)
+  criadoEm     DateTime    @default(now())
+}
+
 model ConfigAgente {
   id                 String  @id @default(uuid())
   mensagemBoasVindas String  @default("Olá! Tudo bem? Aqui é a Lia, assistente virtual. Que bom que você entrou em contato! Como posso te chamar?")

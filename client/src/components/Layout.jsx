@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { Avatar, redimensionarImagem } from './Avatar'
+import ChatInterno from '../pages/ChatInterno'
 
 const NAV_GESTOR = [
   { to: '/dashboard',  label: 'Dashboard',    icon: ChartIcon },
@@ -137,6 +138,7 @@ export default function Layout() {
       <div className="app-main">
         <Outlet />
       </div>
+      <ChatInterno />
     </div>
   )
 }
