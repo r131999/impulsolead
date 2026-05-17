@@ -135,10 +135,13 @@ function cleanupMaps() {
 // ── Processamento de mensagens ─────────────────────────────────────────────────
 async function handleMessage(msg) {
   try {
+    // Rejeitar antes de qualquer extração: sem conteúdo real ou mensagem de sistema.
+    // Bad MAC / erros de descriptografia chegam sem msg.message ou com messageStubType.
+    if (!msg.message || msg.messageStubType) return;
+
     const { key, message } = msg;
 
     // Filtros básicos
-    if (msg.messageStubType) return;  // mensagens de sistema (sync, sessão, notificações)
     if (key.fromMe) return;
     if (!key.remoteJid) return;
     if (key.remoteJid.endsWith('@g.us')) return;
