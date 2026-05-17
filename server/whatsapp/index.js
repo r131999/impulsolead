@@ -195,6 +195,16 @@ async function handleMessage(msg) {
       return;
     }
 
+    // Validação do número: rejeita JIDs @lid gigantes e números inválidos.
+    // Números brasileiros: 55 + DDD(2) + número(8 ou 9) = 12 ou 13 dígitos.
+    const phoneValido = phone.startsWith('55')
+      ? phone.length === 12 || phone.length === 13
+      : phone.length >= 10 && phone.length <= 13;
+    if (!phoneValido) {
+      tag(`Número inválido ignorado: ${phone}`);
+      return;
+    }
+
     // Nome do lead vem do pushName
     const rawName = msg.pushName || '';
     const nome = rawName && rawName !== 'undefined' && rawName.trim()
