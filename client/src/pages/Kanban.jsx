@@ -747,6 +747,7 @@ function ModalDetalhes({ lead, onClose, onSalvo }) {
   const { conteudo: conteudoInicial, timestamp: tsInicial } = extrairTimestamp(lead.observacoes || '')
   const [nome, setNome] = useState(lead.nome)
   const [origem, setOrigem] = useState(lead.origem || '')
+  const [leadCampanha, setLeadCampanha] = useState(!!lead.campanha)
   const [observacoes, setObservacoes] = useState(conteudoInicial)
   const [ultimaAtualizacao] = useState(tsInicial)
   const [salvando, setSalvando] = useState(false)
@@ -772,6 +773,7 @@ function ModalDetalhes({ lead, onClose, onSalvo }) {
       await leadsApi.atualizarDetalhes(lead.id, {
         nome: nome.trim(),
         origem: origem || null,
+        campanha: leadCampanha ? 'Anúncio' : null,
         observacoes: observacoes.trim() || null,
       })
       onSalvo()
@@ -853,6 +855,35 @@ function ModalDetalhes({ lead, onClose, onSalvo }) {
               <option value="">Selecionar origem...</option>
               {ORIGENS.map((o) => <option key={o} value={o}>{o}</option>)}
             </select>
+          </div>
+
+          {/* Lead de Campanha */}
+          <div>
+            <label
+              className="flex items-center gap-3 cursor-pointer select-none"
+              style={{ color: leadCampanha ? '#60A5FA' : '#64748B' }}
+            >
+              <div className="relative flex-shrink-0">
+                <input
+                  type="checkbox"
+                  className="sr-only"
+                  checked={leadCampanha}
+                  onChange={(e) => setLeadCampanha(e.target.checked)}
+                />
+                <div
+                  className="w-10 h-5 rounded-full transition-colors"
+                  style={{ backgroundColor: leadCampanha ? 'rgba(96,165,250,0.35)' : '#1E293B' }}
+                />
+                <div
+                  className="absolute top-0.5 left-0.5 w-4 h-4 rounded-full transition-transform"
+                  style={{
+                    backgroundColor: leadCampanha ? '#60A5FA' : '#475569',
+                    transform: leadCampanha ? 'translateX(20px)' : 'translateX(0)',
+                  }}
+                />
+              </div>
+              <span className="text-sm font-medium">📣 Lead de Campanha</span>
+            </label>
           </div>
 
           {/* Qualificação */}

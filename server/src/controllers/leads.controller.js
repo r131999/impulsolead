@@ -345,7 +345,7 @@ async function remover(req, res) {
 
 async function detalhes(req, res) {
   const { id } = req.params;
-  const { nome, origem, observacoes } = req.body;
+  const { nome, origem, observacoes, campanha } = req.body;
 
   const where = { id, imobiliariaId: req.imobiliariaId };
   if (req.role === 'corretor') {
@@ -372,6 +372,7 @@ async function detalhes(req, res) {
     data.nomeEditado = nomeTrimmed;
   }
   if (origem !== undefined) data.origem = origem || null;
+  if (campanha !== undefined) data.campanha = campanha || null;
   if (observacoes !== undefined) {
     const textoBase = observacoes ? observacoes.trim() : null;
     if (!textoBase) {
