@@ -109,13 +109,14 @@ const CAMPAIGN_PATTERNS = [
   /interesse\s+n[oa]\s+(.+)/i,
   /indicad[ao]\s+pel[ao]\s+(.+)/i,
   /vi\s+n[ao]\s+(.+)/i,
+  /tenho interesse e queria mais informa/i,
 ];
 
 function detectCampaign(text) {
   if (!text) return null;
   for (const pattern of CAMPAIGN_PATTERNS) {
     const m = text.match(pattern);
-    if (m) return m[1].trim().slice(0, 100);
+    if (m) return m[1] ? m[1].trim().slice(0, 100) : 'Anúncio';
   }
   return null;
 }
