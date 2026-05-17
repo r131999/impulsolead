@@ -57,7 +57,7 @@ async function listar(req, res) {
       orderBy: { criadoEm: 'desc' },
       select: {
         id: true, nome: true, nomeEditado: true, telefone: true, status: true,
-        origem: true, campanha: true,
+        origem: true, campanha: true, interesse: true,
         primeiroImovel: true, tipoRenda: true, rendaMensal: true,
         restricaoCpf: true, valorEntrada: true,
         urgencia: true, regiao: true, faixaValor: true,
@@ -345,7 +345,7 @@ async function remover(req, res) {
 
 async function detalhes(req, res) {
   const { id } = req.params;
-  const { nome, origem, observacoes, campanha } = req.body;
+  const { nome, origem, observacoes, campanha, interesse } = req.body;
 
   const where = { id, imobiliariaId: req.imobiliariaId };
   if (req.role === 'corretor') {
@@ -373,6 +373,7 @@ async function detalhes(req, res) {
   }
   if (origem !== undefined) data.origem = origem || null;
   if (campanha !== undefined) data.campanha = campanha || null;
+  if (interesse !== undefined) data.interesse = interesse ? interesse.trim() || null : null;
   if (observacoes !== undefined) {
     const textoBase = observacoes ? observacoes.trim() : null;
     if (!textoBase) {

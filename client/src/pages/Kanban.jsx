@@ -390,9 +390,16 @@ function LeadCard({ lead, atualizando, followUp, podeGerenciar, onDetalhes, onAv
         <span
           className="inline-block text-xs font-medium px-1.5 py-0.5 rounded mt-1"
           style={{ backgroundColor: 'rgba(245,158,11,0.18)', color: '#F59E0B' }}
-          title={lead.campanha}
         >
-          📣 Campanha
+          📣 {lead.campanha}
+        </span>
+      )}
+      {lead.interesse && (
+        <span
+          className="inline-block text-xs font-medium px-1.5 py-0.5 rounded mt-1 ml-1"
+          style={{ backgroundColor: 'rgba(16,185,129,0.15)', color: '#10B981' }}
+        >
+          🏠 {lead.interesse}
         </span>
       )}
       {tempo && (
@@ -748,6 +755,7 @@ function ModalDetalhes({ lead, onClose, onSalvo }) {
   const [nome, setNome] = useState(lead.nome)
   const [origem, setOrigem] = useState(lead.origem || '')
   const [leadCampanha, setLeadCampanha] = useState(!!lead.campanha)
+  const [interesse, setInteresse] = useState(lead.interesse || '')
   const [observacoes, setObservacoes] = useState(conteudoInicial)
   const [ultimaAtualizacao] = useState(tsInicial)
   const [salvando, setSalvando] = useState(false)
@@ -774,6 +782,7 @@ function ModalDetalhes({ lead, onClose, onSalvo }) {
         nome: nome.trim(),
         origem: origem || null,
         campanha: leadCampanha ? 'Anúncio' : null,
+        interesse: interesse.trim() || null,
         observacoes: observacoes.trim() || null,
       })
       onSalvo()
@@ -884,6 +893,19 @@ function ModalDetalhes({ lead, onClose, onSalvo }) {
               </div>
               <span className="text-sm font-medium">📣 Lead de Campanha</span>
             </label>
+          </div>
+
+          {/* Interesse */}
+          <div>
+            <label className="text-xs font-semibold uppercase tracking-wide block mb-1.5" style={{ color: '#64748B' }}>
+              Empreendimento de Interesse
+            </label>
+            <input
+              value={interesse}
+              onChange={(e) => setInteresse(e.target.value)}
+              className="input w-full"
+              placeholder="Ex: Village das Estrelas, Residencial Sol..."
+            />
           </div>
 
           {/* Qualificação */}

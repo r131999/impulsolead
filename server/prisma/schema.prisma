@@ -92,6 +92,7 @@ model Lead {
 
   origem            String?
   campanha          String?
+  interesse         String?
   nomeEditado       String?
 
   status            String  @default("lead")
