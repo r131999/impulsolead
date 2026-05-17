@@ -136,9 +136,6 @@ async function handleMessage(msg) {
   try {
     const { key, message } = msg;
 
-    // Log completo para debug — remover após confirmar campos corretos
-    console.log('[WhatsApp] Mensagem recebida:', JSON.stringify(msg, null, 2));
-
     // Filtros básicos
     if (msg.messageStubType) return;  // mensagens de sistema (sync, sessão, notificações)
     if (key.fromMe) return;
