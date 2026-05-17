@@ -136,6 +136,9 @@ async function handleMessage(msg) {
   try {
     const { key, message } = msg;
 
+    // Log completo para debug — remover após confirmar campos corretos
+    console.log('[WhatsApp] Mensagem recebida:', JSON.stringify(msg, null, 2));
+
     // Filtros básicos
     if (key.fromMe) return;
     if (!key.remoteJid) return;
@@ -156,9 +159,45 @@ async function handleMessage(msg) {
     if (seenMsgIds.has(msgId)) return;
     seenMsgIds.set(msgId, Date.now());
 
-    // Extrair número limpo
-    const jid = key.remoteJid;
-    const phone = jid.replace('@s.whatsapp.net', '').replace(/\D/g, '');
+    // ── Extração do JID real e telefone ────────────────────────────────────────
+    // @lid = Linked ID (novo formato do WhatsApp Business API) — o número real
+    // fica em key.participant, msg.participant ou key.senderPn
+    const remoteJid = key.remoteJid;
+    let realJid = remoteJid;
+    let phone;
+
+    if (remoteJid.endsWith('@lid')) {
+      const participant =
+        key.participant ||
+        msg.participant ||
+        key.senderPn ||
+        '';
+
+      if (participant && participant.includes('@')) {
+        realJid = participant;
+        phone = participant.split('@')[0].replace(/\D/g, '');
+      } else if (participant) {
+        phone = String(participant).replace(/\D/g, '');
+        realJid = `${phone}@s.whatsapp.net`;
+      } else {
+        // Último recurso: lid numérico como identificador
+        phone = remoteJid.replace('@lid', '').replace(/\D/g, '');
+        tag(`JID @lid sem participant — usando lid como id: ${phone}`);
+      }
+    } else {
+      phone = remoteJid.split('@')[0].replace(/\D/g, '');
+    }
+
+    if (!phone) {
+      tag(`Não foi possível extrair número do JID: ${remoteJid}`);
+      return;
+    }
+
+    // Nome do lead vem do pushName
+    const rawName = msg.pushName || '';
+    const nome = rawName && rawName !== 'undefined' && rawName.trim()
+      ? rawName.trim()
+      : 'Lead WhatsApp';
 
     // Bloquear números de corretores/gestores
     if (blockedNumbers.has(phone)) {
@@ -173,13 +212,12 @@ async function handleMessage(msg) {
     }
 
     const campanha = detectCampaign(text);
-    const nome = 'Lead WhatsApp';
 
-    tag(`Novo lead detectado: ${phone}${campanha ? ` | campanha: ${campanha}` : ''}`);
+    tag(`Novo lead detectado: ${phone} (${nome})${campanha ? ` | campanha: ${campanha}` : ''}`);
 
     // Mensagem de boas-vindas antes de registrar no CRM
     try {
-      await sock.sendMessage(jid, {
+      await sock.sendMessage(realJid, {
         text: 'Em breve um de nossos consultores entrará em contato com você.',
       });
     } catch (err) {
@@ -192,7 +230,7 @@ async function handleMessage(msg) {
     const leadBody = {
       nome,
       telefone: phone,
-      whatsappJid: jid,
+      whatsappJid: realJid,
       campanha: campanha || undefined,
       imobiliariaId: CONFIG.imobiliariaId,
     };
