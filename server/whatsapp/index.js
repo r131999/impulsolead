@@ -93,14 +93,11 @@ async function fetchBlockedNumbers() {
     });
     if (res.status === 200) {
       const json = JSON.parse(res.data);
-      tag(`[debug] numeros-bloqueados raw: ${JSON.stringify(json).slice(0, 200)}`);
       const nums = Array.isArray(json)
         ? json
         : (json.telefones || json.numeros || json.numbers || []);
       blockedNumbers = new Set(nums.map((n) => String(n).replace(/\D/g, '')));
       tag(`Números bloqueados atualizados: ${blockedNumbers.size}`);
-    } else {
-      tag(`[debug] numeros-bloqueados status inesperado: ${res.status}`);
     }
   } catch (err) {
     tag(`Erro ao buscar números bloqueados: ${err.message}`);
