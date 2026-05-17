@@ -358,12 +358,12 @@ async function getRelatoriosOrigem(req, res) {
 
   const leads = await prisma.lead.findMany({
     where: { imobiliariaId, criadoEm: { gte: dataInicio } },
-    select: { id: true, status: true, origem: true },
+    select: { id: true, status: true, origem: true, campanha: true },
   });
 
   const grupos = {};
   leads.forEach((l) => {
-    const key = l.origem || 'Não informado';
+    const key = (l.campanha || l.origem === 'Meta Ads') ? 'Meta Ads' : (l.origem || 'Não informado');
     if (!grupos[key]) grupos[key] = { total: 0, fechados: 0 };
     grupos[key].total++;
     if (l.status === 'venda') grupos[key].fechados++;
