@@ -1,0 +1,15 @@
+FROM node:20-alpine
+
+WORKDIR /app
+
+# python3 e make são exigidos pelo Baileys (módulos nativos)
+RUN apk add --no-cache python3 make g++
+
+COPY package*.json ./
+RUN npm ci --only=production
+
+COPY . .
+
+EXPOSE 3010
+
+CMD ["node", "whatsapp/index.js"]
