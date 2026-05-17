@@ -241,7 +241,7 @@ export default function ChatInterno() {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          zIndex: 9000,
+          zIndex: 99999,
           boxShadow: '0 4px 16px rgba(79,70,229,0.5)',
           transition: 'transform 0.15s, box-shadow 0.15s',
         }}
@@ -286,7 +286,7 @@ export default function ChatInterno() {
           backgroundColor: '#111827',
           border: '1px solid #1E293B',
           boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
-          zIndex: 9000,
+          zIndex: 99998,
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',

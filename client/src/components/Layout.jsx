@@ -58,88 +58,90 @@ export default function Layout() {
   const navItems = isGerente ? NAV_GERENTE : isCorretor ? NAV_CORRETOR : NAV_GESTOR
 
   return (
-    <div className="app-shell">
-      <button
-        className="hamburger-btn"
-        onClick={() => setAberta(v => !v)}
-        aria-label={aberta ? 'Fechar menu' : 'Abrir menu'}
-      >
-        {aberta ? '✕' : '☰'}
-      </button>
+    <>
+      <div className="app-shell">
+        <button
+          className="hamburger-btn"
+          onClick={() => setAberta(v => !v)}
+          aria-label={aberta ? 'Fechar menu' : 'Abrir menu'}
+        >
+          {aberta ? '✕' : '☰'}
+        </button>
 
-      {aberta && (
-        <div className="sidebar-overlay" onClick={fechar} />
-      )}
+        {aberta && (
+          <div className="sidebar-overlay" onClick={fechar} />
+        )}
 
-      <aside className={`app-sidebar${aberta ? ' sidebar-open' : ''}`}>
-        <div className="px-5 py-4 border-b border-indigo-800">
-          <img src="/logo-branca.png" alt="ImpulsoLead" style={{ height: '32px' }} />
-          <p className="text-indigo-300 text-xs mt-0.5 truncate">{usuario?.imobiliaria?.nome}</p>
-          {isGerente && (
-            <span className="inline-block mt-1 px-2 py-0.5 rounded text-xs font-medium" style={{ backgroundColor: 'rgba(16,185,129,0.15)', color: '#10B981' }}>
-              Gerente
-            </span>
-          )}
-          {isCorretor && (
-            <span className="inline-block mt-1 px-2 py-0.5 rounded text-xs font-medium" style={{ backgroundColor: 'rgba(99,102,241,0.2)', color: '#818cf8' }}>
-              Corretor
-            </span>
-          )}
-        </div>
+        <aside className={`app-sidebar${aberta ? ' sidebar-open' : ''}`}>
+          <div className="px-5 py-4 border-b border-indigo-800">
+            <img src="/logo-branca.png" alt="ImpulsoLead" style={{ height: '32px' }} />
+            <p className="text-indigo-300 text-xs mt-0.5 truncate">{usuario?.imobiliaria?.nome}</p>
+            {isGerente && (
+              <span className="inline-block mt-1 px-2 py-0.5 rounded text-xs font-medium" style={{ backgroundColor: 'rgba(16,185,129,0.15)', color: '#10B981' }}>
+                Gerente
+              </span>
+            )}
+            {isCorretor && (
+              <span className="inline-block mt-1 px-2 py-0.5 rounded text-xs font-medium" style={{ backgroundColor: 'rgba(99,102,241,0.2)', color: '#818cf8' }}>
+                Corretor
+              </span>
+            )}
+          </div>
 
-        <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
-          {navItems.map(({ to, label, icon: Icon }) => (
-            <NavLink
-              key={to}
-              to={to}
-              onClick={fechar}
-              className={({ isActive }) =>
-                `flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                  isActive
-                    ? 'bg-indigo-700 text-white'
-                    : 'text-indigo-200 hover:bg-indigo-800 hover:text-white'
-                }`
-              }
+          <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
+            {navItems.map(({ to, label, icon: Icon }) => (
+              <NavLink
+                key={to}
+                to={to}
+                onClick={fechar}
+                className={({ isActive }) =>
+                  `flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                    isActive
+                      ? 'bg-indigo-700 text-white'
+                      : 'text-indigo-200 hover:bg-indigo-800 hover:text-white'
+                  }`
+                }
+              >
+                <Icon className="w-4 h-4 flex-shrink-0" />
+                {label}
+              </NavLink>
+            ))}
+          </nav>
+
+          <div className="p-3 border-t border-indigo-800">
+            <button
+              className="w-full flex items-center gap-2.5 px-2 py-1.5 mb-1 rounded-lg hover:bg-indigo-800 transition-colors text-left"
+              onClick={() => fotoInputRef.current?.click()}
+              title="Clique para alterar foto de perfil"
+              disabled={salvandoFoto}
             >
-              <Icon className="w-4 h-4 flex-shrink-0" />
-              {label}
-            </NavLink>
-          ))}
-        </nav>
+              <Avatar nome={usuario?.nome} fotoPerfil={usuario?.fotoPerfil} size={36} />
+              <span className="text-indigo-200 text-xs truncate flex-1">
+                {salvandoFoto ? 'Salvando...' : usuario?.nome}
+              </span>
+            </button>
+            <input
+              ref={fotoInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleFoto}
+            />
+            <button
+              onClick={() => { logout(); navigate('/login') }}
+              className="w-full text-left px-3 py-2 text-indigo-300 hover:text-white text-sm rounded-lg hover:bg-indigo-800 transition-colors"
+            >
+              Sair
+            </button>
+          </div>
+        </aside>
 
-        <div className="p-3 border-t border-indigo-800">
-          <button
-            className="w-full flex items-center gap-2.5 px-2 py-1.5 mb-1 rounded-lg hover:bg-indigo-800 transition-colors text-left"
-            onClick={() => fotoInputRef.current?.click()}
-            title="Clique para alterar foto de perfil"
-            disabled={salvandoFoto}
-          >
-            <Avatar nome={usuario?.nome} fotoPerfil={usuario?.fotoPerfil} size={36} />
-            <span className="text-indigo-200 text-xs truncate flex-1">
-              {salvandoFoto ? 'Salvando...' : usuario?.nome}
-            </span>
-          </button>
-          <input
-            ref={fotoInputRef}
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={handleFoto}
-          />
-          <button
-            onClick={() => { logout(); navigate('/login') }}
-            className="w-full text-left px-3 py-2 text-indigo-300 hover:text-white text-sm rounded-lg hover:bg-indigo-800 transition-colors"
-          >
-            Sair
-          </button>
+        <div className="app-main">
+          <Outlet />
         </div>
-      </aside>
-
-      <div className="app-main">
-        <Outlet />
       </div>
       <ChatInterno />
-    </div>
+    </>
   )
 }
 
