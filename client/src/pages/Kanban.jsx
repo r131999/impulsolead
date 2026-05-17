@@ -110,6 +110,7 @@ export default function Kanban() {
   const [modalDetalhes, setModalDetalhes] = useState(null) // lead
   const [modalDistribuir, setModalDistribuir] = useState(null) // lead
   const [corretores, setCorretores] = useState([])
+  const [celebracao, setCelebracao] = useState(null) // { etapa: string }
 
   const carregar = useCallback(() => {
     leadsApi
@@ -151,6 +152,7 @@ export default function Kanban() {
     try {
       await leadsApi.mudarStatus(lead.id, { status: proximo })
       carregar()
+      if (isCorretor) setCelebracao({ etapa: proximo })
     } finally {
       setAtualizando(null)
     }
@@ -318,6 +320,13 @@ export default function Kanban() {
           corretores={corretores}
           onConfirmar={(corretorId) => confirmarDistribuicao(modalDistribuir.id, corretorId)}
           onClose={() => setModalDistribuir(null)}
+        />
+      )}
+
+      {celebracao && isCorretor && (
+        <PopupCelebracao
+          etapa={celebracao.etapa}
+          onClose={() => setCelebracao(null)}
         />
       )}
     </div>
@@ -1017,6 +1026,218 @@ function ModalDistribuir({ lead, corretores, onConfirmar, onClose }) {
     </div>
   )
 }
+
+// ── Popup de Celebração ───────────────────────────────────────────────────────
+
+const MENSAGENS_CELEBRACAO = {
+  atendimento: 'Primeiro contato feito! Você está no caminho certo!',
+  agendamento: 'Visita agendada! Você está a 50% de fechar!',
+  visita: 'Visita confirmada! O lead quer conhecer o imóvel!',
+  proposta: 'Proposta na mesa! 75% de chance de fechar!',
+  venda: 'VENDA FECHADA! Parabéns!\n\nAlém da venda, você ganhou um vale refeição pago pela imobiliária em qualquer restaurante de São Luís!',
+}
+
+const ICONES_ETAPA = {
+  atendimento: '🎯',
+  agendamento: '📅',
+  visita: '🏠',
+  proposta: '💼',
+  venda: '🏆',
+}
+
+const CORES_CONFETTI = ['#f59e0b', '#10b981', '#3b82f6', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16', '#f97316']
+
+function PopupCelebracao({ etapa, onClose }) {
+  const ehVenda = etapa === 'venda'
+  const mensagem = MENSAGENS_CELEBRACAO[etapa] || 'Etapa avançada!'
+  const icone = ICONES_ETAPA[etapa] || '🎉'
+
+  const [confettiItems] = useState(() =>
+    ehVenda
+      ? Array.from({ length: 32 }, (_, i) => ({
+          id: i,
+          color: CORES_CONFETTI[i % CORES_CONFETTI.length],
+          left: Math.floor(Math.random() * 100),
+          delay: (Math.random() * 2.2).toFixed(2),
+          size: Math.floor(7 + Math.random() * 9),
+          duration: (2.5 + Math.random() * 2).toFixed(2),
+          borderRadius: i % 3 === 0 ? '20%' : '50%',
+        }))
+      : []
+  )
+
+  useEffect(() => {
+    const t = setTimeout(onClose, 4000)
+    return () => clearTimeout(t)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const corAccent = ehVenda ? '#f59e0b' : '#6366f1'
+  const corAccentRgba = ehVenda ? 'rgba(245,158,11,0.55)' : 'rgba(99,102,241,0.45)'
+
+  return (
+    <>
+      <style>{`
+        @keyframes cel-entrada {
+          0%   { transform: scale(0.5) translateY(16px); opacity: 0; }
+          70%  { transform: scale(1.04) translateY(-4px); opacity: 1; }
+          100% { transform: scale(1) translateY(0); opacity: 1; }
+        }
+        @keyframes cel-barra {
+          from { width: 100%; }
+          to   { width: 0%; }
+        }
+        @keyframes cel-confetti {
+          0%   { transform: translateY(-20px) rotate(0deg); opacity: 1; }
+          85%  { opacity: 1; }
+          100% { transform: translateY(108vh) rotate(800deg); opacity: 0; }
+        }
+        @keyframes cel-icone {
+          0%, 100% { transform: scale(1) rotate(0deg); }
+          25%       { transform: scale(1.18) rotate(-6deg); }
+          75%       { transform: scale(1.18) rotate(6deg); }
+        }
+      `}</style>
+
+      {/* Overlay — clicar fora fecha */}
+      <div
+        onClick={onClose}
+        style={{
+          position: 'fixed',
+          inset: 0,
+          backgroundColor: 'rgba(0,0,0,0.72)',
+          zIndex: 10000,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: 20,
+        }}
+      >
+        {/* Confetti caindo */}
+        {confettiItems.map((c) => (
+          <div
+            key={c.id}
+            style={{
+              position: 'fixed',
+              top: -24,
+              left: `${c.left}%`,
+              width: c.size,
+              height: c.size,
+              borderRadius: c.borderRadius,
+              backgroundColor: c.color,
+              animation: `cel-confetti ${c.duration}s ${c.delay}s ease-in both`,
+              pointerEvents: 'none',
+              zIndex: 10002,
+            }}
+          />
+        ))}
+
+        {/* Card */}
+        <div
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            background: ehVenda
+              ? 'linear-gradient(148deg, #1a1200 0%, #231800 35%, #111827 100%)'
+              : 'linear-gradient(148deg, #1e1b4b 0%, #14113a 40%, #0f172a 100%)',
+            border: `2px solid ${corAccentRgba}`,
+            borderRadius: 22,
+            width: '100%',
+            maxWidth: 420,
+            overflow: 'hidden',
+            animation: 'cel-entrada 0.42s cubic-bezier(0.22,1,0.36,1) forwards',
+            boxShadow: ehVenda
+              ? `0 0 60px rgba(245,158,11,0.2), 0 28px 72px rgba(0,0,0,0.75)`
+              : `0 0 40px rgba(99,102,241,0.18), 0 28px 72px rgba(0,0,0,0.75)`,
+            position: 'relative',
+          }}
+        >
+          {/* Botão fechar */}
+          <button
+            onClick={onClose}
+            style={{
+              position: 'absolute',
+              top: 14,
+              right: 16,
+              color: '#475569',
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              fontSize: 20,
+              lineHeight: 1,
+              padding: 4,
+              zIndex: 1,
+              transition: 'color 0.15s',
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = '#94A3B8' }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = '#475569' }}
+          >
+            ✕
+          </button>
+
+          {/* Corpo */}
+          <div style={{ padding: ehVenda ? '36px 28px 24px' : '32px 28px 22px' }}>
+            {/* Ícone animado */}
+            <div style={{
+              fontSize: ehVenda ? 60 : 48,
+              textAlign: 'center',
+              marginBottom: 16,
+              animation: 'cel-icone 1.4s ease-in-out infinite',
+              lineHeight: 1,
+            }}>
+              {icone}
+            </div>
+
+            {/* Mensagem */}
+            <p style={{
+              color: '#F1F5F9',
+              fontSize: ehVenda ? 16 : 15,
+              fontWeight: 700,
+              textAlign: 'center',
+              lineHeight: 1.6,
+              margin: 0,
+              whiteSpace: 'pre-line',
+            }}>
+              {mensagem}
+            </p>
+
+            {/* Badge de etapa */}
+            <div style={{ textAlign: 'center', marginTop: 16 }}>
+              <span style={{
+                display: 'inline-block',
+                fontSize: 11,
+                fontWeight: 700,
+                color: corAccent,
+                backgroundColor: ehVenda ? 'rgba(245,158,11,0.1)' : 'rgba(99,102,241,0.14)',
+                padding: '4px 14px',
+                borderRadius: 20,
+                textTransform: 'uppercase',
+                letterSpacing: '0.07em',
+                border: `1px solid ${corAccentRgba}`,
+              }}>
+                {etapa === 'atendimento' && 'Em Atendimento'}
+                {etapa === 'agendamento' && 'Agendamento'}
+                {etapa === 'visita'      && 'Visita Marcada'}
+                {etapa === 'proposta'    && 'Proposta Enviada'}
+                {etapa === 'venda'       && '🎉 Venda Fechada!'}
+              </span>
+            </div>
+          </div>
+
+          {/* Barra de progresso — 4s até fechar */}
+          <div style={{ height: 4, backgroundColor: 'rgba(255,255,255,0.05)' }}>
+            <div style={{
+              height: '100%',
+              backgroundColor: corAccent,
+              animation: 'cel-barra 4s linear forwards',
+              opacity: 0.85,
+            }} />
+          </div>
+        </div>
+      </div>
+    </>
+  )
+}
+
+// ── Modal de Perda ────────────────────────────────────────────────────────────
 
 function ModalPerda({ onConfirm, onCancel }) {
   const [motivo, setMotivo] = useState('')
