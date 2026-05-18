@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react'
 import * as leadsApi from '../api/leads'
 import * as corretoresApi from '../api/corretores'
 import ContatosImportados from './ContatosImportados'
+import { useAuth } from '../context/AuthContext'
 
 const STATUS_BADGE_STYLE = {
   lead:        { color: '#60A5FA',  bg: 'rgba(59,130,246,0.15)' },
@@ -21,7 +22,16 @@ const FORM_VAZIO = {
   tipoRenda: '', rendaMensal: '', restricaoCpf: '', valorEntrada: '',
 }
 
+function formatarDataBrasilia(iso) {
+  return new Intl.DateTimeFormat('pt-BR', {
+    dateStyle: 'short',
+    timeStyle: 'short',
+    timeZone: 'America/Sao_Paulo',
+  }).format(new Date(iso))
+}
+
 export default function Leads() {
+  const { isGestor, isGerente } = useAuth()
   const [aba, setAba] = useState('leads')
   const [leads, setLeads] = useState([])
   const [total, setTotal] = useState(0)
@@ -34,6 +44,12 @@ export default function Leads() {
   const [statusForm, setStatusForm] = useState({ status: '', observacao: '', motivoPerda: '' })
   const [salvando, setSalvando] = useState(false)
   const [erro, setErro] = useState('')
+
+  const [histDist, setHistDist] = useState([])
+  const [histTotal, setHistTotal] = useState(0)
+  const [histPage, setHistPage] = useState(1)
+  const [histPeriodo, setHistPeriodo] = useState('')
+  const [histLoading, setHistLoading] = useState(false)
 
   const carregar = useCallback(() => {
     const params = { page: filtros.page, limit: 30 }
@@ -53,6 +69,20 @@ export default function Leads() {
   useEffect(() => {
     corretoresApi.listar({ ativo: true }).then((res) => setCorretores(res.data.corretores))
   }, [])
+
+  useEffect(() => {
+    if (aba !== 'historico') return
+    setHistLoading(true)
+    const params = { page: histPage, limit: 50 }
+    if (histPeriodo) params.periodo = histPeriodo
+    leadsApi
+      .historicoDistribuicao(params)
+      .then((res) => {
+        setHistDist(res.data.registros)
+        setHistTotal(res.data.total)
+      })
+      .finally(() => setHistLoading(false))
+  }, [aba, histPage, histPeriodo])
 
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
   const setFiltro = (k) => (e) => setFiltros((f) => ({ ...f, [k]: e.target.value, page: 1 }))
@@ -112,7 +142,7 @@ export default function Leads() {
         <div>
           <h1 className="text-xl md:text-2xl font-bold" style={{ color: '#F1F5F9' }}>Leads</h1>
           <p className="text-xs md:text-sm mt-0.5" style={{ color: '#94A3B8' }}>
-            {aba === 'leads' ? `${total} leads encontrados` : 'Contatos importados para reativação'}
+            {aba === 'leads' ? `${total} leads encontrados` : aba === 'contatos' ? 'Contatos importados para reativação' : 'Registro de todas as distribuições de leads'}
           </p>
         </div>
         {aba === 'leads' && (
@@ -121,10 +151,11 @@ export default function Leads() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 mb-4 p-1 rounded-xl w-fit" style={{ backgroundColor: '#0B1120' }}>
+      <div className="flex gap-1 mb-4 p-1 rounded-xl w-fit flex-wrap" style={{ backgroundColor: '#0B1120' }}>
         {[
           { key: 'leads', label: 'Leads' },
           { key: 'contatos', label: 'Contatos Importados' },
+          ...((isGestor || isGerente) ? [{ key: 'historico', label: '📋 Histórico de Distribuição' }] : []),
         ].map(({ key, label }) => (
           <button
             key={key}
@@ -141,6 +172,115 @@ export default function Leads() {
       </div>
 
       {aba === 'contatos' && <ContatosImportados />}
+
+      {aba === 'historico' && (isGestor || isGerente) && (
+        <div>
+          {/* Filtros rápidos */}
+          <div className="flex flex-wrap gap-2 mb-4">
+            {[{ v: '', l: 'Todos' }, { v: '24h', l: 'Últimas 24h' }, { v: '7d', l: 'Últimos 7 dias' }, { v: '30d', l: 'Últimos 30 dias' }].map(({ v, l }) => (
+              <button
+                key={v}
+                onClick={() => { setHistPeriodo(v); setHistPage(1) }}
+                className="px-3 py-1.5 rounded-lg text-sm font-medium transition-colors"
+                style={{
+                  backgroundColor: histPeriodo === v ? '#3B82F6' : '#1E293B',
+                  color: histPeriodo === v ? '#fff' : '#94A3B8',
+                  border: '1px solid',
+                  borderColor: histPeriodo === v ? '#3B82F6' : '#334155',
+                }}
+              >
+                {l}
+              </button>
+            ))}
+          </div>
+
+          {/* Tabela */}
+          <div className="card p-0 overflow-hidden">
+            {histLoading ? (
+              <div className="flex items-center justify-center py-16">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-500" />
+              </div>
+            ) : histDist.length === 0 ? (
+              <p className="text-center py-16 text-sm" style={{ color: '#64748B' }}>Nenhum registro de distribuição encontrado.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm min-w-[640px]">
+                  <thead style={{ backgroundColor: '#0B1120', borderBottom: '1px solid #1E293B' }}>
+                    <tr>
+                      {['Lead', 'Telefone', 'Corretor', 'Distribuído por', 'Data/Hora'].map((h, i) => (
+                        <th
+                          key={i}
+                          className={`text-left px-4 py-3 font-medium text-xs uppercase tracking-wide ${i === 1 ? 'hidden sm:table-cell' : ''}`}
+                          style={{ color: '#64748B' }}
+                        >
+                          {h}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {histDist.map((r, idx) => (
+                      <tr
+                        key={r.id}
+                        className="transition-colors"
+                        style={{
+                          borderBottom: '1px solid #1E293B',
+                          backgroundColor: idx % 2 === 1 ? 'rgba(255,255,255,0.02)' : 'transparent',
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#1a2332'}
+                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = idx % 2 === 1 ? 'rgba(255,255,255,0.02)' : 'transparent'}
+                      >
+                        <td className="px-4 py-3 font-medium" style={{ color: '#F1F5F9' }}>{r.leadNome}</td>
+                        <td className="px-4 py-3 hidden sm:table-cell" style={{ color: '#94A3B8' }}>{r.leadTelefone}</td>
+                        <td className="px-4 py-3" style={{ color: '#94A3B8' }}>{r.corretorNome}</td>
+                        <td className="px-4 py-3">
+                          {r.distribuidoPor === 'automatico' ? (
+                            <span className="badge" style={{ color: '#60A5FA', backgroundColor: 'rgba(59,130,246,0.15)' }}>
+                              🤖 Automático
+                            </span>
+                          ) : (
+                            <span className="badge" style={{ color: '#A78BFA', backgroundColor: 'rgba(139,92,246,0.15)' }}>
+                              👤 {r.distribuidoPorNome || 'Gestor'}
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3" style={{ color: '#64748B' }}>
+                          {formatarDataBrasilia(r.criadoEm)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* Paginação */}
+            {histTotal > 50 && (
+              <div className="flex items-center justify-between px-4 py-3" style={{ borderTop: '1px solid #1E293B' }}>
+                <span className="text-xs" style={{ color: '#64748B' }}>
+                  Página {histPage} de {Math.ceil(histTotal / 50)} · {histTotal} registros
+                </span>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setHistPage((p) => Math.max(1, p - 1))}
+                    disabled={histPage === 1}
+                    className="btn-secondary text-xs py-1 px-3"
+                  >
+                    Anterior
+                  </button>
+                  <button
+                    onClick={() => setHistPage((p) => p + 1)}
+                    disabled={histPage >= Math.ceil(histTotal / 50)}
+                    className="btn-secondary text-xs py-1 px-3"
+                  >
+                    Próxima
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {aba === 'leads' && <>
 
