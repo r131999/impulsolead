@@ -74,6 +74,8 @@ async function getRelatorios(req, res) {
   const fechados = leads.filter((l) => l.status === 'venda').length;
   const taxaConversao = naoPerdidos === 0 ? 0 : Math.round((fechados / naoPerdidos) * 100);
 
+  const leadsCampanha = leads.filter((l) => l.campanha).length;
+
   // Motivos de perda
   const perdidos = leads.filter((l) => l.status === 'perdido' && l.motivoPerda);
   const motivosPerda = perdidos.reduce((acc, l) => {
@@ -144,6 +146,7 @@ async function getRelatorios(req, res) {
       fechados,
       taxaConversao,
       tempoMedioResposta,
+      leadsCampanha,
     },
     funil: STATUS_ORDEM.map((s) => ({ status: s, total: porStatus[s] })),
     leadsPorDia: serie,

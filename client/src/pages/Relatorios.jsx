@@ -116,11 +116,12 @@ export default function Relatorios() {
           </div>
         ) : (
           <div className="space-y-6">
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
               <ResumoCard titulo="Total de leads" valor={dados.resumo.total} sub={variacao(dados.resumo.variacaoTotal)} cor="indigo" />
               <ResumoCard titulo="Leads fechados" valor={dados.resumo.fechados} cor="green" />
               <ResumoCard titulo="Taxa de conversão" valor={`${dados.resumo.taxaConversao}%`} cor="purple" />
               <ResumoCard titulo="Tempo médio resposta" valor={formatarTempo(dados.resumo.tempoMedioResposta)} cor="blue" />
+              <ResumoCard titulo="📣 Leads de Campanha" valor={dados.resumo.leadsCampanha} cor="orange" />
             </div>
 
             <div className="card">
@@ -514,10 +515,11 @@ export default function Relatorios() {
 
 function ResumoCard({ titulo, valor, sub, cor }) {
   const cores = {
-    indigo: { bg: 'rgba(99,102,241,0.12)',  text: '#818cf8' },
-    green:  { bg: 'rgba(16,185,129,0.12)',  text: '#10B981' },
-    purple: { bg: 'rgba(139,92,246,0.12)',  text: '#8B5CF6' },
-    blue:   { bg: 'rgba(59,130,246,0.12)',  text: '#60A5FA' },
+    indigo:  { bg: 'rgba(99,102,241,0.12)',  text: '#818cf8' },
+    green:   { bg: 'rgba(16,185,129,0.12)',  text: '#10B981' },
+    purple:  { bg: 'rgba(139,92,246,0.12)',  text: '#8B5CF6' },
+    blue:    { bg: 'rgba(59,130,246,0.12)',  text: '#60A5FA' },
+    orange:  { bg: 'rgba(249,115,22,0.12)',  text: '#fb923c' },
   }
   const { bg, text } = cores[cor] || cores.blue
   return (
