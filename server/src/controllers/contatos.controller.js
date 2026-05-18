@@ -224,6 +224,21 @@ async function transferir(req, res) {
         data: { leadId: lead.id, acao: 'criado', detalhes },
       });
 
+      if (corretor) {
+        await tx.historicoDistribuicao.create({
+          data: {
+            leadId: lead.id,
+            leadNome: lead.nome,
+            leadTelefone: lead.telefone,
+            corretorId: corretor.id,
+            corretorNome: corretor.nome,
+            distribuidoPor: corretorId ? 'manual' : 'automatico',
+            distribuidoPorNome: corretorId ? (req.usuario?.nome || null) : null,
+            imobiliariaId,
+          },
+        });
+      }
+
       await tx.contatoImportado.update({
         where: { id },
         data: { status: 'convertido', leadId: lead.id },

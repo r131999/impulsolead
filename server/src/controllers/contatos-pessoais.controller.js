@@ -165,6 +165,11 @@ async function converter(req, res) {
   const jid = `${telefoneFormatado}@s.whatsapp.net`;
 
   const lead = await prisma.$transaction(async (tx) => {
+    const corretorObj = await tx.corretor.findUnique({
+      where: { id: corretorId },
+      select: { nome: true },
+    });
+
     const novoLead = await tx.lead.create({
       data: {
         nome: contato.nome,
@@ -183,6 +188,19 @@ async function converter(req, res) {
         leadId: novoLead.id,
         acao: 'criado',
         detalhes: `Convertido de contato pessoal do corretor`,
+      },
+    });
+
+    await tx.historicoDistribuicao.create({
+      data: {
+        leadId: novoLead.id,
+        leadNome: novoLead.nome,
+        leadTelefone: novoLead.telefone,
+        corretorId,
+        corretorNome: corretorObj?.nome || 'Corretor',
+        distribuidoPor: 'manual',
+        distribuidoPorNome: req.usuario?.nome || null,
+        imobiliariaId,
       },
     });
 

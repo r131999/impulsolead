@@ -145,6 +145,21 @@ async function criar(req, res) {
       },
     });
 
+    if (corretorId && novoLead.corretor) {
+      await tx.historicoDistribuicao.create({
+        data: {
+          leadId: novoLead.id,
+          leadNome: novoLead.nome,
+          leadTelefone: novoLead.telefone,
+          corretorId: novoLead.corretor.id,
+          corretorNome: novoLead.corretor.nome,
+          distribuidoPor: 'manual',
+          distribuidoPorNome: req.usuario?.nome || null,
+          imobiliariaId: req.imobiliariaId,
+        },
+      });
+    }
+
     return novoLead;
   });
 
@@ -212,6 +227,21 @@ async function atualizar(req, res) {
             detalhes: `Novo corretor: ${nomeCorretor}`,
           },
         });
+
+        if (corretorId && result.corretor) {
+          await tx.historicoDistribuicao.create({
+            data: {
+              leadId: id,
+              leadNome: result.nome,
+              leadTelefone: result.telefone,
+              corretorId: result.corretor.id,
+              corretorNome: result.corretor.nome,
+              distribuidoPor: 'manual',
+              distribuidoPorNome: req.usuario?.nome || null,
+              imobiliariaId: req.imobiliariaId,
+            },
+          });
+        }
       }
 
       return result;
@@ -255,6 +285,21 @@ async function atualizar(req, res) {
           detalhes: `Novo corretor: ${nomeCorretor}`,
         },
       });
+
+      if (corretorId && result.corretor) {
+        await tx.historicoDistribuicao.create({
+          data: {
+            leadId: id,
+            leadNome: result.nome,
+            leadTelefone: result.telefone,
+            corretorId: result.corretor.id,
+            corretorNome: result.corretor.nome,
+            distribuidoPor: 'manual',
+            distribuidoPorNome: req.usuario?.nome || null,
+            imobiliariaId: req.imobiliariaId,
+          },
+        });
+      }
     }
 
     return result;
