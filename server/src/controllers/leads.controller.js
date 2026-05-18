@@ -475,6 +475,19 @@ async function distribuir(req, res) {
       },
     });
 
+    await tx.historicoDistribuicao.create({
+      data: {
+        leadId: id,
+        leadNome: lead.nome,
+        leadTelefone: lead.telefone,
+        corretorId: corretorEscolhido.id,
+        corretorNome: corretorEscolhido.nome,
+        distribuidoPor: 'manual',
+        distribuidoPorNome: req.usuario?.nome || null,
+        imobiliariaId: req.imobiliariaId,
+      },
+    });
+
     return result;
   });
 
@@ -483,4 +496,40 @@ async function distribuir(req, res) {
   res.json({ lead: leadAtualizado });
 }
 
-module.exports = { listar, buscarPorId, criar, atualizar, mudarStatus, remover, detalhes, getHistoricoConversa, distribuir };
+async function listarHistoricoDistribuicao(req, res) {
+  const { page = 1, limit = 50, periodo } = req.query;
+
+  const where = { imobiliariaId: req.imobiliariaId };
+
+  if (periodo) {
+    const agora = new Date();
+    const ms = { '24h': 24 * 60 * 60 * 1000, '7d': 7 * 24 * 60 * 60 * 1000, '30d': 30 * 24 * 60 * 60 * 1000 };
+    if (ms[periodo]) where.criadoEm = { gte: new Date(agora.getTime() - ms[periodo]) };
+  }
+
+  const skip = (Number(page) - 1) * Number(limit);
+
+  const [registros, total] = await prisma.$transaction([
+    prisma.historicoDistribuicao.findMany({
+      where,
+      skip,
+      take: Number(limit),
+      orderBy: { criadoEm: 'desc' },
+      select: {
+        id: true,
+        leadId: true,
+        leadNome: true,
+        leadTelefone: true,
+        corretorNome: true,
+        distribuidoPor: true,
+        distribuidoPorNome: true,
+        criadoEm: true,
+      },
+    }),
+    prisma.historicoDistribuicao.count({ where }),
+  ]);
+
+  res.json({ registros, total, page: Number(page), limit: Number(limit) });
+}
+
+module.exports = { listar, buscarPorId, criar, atualizar, mudarStatus, remover, detalhes, getHistoricoConversa, distribuir, listarHistoricoDistribuicao };

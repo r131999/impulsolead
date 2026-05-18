@@ -1,7 +1,7 @@
 const { Router } = require('express');
 const { authMiddleware, requireRole } = require('../middleware/auth.middleware');
 const {
-  listar, buscarPorId, criar, atualizar, mudarStatus, remover, detalhes, getHistoricoConversa, distribuir,
+  listar, buscarPorId, criar, atualizar, mudarStatus, remover, detalhes, getHistoricoConversa, distribuir, listarHistoricoDistribuicao,
 } = require('../controllers/leads.controller');
 const { criar: criarFollowUp } = require('../controllers/followups.controller');
 
@@ -9,6 +9,7 @@ const router = Router();
 router.use(authMiddleware);
 
 router.get('/', listar);
+router.get('/historico-distribuicao', requireRole('gestor', 'admin', 'gerente'), listarHistoricoDistribuicao);
 router.get('/:id', buscarPorId);
 router.post('/', requireRole('gestor', 'admin'), criar);
 router.put('/:id', atualizar);

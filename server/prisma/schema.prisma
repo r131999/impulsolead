@@ -19,16 +19,17 @@ model Imobiliaria {
   criadoEm      DateTime @default(now())
   atualizadoEm  DateTime @updatedAt
 
-  usuarios           Usuario[]
-  corretores         Corretor[]
-  leads              Lead[]
-  configAgente       ConfigAgente?
-  equipes            Equipe[]
-  contatosImportados ContatoImportado[]
-  modelosMensagem    ModeloMensagem[]
-  contatosPessoais   ContatoPessoal[]
-  imoveis            Imovel[]
-  sessoesAgente      SessaoAgente[]
+  usuarios                Usuario[]
+  corretores              Corretor[]
+  leads                   Lead[]
+  configAgente            ConfigAgente?
+  equipes                 Equipe[]
+  contatosImportados      ContatoImportado[]
+  modelosMensagem         ModeloMensagem[]
+  contatosPessoais        ContatoPessoal[]
+  imoveis                 Imovel[]
+  sessoesAgente           SessaoAgente[]
+  historicosDistribuicao  HistoricoDistribuicao[]
 }
 
 model Usuario {
@@ -278,6 +279,21 @@ model ChatMensagem {
   leadNome      String?
   lida          Boolean     @default(false)
   criadoEm     DateTime    @default(now())
+}
+
+model HistoricoDistribuicao {
+  id                 String   @id @default(uuid())
+  leadId             String
+  leadNome           String
+  leadTelefone       String
+  corretorId         String
+  corretorNome       String
+  distribuidoPor     String   // "automatico" ou "manual"
+  distribuidoPorNome String?
+  criadoEm           DateTime @default(now())
+
+  imobiliariaId String
+  imobiliaria   Imobiliaria @relation(fields: [imobiliariaId], references: [id])
 }
 
 model ConfigAgente {

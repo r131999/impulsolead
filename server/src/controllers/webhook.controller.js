@@ -131,6 +131,18 @@ async function receberLead(req, res) {
           detalhes: `Corretor: ${proximo.nome} | Origem: N8N/WhatsApp`,
         },
       });
+
+      await tx.historicoDistribuicao.create({
+        data: {
+          leadId: lead.id,
+          leadNome: nomeSanitizado,
+          leadTelefone: telefoneSanitizado,
+          corretorId: proximo.id,
+          corretorNome: proximo.nome,
+          distribuidoPor: 'automatico',
+          imobiliariaId: req.imobiliariaId,
+        },
+      });
     } else {
       await tx.historicoLead.create({
         data: {
