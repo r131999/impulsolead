@@ -284,7 +284,7 @@ async function getFunil(req, res) {
   const mapa = {};
   for (const c of contagens) mapa[c.status] = c._count.id;
 
-  const etapas = ['lead', 'atendimento', 'agendamento', 'visita', 'proposta', 'venda'];
+  const etapas = ['lead', 'atendimento', 'em_espera', 'agendamento', 'visita', 'proposta', 'venda'];
   const funil = etapas.map((s) => ({ status: s, total: mapa[s] || 0 }));
 
   res.json({ funil, perdidos: mapa['perdido'] || 0 });

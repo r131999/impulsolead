@@ -3,7 +3,7 @@ const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
 const PERIODOS_VALIDOS = [7, 30, 90];
-const STATUS_ORDEM = ['lead', 'atendimento', 'agendamento', 'visita', 'proposta', 'venda', 'perdido'];
+const STATUS_ORDEM = ['lead', 'atendimento', 'em_espera', 'agendamento', 'visita', 'proposta', 'venda', 'perdido'];
 
 // Brasília = UTC-3. Midnight Brasília = 03:00 UTC.
 

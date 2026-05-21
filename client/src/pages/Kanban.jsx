@@ -8,6 +8,7 @@ import { Avatar } from '../components/Avatar'
 const COLUNAS = [
   { id: 'lead',        label: 'Lead',        dot: '#3B82F6' },
   { id: 'atendimento', label: 'Atendimento', dot: '#6366f1' },
+  { id: 'em_espera',   label: 'Em Espera',   dot: '#64748B' },
   { id: 'agendamento', label: 'Agendamento', dot: '#8B5CF6' },
   { id: 'visita',      label: 'Visita',      dot: '#F59E0B' },
   { id: 'proposta',    label: 'Proposta',    dot: '#f97316' },
@@ -15,7 +16,7 @@ const COLUNAS = [
   { id: 'perdido',     label: 'Perdido',     dot: '#EF4444' },
 ]
 
-const SEQUENCIA = ['lead', 'atendimento', 'agendamento', 'visita', 'proposta', 'venda']
+const SEQUENCIA = ['lead', 'atendimento', 'em_espera', 'agendamento', 'visita', 'proposta', 'venda']
 
 const URGENCIA_COR = {
   alta: '#EF4444',
@@ -746,7 +747,7 @@ const QUALIFICACAO_LABELS = {
 }
 
 const STATUS_COR_MODAL = {
-  lead: '#3B82F6', atendimento: '#6366f1', agendamento: '#8B5CF6',
+  lead: '#3B82F6', atendimento: '#6366f1', em_espera: '#64748B', agendamento: '#8B5CF6',
   visita: '#F59E0B', proposta: '#f97316', venda: '#10B981', perdido: '#EF4444',
 }
 
@@ -1270,6 +1271,7 @@ function PopupCelebracao({ etapa, onClose }) {
                 border: `1px solid ${corAccentRgba}`,
               }}>
                 {etapa === 'atendimento' && 'Em Atendimento'}
+                {etapa === 'em_espera'   && 'Em Espera'}
                 {etapa === 'agendamento' && 'Agendamento'}
                 {etapa === 'visita'      && 'Visita Marcada'}
                 {etapa === 'proposta'    && 'Proposta Enviada'}

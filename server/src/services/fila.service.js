@@ -3,7 +3,7 @@ const { notificarGestorPendencia } = require('./notificacao.service');
 
 const prisma = new PrismaClient();
 
-const STATUS_VALIDOS = ['lead', 'atendimento', 'agendamento', 'visita', 'proposta', 'venda', 'perdido'];
+const STATUS_VALIDOS = ['lead', 'atendimento', 'em_espera', 'agendamento', 'visita', 'proposta', 'venda', 'perdido'];
 const LIMITE_PENDENCIA_MS = 24 * 60 * 60 * 1000;
 
 async function temPendencia(corretorId) {
