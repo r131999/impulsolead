@@ -370,7 +370,14 @@ const server = http.createServer(async (req, res) => {
       }
 
       const jid = number.includes('@') ? number : `${number.replace(/\D/g, '')}@s.whatsapp.net`;
-      await sock.sendMessage(jid, { text });
+      console.log('[WhatsApp] Enviando mensagem para:', jid);
+      try {
+        await sock.sendMessage(jid, { text });
+        console.log('[WhatsApp] Mensagem enviada com sucesso para:', jid);
+      } catch (err) {
+        console.error('[WhatsApp] Erro ao enviar mensagem para:', jid, '-', err.message);
+        return sendJson(res, 500, { error: err.message });
+      }
       return sendJson(res, 200, { ok: true });
     }
 
