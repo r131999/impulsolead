@@ -25,7 +25,7 @@ async function notificarViaEvolution(corretor, lead) {
   const texto  = montarMensagem(corretor, lead);
   const body   = JSON.stringify({ number: numero, text: texto });
 
-  await httpPost('http://localhost:3010/send', body, {});
+  await httpPost('http://impulsolead-whatsapp:3010/send', body, {});
   console.log(`[notificacao] WhatsApp enviado para ${corretor.nome} (${numero})`);
   return { enviado: true };
 }
@@ -86,7 +86,7 @@ async function notificarGestorPendencia(telefoneGestor, nomeCorretor) {
   const body   = JSON.stringify({ number: numero, text: texto });
 
   try {
-    await httpPost('http://localhost:3010/send', body, {});
+    await httpPost('http://impulsolead-whatsapp:3010/send', body, {});
     console.log(`[notificacao] Pendência notificada ao gestor sobre ${nomeCorretor}`);
     return { enviado: true };
   } catch (err) {
@@ -138,7 +138,7 @@ async function enviarWhatsApp(telefone, texto) {
   const body   = JSON.stringify({ number: numero, text: texto });
 
   try {
-    await httpPost('http://localhost:3010/send', body, {});
+    await httpPost('http://impulsolead-whatsapp:3010/send', body, {});
     console.log(`[notificacao] WhatsApp enviado para ${numero}`);
     return { enviado: true };
   } catch (err) {
