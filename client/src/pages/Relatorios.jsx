@@ -169,27 +169,38 @@ export default function Relatorios() {
                     Nenhum lead perdido no período
                   </div>
                 ) : (
-                  <ResponsiveContainer width="100%" height={240}>
-                    <PieChart>
-                      <Pie
-                        data={dados.motivosPerda}
-                        dataKey="total"
-                        nameKey="motivo"
-                        cx="50%"
-                        cy="50%"
-                        outerRadius={80}
-                        label={({ motivo, percent }) =>
-                          `${motivo.slice(0, 16)}${motivo.length > 16 ? '…' : ''} (${(percent * 100).toFixed(0)}%)`
-                        }
-                        labelLine={false}
-                      >
-                        {dados.motivosPerda.map((_, i) => (
-                          <Cell key={i} fill={CORES_PIE[i % CORES_PIE.length]} />
-                        ))}
-                      </Pie>
-                      <Tooltip contentStyle={TOOLTIP_STYLE} labelStyle={LABEL_STYLE} formatter={(v, n) => [v, n]} />
-                    </PieChart>
-                  </ResponsiveContainer>
+                  <>
+                    <ResponsiveContainer width="100%" height={200}>
+                      <PieChart>
+                        <Pie
+                          data={dados.motivosPerda}
+                          dataKey="total"
+                          nameKey="motivo"
+                          cx="50%"
+                          cy="50%"
+                          outerRadius={80}
+                        >
+                          {dados.motivosPerda.map((_, i) => (
+                            <Cell key={i} fill={CORES_PIE[i % CORES_PIE.length]} />
+                          ))}
+                        </Pie>
+                        <Tooltip contentStyle={TOOLTIP_STYLE} labelStyle={LABEL_STYLE} formatter={(v, n) => [v, n]} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                    <div className="mt-3 pt-3 space-y-1.5" style={{ borderTop: '1px solid #1E293B' }}>
+                      {(() => {
+                        const tot = dados.motivosPerda.reduce((s, m) => s + m.total, 0)
+                        return dados.motivosPerda.map((m, i) => (
+                          <div key={m.motivo} className="flex items-center gap-2 text-sm">
+                            <span className="flex-shrink-0 w-3 h-3 rounded-sm" style={{ backgroundColor: CORES_PIE[i % CORES_PIE.length] }} />
+                            <span className="flex-1 truncate" style={{ color: '#94A3B8' }} title={m.motivo}>{m.motivo}</span>
+                            <span className="font-medium flex-shrink-0" style={{ color: '#F1F5F9' }}>{m.total}</span>
+                            <span className="flex-shrink-0 text-xs" style={{ color: '#64748B' }}>({Math.round((m.total / tot) * 100)}%)</span>
+                          </div>
+                        ))
+                      })()}
+                    </div>
+                  </>
                 )}
               </div>
             </div>
