@@ -154,25 +154,15 @@ function httpPost(url, body, extraHeaders = {}) {
 
 // Envio genérico — usado pelos cron jobs
 async function enviarWhatsApp(telefone, texto) {
-  const apiUrl    = process.env.EVOLUTION_API_URL;
-  const apiKey    = process.env.EVOLUTION_API_KEY;
-  const instancia = process.env.EVOLUTION_INSTANCE_NAME;
-
-  if (!apiUrl || !apiKey || !instancia) {
-    console.log('[notificacao] Evolution API não configurada — mensagem ignorada');
-    return { enviado: false };
-  }
-
   const numero = formatarNumero(telefone);
-  const url    = `${apiUrl}/message/sendText/${instancia}`;
   const body   = JSON.stringify({ number: numero, text: texto });
 
   try {
-    await httpPost(url, body, { apikey: apiKey });
+    await httpPost('http://localhost:3010/send', body, {});
     console.log(`[notificacao] WhatsApp enviado para ${numero}`);
     return { enviado: true };
   } catch (err) {
-    console.error('[notificacao] Falha ao enviar WhatsApp:', err.message);
+    console.error('[notificacao] Falha ao enviar WhatsApp via Baileys:', err.message);
     return { enviado: false };
   }
 }
