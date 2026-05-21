@@ -123,6 +123,15 @@ function detectCampaign(text) {
   return null;
 }
 
+// ── Normalização de telefone ───────────────────────────────────────────────────
+// 559888123187 (12 dígitos) → 5598988123187 (13 dígitos): insere 9 após o DDD
+function normalizarTelefone(phone) {
+  if (phone.length === 12 && phone.startsWith('55') && phone[4] !== '9') {
+    return phone.slice(0, 4) + '9' + phone.slice(4);
+  }
+  return phone;
+}
+
 // ── Limpeza periódica dos Maps ─────────────────────────────────────────────────
 function cleanupMaps() {
   const now = Date.now();
@@ -196,6 +205,8 @@ async function handleMessage(msg) {
       tag(`Não foi possível extrair número do JID: ${remoteJid}`);
       return;
     }
+
+    phone = normalizarTelefone(phone);
 
     // Validação do número: rejeita JIDs @lid gigantes e números inválidos.
     // Números brasileiros: 55 + DDD(2) + número(8 ou 9) = 12 ou 13 dígitos.
