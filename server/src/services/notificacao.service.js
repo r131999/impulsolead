@@ -21,21 +21,11 @@ function montarMensagem(corretor, lead) {
 }
 
 async function notificarViaEvolution(corretor, lead) {
-  const apiUrl      = process.env.EVOLUTION_API_URL;
-  const apiKey      = process.env.EVOLUTION_API_KEY;
-  const instancia   = process.env.EVOLUTION_INSTANCE_NAME;
-
-  if (!apiUrl || !apiKey || !instancia) {
-    return { enviado: false, motivo: 'Evolution API não configurada (EVOLUTION_API_URL, EVOLUTION_API_KEY ou EVOLUTION_INSTANCE_NAME ausente)' };
-  }
-
   const numero = formatarNumero(corretor.whatsapp || corretor.telefone);
   const texto  = montarMensagem(corretor, lead);
-  const url    = `${apiUrl}/message/sendText/${instancia}`;
+  const body   = JSON.stringify({ number: numero, text: texto });
 
-  const body = JSON.stringify({ number: numero, text: texto });
-
-  await httpPost(url, body, { apikey: apiKey });
+  await httpPost('http://localhost:3010/send', body, {});
   console.log(`[notificacao] WhatsApp enviado para ${corretor.nome} (${numero})`);
   return { enviado: true };
 }
@@ -74,14 +64,14 @@ async function notificarViaWebhook(corretor, lead, imobiliaria) {
   return { enviado: true };
 }
 
-// Ponto de entrada principal — tenta Evolution API, faz fallback para webhook genérico.
+// Ponto de entrada principal — tenta Baileys, faz fallback para webhook genérico.
 // Não bloqueia o fluxo principal: falhas são logadas, não propagadas.
 async function notificarCorretor(corretor, lead, imobiliaria) {
   try {
     const resultado = await notificarViaEvolution(corretor, lead);
     if (resultado.enviado) return resultado;
 
-    // Se Evolution não está configurada, tenta o webhook genérico
+    // Se Baileys falhou, tenta o webhook genérico
     console.log(`[notificacao] ${resultado.motivo} — tentando webhook genérico.`);
     return await notificarViaWebhook(corretor, lead, imobiliaria);
   } catch (err) {
@@ -91,26 +81,16 @@ async function notificarCorretor(corretor, lead, imobiliaria) {
 }
 
 async function notificarGestorPendencia(telefoneGestor, nomeCorretor) {
-  const apiUrl    = process.env.EVOLUTION_API_URL;
-  const apiKey    = process.env.EVOLUTION_API_KEY;
-  const instancia = process.env.EVOLUTION_INSTANCE_NAME;
-
-  if (!apiUrl || !apiKey || !instancia) {
-    console.log('[notificacao] Evolution API não configurada — notificação de pendência ignorada');
-    return { enviado: false };
-  }
-
   const numero = formatarNumero(telefoneGestor);
   const texto  = `⚠️ *${nomeCorretor}* foi pulado na fila.\nMotivo: lead parado há mais de 24h sem observação.`;
-  const url    = `${apiUrl}/message/sendText/${instancia}`;
   const body   = JSON.stringify({ number: numero, text: texto });
 
   try {
-    await httpPost(url, body, { apikey: apiKey });
+    await httpPost('http://localhost:3010/send', body, {});
     console.log(`[notificacao] Pendência notificada ao gestor sobre ${nomeCorretor}`);
     return { enviado: true };
   } catch (err) {
-    console.error('[notificacao] Falha ao notificar gestor sobre pendência:', err.message);
+    console.error('[notificacao] Falha ao notificar gestor sobre pendência via Baileys:', err.message);
     return { enviado: false };
   }
 }
