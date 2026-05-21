@@ -258,6 +258,106 @@ async function transferir(req, res) {
   res.json({ ok: true, leadId: result.lead.id, semCorretor: !result.corretor });
 }
 
+async function transferirLote(req, res) {
+  const { contatoIds, corretorId } = req.body;
+  const imobiliariaId = req.imobiliariaId;
+
+  if (!Array.isArray(contatoIds) || contatoIds.length === 0) {
+    return res.status(400).json({ error: 'Informe ao menos um contato' });
+  }
+
+  if (corretorId) {
+    const corretor = await prisma.corretor.findFirst({
+      where: { id: corretorId, imobiliariaId, ativo: true },
+    });
+    if (!corretor) return res.status(400).json({ error: 'Corretor não encontrado ou inativo' });
+  }
+
+  let sucesso = 0;
+  let erros = 0;
+  const notificacoes = [];
+
+  for (const id of contatoIds) {
+    try {
+      const contato = await prisma.contatoImportado.findFirst({ where: { id, imobiliariaId } });
+      if (!contato || contato.status === 'convertido') { erros++; continue; }
+
+      const telefoneFormatado = contato.telefone.startsWith('55') ? contato.telefone : `55${contato.telefone}`;
+      const jid = `${telefoneFormatado}@s.whatsapp.net`;
+
+      const result = await prisma.$transaction(async (tx) => {
+        const lead = await tx.lead.create({
+          data: { nome: contato.nome, telefone: contato.telefone, whatsappJid: jid, status: 'lead', imobiliariaId },
+        });
+
+        let corretor = null;
+
+        if (corretorId) {
+          corretor = await tx.corretor.findFirst({ where: { id: corretorId, imobiliariaId, ativo: true } });
+          if (corretor) await tx.lead.update({ where: { id: lead.id }, data: { corretorId: corretor.id } });
+        } else {
+          const corretores = await tx.corretor.findMany({
+            where: { imobiliariaId, ativo: true, disponivel: true },
+            orderBy: { posicaoFila: 'asc' },
+          });
+          if (corretores.length > 0) {
+            const proximo = corretores[0];
+            const maxPosicao = corretores[corretores.length - 1].posicaoFila;
+            await tx.corretor.update({
+              where: { id: proximo.id },
+              data: { leadsRecebidos: { increment: 1 }, posicaoFila: maxPosicao + 1 },
+            });
+            await tx.lead.update({ where: { id: lead.id }, data: { corretorId: proximo.id } });
+            corretor = proximo;
+          }
+        }
+
+        const origemTexto = corretorId ? 'selecionado manualmente' : 'round-robin';
+        await tx.historicoLead.create({
+          data: {
+            leadId: lead.id,
+            acao: 'criado',
+            detalhes: corretor
+              ? `Corretor: ${corretor.nome} | Origem: Transferência em lote (${origemTexto})`
+              : 'Sem corretor disponível na fila',
+          },
+        });
+
+        if (corretor) {
+          await tx.historicoDistribuicao.create({
+            data: {
+              leadId: lead.id,
+              leadNome: lead.nome,
+              leadTelefone: lead.telefone,
+              corretorId: corretor.id,
+              corretorNome: corretor.nome,
+              distribuidoPor: corretorId ? 'manual' : 'automatico',
+              distribuidoPorNome: corretorId ? (req.usuario?.nome || null) : null,
+              imobiliariaId,
+            },
+          });
+        }
+
+        await tx.contatoImportado.update({ where: { id }, data: { status: 'convertido', leadId: lead.id } });
+
+        return { lead, corretor };
+      });
+
+      if (result.corretor) notificacoes.push({ corretor: result.corretor, lead: result.lead });
+      sucesso++;
+    } catch (err) {
+      console.error(`[transferirLote] Erro ao transferir contato ${id}:`, err.message);
+      erros++;
+    }
+  }
+
+  for (const { corretor, lead } of notificacoes) {
+    notificarCorretor(corretor, lead, req.imobiliaria).catch(() => {});
+  }
+
+  res.json({ sucesso, erros });
+}
+
 async function limpar(req, res) {
   const imobiliariaId = req.imobiliariaId;
   const { status } = req.query;
@@ -269,4 +369,4 @@ async function limpar(req, res) {
   res.json({ removidos: count });
 }
 
-module.exports = { importar, listar, remover, enviarMensagem, transferir, limpar };
+module.exports = { importar, listar, remover, enviarMensagem, transferir, transferirLote, limpar };

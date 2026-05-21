@@ -34,6 +34,13 @@ export default function ContatosImportados() {
   const [transferindo, setTransferindo] = useState(false)
   const [erroTransf, setErroTransf] = useState('')
   const [toast, setToast] = useState('')
+  const [selecionados, setSelecionados] = useState([])
+  const [modalLote, setModalLote] = useState(false)
+  const [tipoAtribLote, setTipoAtribLote] = useState('roundRobin')
+  const [corretorIdLote, setCorretorIdLote] = useState('')
+  const [transferindoLote, setTransferindoLote] = useState(false)
+  const [erroLote, setErroLote] = useState('')
+  const [resultadoLote, setResultadoLote] = useState(null)
 
   const carregar = useCallback(() => {
     setLoading(true)
@@ -49,6 +56,7 @@ export default function ContatosImportados() {
 
   useEffect(() => { carregar() }, [carregar])
   useEffect(() => { modelosApi.listar().then((res) => setModelos(res.data)) }, [])
+  useEffect(() => { setSelecionados([]) }, [filtroStatus])
 
   const importarArquivo = async (file) => {
     if (!file) return
@@ -132,7 +140,56 @@ export default function ContatosImportados() {
     }
   }
 
+  const abrirModalLote = async () => {
+    setTipoAtribLote('roundRobin')
+    setCorretorIdLote('')
+    setErroLote('')
+    setResultadoLote(null)
+    setModalLote(true)
+    if (corretores.length === 0) {
+      try {
+        const res = await corretoresApi.listar({ ativo: true })
+        setCorretores(res.data.corretores || [])
+      } catch {}
+    }
+  }
+
+  const confirmarTransferirLote = async () => {
+    setTransferindoLote(true)
+    setErroLote('')
+    try {
+      const res = await contatosApi.transferirLote(
+        selecionados,
+        tipoAtribLote === 'especifico' ? corretorIdLote : null
+      )
+      setResultadoLote(res.data)
+      setSelecionados([])
+      carregar()
+    } catch (err) {
+      setErroLote(err.response?.data?.error || 'Erro ao transferir em lote')
+    } finally {
+      setTransferindoLote(false)
+    }
+  }
+
   const totalPages = Math.ceil(total / 50)
+
+  const selecionaveis = contatos.filter((c) => c.status !== 'convertido').map((c) => c.id)
+  const todosSelecionados = selecionaveis.length > 0 && selecionaveis.every((id) => selecionados.includes(id))
+
+  const toggleSelecionado = (id) => {
+    setSelecionados((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id])
+  }
+
+  const toggleTodos = () => {
+    if (todosSelecionados) {
+      setSelecionados((prev) => prev.filter((id) => !selecionaveis.includes(id)))
+    } else {
+      setSelecionados((prev) => [...new Set([...prev, ...selecionaveis])])
+    }
+  }
+
+  const limparSelecao = () => setSelecionados([])
 
   return (
     <div className="space-y-4">
@@ -204,6 +261,37 @@ export default function ContatosImportados() {
         </select>
       </div>
 
+      {selecionados.length > 0 && (
+        <div
+          className="flex items-center justify-between gap-3 rounded-xl px-4 py-3"
+          style={{ backgroundColor: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.3)' }}
+        >
+          <span className="text-sm font-medium" style={{ color: '#818cf8' }}>
+            {selecionados.length} contato{selecionados.length !== 1 ? 's' : ''} selecionado{selecionados.length !== 1 ? 's' : ''}
+          </span>
+          <div className="flex gap-2">
+            <button
+              onClick={limparSelecao}
+              className="text-xs font-medium px-3 py-1.5 rounded-lg transition-colors"
+              style={{ color: '#64748B', backgroundColor: 'rgba(100,116,139,0.12)' }}
+              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(100,116,139,0.22)' }}
+              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'rgba(100,116,139,0.12)' }}
+            >
+              Limpar seleção
+            </button>
+            <button
+              onClick={abrirModalLote}
+              className="text-xs font-medium px-3 py-1.5 rounded-lg transition-colors"
+              style={{ color: '#10B981', backgroundColor: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.25)' }}
+              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(16,185,129,0.22)' }}
+              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'rgba(16,185,129,0.12)' }}
+            >
+              Transferir selecionados
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Tabela */}
       <div className="card p-0 overflow-hidden">
         {loading ? (
@@ -219,15 +307,21 @@ export default function ContatosImportados() {
             <table className="w-full text-sm min-w-[500px]">
               <thead style={{ backgroundColor: '#0B1120', borderBottom: '1px solid #1E293B' }}>
                 <tr>
-                  {['Nome', 'Telefone', 'Status', 'Importado em', ''].map((h, i) => (
-                    <th
-                      key={i}
-                      className={`text-left px-4 py-3 font-medium text-xs uppercase tracking-wide ${i === 1 ? 'hidden sm:table-cell' : i === 3 ? 'hidden md:table-cell' : ''}`}
-                      style={{ color: '#64748B' }}
-                    >
-                      {h}
-                    </th>
-                  ))}
+                  <th className="px-4 py-3 w-10">
+                    <input
+                      type="checkbox"
+                      checked={todosSelecionados}
+                      onChange={toggleTodos}
+                      disabled={selecionaveis.length === 0}
+                      className="accent-indigo-500"
+                      title="Selecionar todos desta página"
+                    />
+                  </th>
+                  <th className="text-left px-4 py-3 font-medium text-xs uppercase tracking-wide" style={{ color: '#64748B' }}>Nome</th>
+                  <th className="text-left px-4 py-3 font-medium text-xs uppercase tracking-wide hidden sm:table-cell" style={{ color: '#64748B' }}>Telefone</th>
+                  <th className="text-left px-4 py-3 font-medium text-xs uppercase tracking-wide" style={{ color: '#64748B' }}>Status</th>
+                  <th className="text-left px-4 py-3 font-medium text-xs uppercase tracking-wide hidden md:table-cell" style={{ color: '#64748B' }}>Importado em</th>
+                  <th className="px-4 py-3" />
                 </tr>
               </thead>
               <tbody>
@@ -243,6 +337,16 @@ export default function ContatosImportados() {
                       onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#1a2332'}
                       onMouseLeave={(e) => e.currentTarget.style.backgroundColor = idx % 2 === 1 ? 'rgba(255,255,255,0.02)' : 'transparent'}
                     >
+                      <td className="px-4 py-3 w-10">
+                        {c.status !== 'convertido' && (
+                          <input
+                            type="checkbox"
+                            checked={selecionados.includes(c.id)}
+                            onChange={() => toggleSelecionado(c.id)}
+                            className="accent-indigo-500"
+                          />
+                        )}
+                      </td>
                       <td className="px-4 py-3 font-medium" style={{ color: '#F1F5F9' }}>{c.nome}</td>
                       <td className="px-4 py-3 hidden sm:table-cell" style={{ color: '#94A3B8' }}>{c.telefone}</td>
                       <td className="px-4 py-3">
@@ -300,6 +404,106 @@ export default function ContatosImportados() {
           </div>
         )}
       </div>
+
+      {/* Modal transferir em lote */}
+      {modalLote && (
+        <div className="fixed inset-0 bg-black/60 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
+          <div
+            className="w-full rounded-t-2xl sm:rounded-2xl shadow-2xl sm:max-w-lg"
+            style={{ backgroundColor: '#111827', border: '1px solid #1E293B' }}
+          >
+            <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid #1E293B' }}>
+              <div>
+                <h2 className="font-bold" style={{ color: '#F1F5F9' }}>Transferir em lote</h2>
+                <p className="text-xs mt-0.5" style={{ color: '#64748B' }}>
+                  {selecionados.length} contato{selecionados.length !== 1 ? 's' : ''} selecionado{selecionados.length !== 1 ? 's' : ''}
+                </p>
+              </div>
+              <button onClick={() => setModalLote(false)} className="text-xl leading-none hover:opacity-80" style={{ color: '#64748B' }}>×</button>
+            </div>
+
+            <div className="px-5 py-5 space-y-4">
+              {!resultadoLote ? (
+                <>
+                  <div className="space-y-3">
+                    <label className="flex items-start gap-3 cursor-pointer">
+                      <input
+                        type="radio"
+                        className="mt-0.5 accent-indigo-500"
+                        checked={tipoAtribLote === 'roundRobin'}
+                        onChange={() => setTipoAtribLote('roundRobin')}
+                      />
+                      <div>
+                        <p className="text-sm font-medium" style={{ color: '#F1F5F9' }}>Fila automática (round-robin)</p>
+                        <p className="text-xs" style={{ color: '#64748B' }}>Distribui automaticamente entre corretores disponíveis</p>
+                      </div>
+                    </label>
+                    <label className="flex items-start gap-3 cursor-pointer">
+                      <input
+                        type="radio"
+                        className="mt-0.5 accent-indigo-500"
+                        checked={tipoAtribLote === 'especifico'}
+                        onChange={() => setTipoAtribLote('especifico')}
+                      />
+                      <div className="flex-1">
+                        <p className="text-sm font-medium" style={{ color: '#F1F5F9' }}>Corretor específico</p>
+                        <p className="text-xs mb-2" style={{ color: '#64748B' }}>Todos os leads vão para o mesmo corretor</p>
+                        {tipoAtribLote === 'especifico' && (
+                          <select
+                            className="input w-full"
+                            value={corretorIdLote}
+                            onChange={(e) => setCorretorIdLote(e.target.value)}
+                          >
+                            <option value="">Selecione um corretor...</option>
+                            {corretores.map((cor) => (
+                              <option key={cor.id} value={cor.id}>
+                                {cor.nome}{!cor.disponivel ? ' (indisponível)' : ''}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                      </div>
+                    </label>
+                  </div>
+
+                  {erroLote && <p className="text-sm" style={{ color: '#EF4444' }}>{erroLote}</p>}
+
+                  <div className="flex gap-2 pt-1">
+                    <button onClick={() => setModalLote(false)} className="btn-secondary flex-1">Cancelar</button>
+                    <button
+                      onClick={confirmarTransferirLote}
+                      disabled={transferindoLote || (tipoAtribLote === 'especifico' && !corretorIdLote)}
+                      className="btn-primary flex-1"
+                    >
+                      {transferindoLote
+                        ? 'Transferindo...'
+                        : `Transferir ${selecionados.length} contato${selecionados.length !== 1 ? 's' : ''}`}
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div
+                    className="rounded-xl p-5 text-center space-y-1"
+                    style={{ backgroundColor: '#0B1120', border: '1px solid #1E293B' }}
+                  >
+                    <p className="text-3xl font-bold" style={{ color: '#10B981' }}>{resultadoLote.sucesso}</p>
+                    <p className="text-sm" style={{ color: '#94A3B8' }}>
+                      lead{resultadoLote.sucesso !== 1 ? 's' : ''} criado{resultadoLote.sucesso !== 1 ? 's' : ''} com sucesso
+                    </p>
+                    {resultadoLote.erros > 0 && (
+                      <p className="text-sm pt-2" style={{ color: '#EF4444' }}>
+                        {resultadoLote.erros} ignorado{resultadoLote.erros !== 1 ? 's' : ''} (já convertidos ou inválidos)
+                      </p>
+                    )}
+                  </div>
+                  <button onClick={() => setModalLote(false)} className="btn-secondary w-full">Fechar</button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal transferir para corretor */}
       {modalTransferir && contatoTransf && (
