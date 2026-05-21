@@ -346,7 +346,7 @@ export default function Relatorios() {
                 <table className="w-full text-sm min-w-[480px]">
                   <thead style={{ backgroundColor: '#0B1120', borderBottom: '1px solid #1E293B' }}>
                     <tr>
-                      {['Equipe', 'Líder', 'Leads', 'Fechamentos', 'Conversão'].map((h) => (
+                      {['Equipe', 'Líder', 'Leads', 'Fechamentos', 'Conversão', 'Campanha'].map((h) => (
                         <th key={h} className="text-left px-4 py-3 font-medium text-xs uppercase tracking-wide" style={{ color: '#64748B' }}>{h}</th>
                       ))}
                     </tr>
@@ -362,6 +362,15 @@ export default function Relatorios() {
                           <span className="badge" style={eq.taxaConversao >= 25 ? { color: '#10B981', backgroundColor: 'rgba(16,185,129,0.15)' } : eq.taxaConversao >= 10 ? { color: '#F59E0B', backgroundColor: 'rgba(245,158,11,0.15)' } : { color: '#EF4444', backgroundColor: 'rgba(239,68,68,0.15)' }}>
                             {eq.taxaConversao}%
                           </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          {eq.leadsCampanha > 0 ? (
+                            <span className="text-xs font-medium" style={{ color: '#F59E0B' }}>
+                              📣 {eq.leadsCampanha}
+                            </span>
+                          ) : (
+                            <span style={{ color: '#475569' }}>—</span>
+                          )}
                         </td>
                       </tr>
                     ))}

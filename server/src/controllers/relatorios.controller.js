@@ -183,7 +183,7 @@ async function getRelatoriosEquipes(req, res) {
     }),
     prisma.lead.findMany({
       where: { imobiliariaId, criadoEm: { gte: dataInicio } },
-      select: { id: true, status: true, corretorId: true },
+      select: { id: true, status: true, corretorId: true, campanha: true },
     }),
   ]);
 
@@ -209,6 +209,9 @@ async function getRelatoriosEquipes(req, res) {
     const totalLeads = rankingCorretores.reduce((s, c) => s + c.leads, 0);
     const fechamentos = rankingCorretores.reduce((s, c) => s + c.fechamentos, 0);
     const taxaConversao = totalLeads === 0 ? 0 : Math.round((fechamentos / totalLeads) * 100);
+    const leadsCampanha = equipe.corretores.reduce((sum, c) => {
+      return sum + (leadsPorCorretor[c.id] || []).filter((l) => l.campanha).length;
+    }, 0);
 
     return {
       id: equipe.id,
@@ -217,6 +220,7 @@ async function getRelatoriosEquipes(req, res) {
       totalLeads,
       fechamentos,
       taxaConversao,
+      leadsCampanha,
       rankingCorretores,
     };
   }).sort((a, b) => b.totalLeads - a.totalLeads);
