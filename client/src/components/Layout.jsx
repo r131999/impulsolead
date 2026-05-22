@@ -5,15 +5,16 @@ import { Avatar, redimensionarImagem } from './Avatar'
 import ChatInterno from '../pages/ChatInterno'
 
 const NAV_GESTOR = [
-  { to: '/dashboard',  label: 'Dashboard',    icon: ChartIcon },
-  { to: '/kanban',     label: 'Kanban',        icon: KanbanIcon },
-  { to: '/leads',      label: 'Leads',         icon: UsersIcon },
-  { to: '/corretores', label: 'Corretores',    icon: HomeIcon },
-  { to: '/equipes',    label: 'Equipes',       icon: EquipeIcon },
-  { to: '/relatorios', label: 'Relatórios',    icon: BarChartIcon },
-  { to: '/imoveis',    label: 'Imóveis',       icon: BuildingIcon },
-  { to: '/config',     label: 'Agente IA',     icon: BotIcon },
-  { to: '/chat',       label: 'Assistente IA', icon: ChatIAIcon },
+  { to: '/dashboard',        label: 'Dashboard',         icon: ChartIcon },
+  { to: '/kanban',           label: 'Kanban',             icon: KanbanIcon },
+  { to: '/leads',            label: 'Leads',              icon: UsersIcon },
+  { to: '/corretores',       label: 'Corretores',         icon: HomeIcon },
+  { to: '/equipes',          label: 'Equipes',            icon: EquipeIcon },
+  { to: '/relatorios',       label: 'Relatórios',         icon: BarChartIcon },
+  { to: '/imoveis',          label: 'Imóveis',            icon: BuildingIcon },
+  { to: '/arquivos-imoveis', label: 'Arquivos de Imóveis', icon: FolderIcon },
+  { to: '/config',           label: 'Agente IA',          icon: BotIcon },
+  { to: '/chat',             label: 'Assistente IA',      icon: ChatIAIcon },
 ]
 
 const NAV_CORRETOR = [
@@ -24,13 +25,14 @@ const NAV_CORRETOR = [
 ]
 
 const NAV_GERENTE = [
-  { to: '/gerente/dashboard',    label: 'Dashboard da Equipe', icon: ChartIcon },
-  { to: '/gerente/leads',        label: 'Leads da Equipe',     icon: KanbanIcon },
-  { to: '/gerente/minha-equipe', label: 'Minha Equipe',        icon: UsersIcon },
-  { to: '/gerente/relatorios',   label: 'Relatório da Equipe', icon: BarChartIcon },
-  { to: '/imoveis',              label: 'Imóveis',             icon: BuildingIcon },
-  { to: '/meus-contatos',        label: 'Meus Contatos',       icon: ContactIcon },
-  { to: '/chat',                 label: 'Assistente IA',       icon: ChatIAIcon },
+  { to: '/gerente/dashboard',    label: 'Dashboard da Equipe',  icon: ChartIcon },
+  { to: '/gerente/leads',        label: 'Leads da Equipe',      icon: KanbanIcon },
+  { to: '/gerente/minha-equipe', label: 'Minha Equipe',         icon: UsersIcon },
+  { to: '/gerente/relatorios',   label: 'Relatório da Equipe',  icon: BarChartIcon },
+  { to: '/imoveis',              label: 'Imóveis',              icon: BuildingIcon },
+  { to: '/arquivos-imoveis',     label: 'Arquivos de Imóveis',  icon: FolderIcon },
+  { to: '/meus-contatos',        label: 'Meus Contatos',        icon: ContactIcon },
+  { to: '/chat',                 label: 'Assistente IA',        icon: ChatIAIcon },
 ]
 
 export default function Layout() {
@@ -221,6 +223,14 @@ function ChatIAIcon({ className }) {
   return (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
+    </svg>
+  )
+}
+
+function FolderIcon({ className }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" />
     </svg>
   )
 }

@@ -21,6 +21,7 @@ import Chat from './pages/Chat'
 import Imoveis from './pages/Imoveis'
 import AdminLogin from './pages/admin/AdminLogin'
 import AdminDashboard from './pages/admin/AdminDashboard'
+import ArquivosImovel from './pages/ArquivosImovel'
 
 function HomeRedirect() {
   const { usuario } = useAuth()
@@ -57,6 +58,7 @@ export default function App() {
             {/* Rotas compartilhadas */}
             <Route path="chat" element={<Chat />} />
             <Route path="imoveis" element={<Imoveis />} />
+            <Route path="arquivos-imoveis" element={<ArquivosImovel />} />
 
             {/* Rotas do corretor */}
             <Route path="meus-leads" element={<Kanban />} />
