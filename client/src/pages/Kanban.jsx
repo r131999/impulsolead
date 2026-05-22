@@ -82,6 +82,12 @@ function agrupar(leads) {
   leads.forEach((l) => {
     if (grupos[l.status]) grupos[l.status].push(l)
   })
+  grupos.lead.sort((a, b) => {
+    const aSemCorretor = a.corretorId ? 1 : 0
+    const bSemCorretor = b.corretorId ? 1 : 0
+    if (aSemCorretor !== bSemCorretor) return aSemCorretor - bSemCorretor
+    return new Date(b.criadoEm) - new Date(a.criadoEm)
+  })
   return grupos
 }
 
