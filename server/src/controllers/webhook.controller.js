@@ -209,4 +209,38 @@ async function numerosBloqueados(req, res) {
   res.json({ telefones });
 }
 
-module.exports = { receberLead, numerosBloqueados };
+async function leadAtivo(req, res) {
+  const { telefone } = req.query;
+
+  if (!telefone) {
+    return res.status(400).json({ error: 'Parâmetro obrigatório: telefone' });
+  }
+
+  const digitos = String(telefone).replace(/\D/g, '');
+
+  // Busca pelo telefone exato ou pela variante sem/com dígito 9
+  const variantes = [digitos];
+  if (digitos.startsWith('55') && digitos.length === 13) {
+    variantes.push(digitos.slice(0, 4) + digitos.slice(5)); // remove o 9
+  } else if (digitos.startsWith('55') && digitos.length === 12) {
+    variantes.push(digitos.slice(0, 4) + '9' + digitos.slice(4)); // insere o 9
+  }
+
+  const lead = await prisma.lead.findFirst({
+    where: {
+      imobiliariaId: req.imobiliariaId,
+      telefone: { in: variantes },
+      status: { notIn: ['perdido'] },
+    },
+    select: { id: true },
+    orderBy: { criadoEm: 'desc' },
+  });
+
+  if (lead) {
+    return res.json({ existe: true, leadId: lead.id });
+  }
+
+  res.json({ existe: false, leadId: null });
+}
+
+module.exports = { receberLead, numerosBloqueados, leadAtivo };

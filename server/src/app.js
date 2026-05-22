@@ -1,8 +1,10 @@
 require('dotenv').config();
+const http = require('http');
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
+const { initSocketIO } = require('./services/socketio.service');
 
 const authRoutes = require('./routes/auth.routes');
 const leadsRoutes = require('./routes/leads.routes');
@@ -22,6 +24,8 @@ const chatRoutes = require('./routes/chat.routes');
 const chatInternoRoutes = require('./routes/chat-interno.routes');
 const adminRoutes = require('./routes/admin.routes');
 const agenteRoutes = require('./routes/agente.routes');
+const arquivosImovelRoutes = require('./routes/arquivos-imovel.routes');
+const chatLeadRoutes = require('./routes/chat-lead.routes');
 const { iniciarCrons } = require('./services/cron.service');
 
 const app = express();
@@ -33,6 +37,9 @@ app.use(cors({
   credentials: true,
 }));
 app.use(express.json({ limit: '1mb' }));
+
+const UPLOAD_DIR_IMOVEIS = process.env.UPLOAD_DIR_IMOVEIS || '/opt/uploads/imoveis';
+app.use('/uploads/imoveis', express.static(UPLOAD_DIR_IMOVEIS));
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -60,6 +67,8 @@ app.use('/api/chat', chatRoutes);
 app.use('/api/chat-interno', chatInternoRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/agente', agenteRoutes);
+app.use('/api/arquivos-imovel', arquivosImovelRoutes);
+app.use('/api/chat-lead', chatLeadRoutes);
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
@@ -75,7 +84,9 @@ app.use((err, req, res, next) => {
 });
 
 const PORT = process.env.PORT || 3002;
-app.listen(PORT, () => {
+const httpServer = http.createServer(app);
+initSocketIO(httpServer);
+httpServer.listen(PORT, () => {
   console.log(`ImpulsoLead API rodando na porta ${PORT}`);
   iniciarCrons();
 });

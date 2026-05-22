@@ -8,28 +8,30 @@ datasource db {
 }
 
 model Imobiliaria {
-  id            String   @id @default(uuid())
+  id            String    @id @default(uuid())
   nome          String
-  email         String   @unique
+  email         String    @unique
   telefone      String?
   logoUrl       String?
-  plano         String   @default("trial")
+  plano         String    @default("trial")
   trialExpiraEm DateTime?
-  apiKey        String   @unique
-  criadoEm      DateTime @default(now())
-  atualizadoEm  DateTime @updatedAt
+  apiKey        String    @unique
+  criadoEm      DateTime  @default(now())
+  atualizadoEm  DateTime  @updatedAt
 
-  usuarios                Usuario[]
-  corretores              Corretor[]
-  leads                   Lead[]
-  configAgente            ConfigAgente?
-  equipes                 Equipe[]
-  contatosImportados      ContatoImportado[]
-  modelosMensagem         ModeloMensagem[]
-  contatosPessoais        ContatoPessoal[]
-  imoveis                 Imovel[]
-  sessoesAgente           SessaoAgente[]
-  historicosDistribuicao  HistoricoDistribuicao[]
+  usuarios               Usuario[]
+  corretores             Corretor[]
+  leads                  Lead[]
+  configAgente           ConfigAgente?
+  equipes                Equipe[]
+  contatosImportados     ContatoImportado[]
+  modelosMensagem        ModeloMensagem[]
+  contatosPessoais       ContatoPessoal[]
+  imoveis                Imovel[]
+  sessoesAgente          SessaoAgente[]
+  historicosDistribuicao HistoricoDistribuicao[]
+  arquivosImovel         ArquivoImovel[]
+  mensagensLead          MensagemLead[]
 }
 
 model Usuario {
@@ -41,7 +43,7 @@ model Usuario {
   ativo        Boolean  @default(true)
   telefone     String?
   fotoPerfil   String?
-  criadoEm    DateTime @default(now())
+  criadoEm     DateTime @default(now())
   atualizadoEm DateTime @updatedAt
 
   imobiliariaId String
@@ -49,27 +51,27 @@ model Usuario {
 }
 
 model Corretor {
-  id            String   @id @default(uuid())
-  nome          String
-  email         String?  @unique
-  telefone      String
-  whatsapp      String
-  ativo         Boolean  @default(true)
-  disponivel    Boolean  @default(true)
-  posicaoFila   Int      @default(0)
-  leadsRecebidos Int     @default(0)
-  senhaHash     String?
-  usuarioAtivo  Boolean  @default(false)
-  role          String   @default("corretor") // "corretor" ou "gerente"
-  fotoPerfil    String?
-  equipeId      String?
-  criadoEm     DateTime @default(now())
-  atualizadoEm  DateTime @updatedAt
+  id             String   @id @default(uuid())
+  nome           String
+  email          String?  @unique
+  telefone       String
+  whatsapp       String
+  ativo          Boolean  @default(true)
+  disponivel     Boolean  @default(true)
+  posicaoFila    Int      @default(0)
+  leadsRecebidos Int      @default(0)
+  senhaHash      String?
+  usuarioAtivo   Boolean  @default(false)
+  role           String   @default("corretor") // "corretor" ou "gerente"
+  fotoPerfil     String?
+  equipeId       String?
+  criadoEm       DateTime @default(now())
+  atualizadoEm   DateTime @updatedAt
 
-  imobiliariaId String
-  imobiliaria   Imobiliaria @relation(fields: [imobiliariaId], references: [id])
-  equipe        Equipe?     @relation("EquipeCorretores", fields: [equipeId], references: [id])
-  equipeLiderada Equipe[]   @relation("EquipeLider")
+  imobiliariaId  String
+  imobiliaria    Imobiliaria @relation(fields: [imobiliariaId], references: [id])
+  equipe         Equipe?     @relation("EquipeCorretores", fields: [equipeId], references: [id])
+  equipeLiderada Equipe[]    @relation("EquipeLider")
 
   leads            Lead[]
   followUps        FollowUp[]
@@ -77,10 +79,10 @@ model Corretor {
 }
 
 model Lead {
-  id           String  @id @default(uuid())
-  nome         String
-  telefone     String
-  whatsappJid  String
+  id          String @id @default(uuid())
+  nome        String
+  telefone    String
+  whatsappJid String
 
   primeiroImovel String?
   tipoRenda      String?
@@ -91,10 +93,10 @@ model Lead {
   regiao         String?
   faixaValor     String?
 
-  origem            String?
-  campanha          String?
-  interesse         String?
-  nomeEditado       String?
+  origem      String?
+  campanha    String?
+  interesse   String?
+  nomeEditado String?
 
   status            String  @default("lead")
   motivoPerda       String?
@@ -103,17 +105,18 @@ model Lead {
   temConversa       Boolean @default(false)
 
   corretorId String?
-  corretor   Corretor?   @relation(fields: [corretorId], references: [id])
+  corretor   Corretor? @relation(fields: [corretorId], references: [id])
 
   imobiliariaId String
   imobiliaria   Imobiliaria @relation(fields: [imobiliariaId], references: [id])
 
   historico HistoricoLead[]
   followUps FollowUp[]
+  mensagens MensagemLead[]
 
   ultimaNotificacaoGestor DateTime?
 
-  criadoEm    DateTime @default(now())
+  criadoEm     DateTime @default(now())
   atualizadoEm DateTime @updatedAt
 }
 
@@ -128,32 +131,32 @@ model HistoricoLead {
 }
 
 model Equipe {
-  id            String   @id @default(uuid())
-  nome          String
-  descricao     String?
-  ativo         Boolean  @default(true)
+  id        String  @id @default(uuid())
+  nome      String
+  descricao String?
+  ativo     Boolean @default(true)
 
-  liderId       String?
-  lider         Corretor?   @relation("EquipeLider", fields: [liderId], references: [id])
+  liderId String?
+  lider   Corretor? @relation("EquipeLider", fields: [liderId], references: [id])
 
   imobiliariaId String
   imobiliaria   Imobiliaria @relation(fields: [imobiliariaId], references: [id])
 
-  corretores    Corretor[]  @relation("EquipeCorretores")
+  corretores Corretor[] @relation("EquipeCorretores")
 
-  criadoEm      DateTime @default(now())
-  atualizadoEm  DateTime @updatedAt
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
 }
 
 model ContatoImportado {
-  id            String   @id @default(uuid())
-  nome          String
-  telefone      String
-  status        String   @default("pendente") // pendente | enviado | convertido | erro
+  id              String   @id @default(uuid())
+  nome            String
+  telefone        String
+  status          String   @default("pendente") // pendente | enviado | convertido | erro
   mensagemEnviada String?
-  leadId        String?
-  criadoEm     DateTime @default(now())
-  atualizadoEm  DateTime @updatedAt
+  leadId          String?
+  criadoEm        DateTime @default(now())
+  atualizadoEm    DateTime @updatedAt
 
   imobiliariaId String
   imobiliaria   Imobiliaria @relation(fields: [imobiliariaId], references: [id])
@@ -162,12 +165,12 @@ model ContatoImportado {
 }
 
 model ModeloMensagem {
-  id            String   @id @default(uuid())
-  nome          String
-  conteudo      String
-  ativo         Boolean  @default(true)
+  id           String   @id @default(uuid())
+  nome         String
+  conteudo     String
+  ativo        Boolean  @default(true)
   criadoEm     DateTime @default(now())
-  atualizadoEm  DateTime @updatedAt
+  atualizadoEm DateTime @updatedAt
 
   imobiliariaId String
   imobiliaria   Imobiliaria @relation(fields: [imobiliariaId], references: [id])
@@ -178,27 +181,27 @@ model FollowUp {
   dataHora     DateTime
   observacao   String?
   status       String   @default("pendente")
-  criadoEm    DateTime @default(now())
+  criadoEm     DateTime @default(now())
   atualizadoEm DateTime @updatedAt
 
-  leadId     String
-  lead       Lead     @relation(fields: [leadId], references: [id])
+  leadId String
+  lead   Lead   @relation(fields: [leadId], references: [id])
 
   corretorId String
   corretor   Corretor @relation(fields: [corretorId], references: [id])
 }
 
 model ContatoPessoal {
-  id          String   @id @default(uuid())
+  id          String  @id @default(uuid())
   nome        String
   telefone    String
   email       String?
   observacoes String?
-  status      String   @default("ativo") // "ativo" | "convertido"
+  status      String  @default("ativo") // "ativo" | "convertido"
   leadId      String?
 
-  corretorId    String
-  corretor      Corretor    @relation(fields: [corretorId], references: [id])
+  corretorId String
+  corretor   Corretor @relation(fields: [corretorId], references: [id])
 
   imobiliariaId String
   imobiliaria   Imobiliaria @relation(fields: [imobiliariaId], references: [id])
@@ -208,19 +211,19 @@ model ContatoPessoal {
 }
 
 model Imovel {
-  id            String   @id @default(uuid())
-  nome          String
-  descricao     String
-  tipo          String
-  localizacao   String
-  valorMin      Float?
-  valorMax      Float?
-  quartos       Int?
-  area          String?
-  status        String   @default("disponivel")
-  destaque      Boolean  @default(false)
+  id           String   @id @default(uuid())
+  nome         String
+  descricao    String
+  tipo         String
+  localizacao  String
+  valorMin     Float?
+  valorMax     Float?
+  quartos      Int?
+  area         String?
+  status       String   @default("disponivel")
+  destaque     Boolean  @default(false)
   criadoEm     DateTime @default(now())
-  atualizadoEm  DateTime @updatedAt
+  atualizadoEm DateTime @updatedAt
 
   imobiliariaId String
   imobiliaria   Imobiliaria @relation(fields: [imobiliariaId], references: [id])
@@ -232,22 +235,22 @@ model UsuarioSupremo {
   email        String   @unique
   senhaHash    String
   ativo        Boolean  @default(true)
-  criadoEm    DateTime @default(now())
+  criadoEm     DateTime @default(now())
   atualizadoEm DateTime @updatedAt
 }
 
 model SessaoAgente {
-  id            String   @id @default(uuid())
+  id            String      @id @default(uuid())
   telefone      String
   nome          String?
-  etapaAtual    Int      @default(0)
-  respostas     Json     @default("{}")
-  status        String   @default("em_andamento") // "em_andamento" | "finalizado"
+  etapaAtual    Int         @default(0)
+  respostas     Json        @default("{}")
+  status        String      @default("em_andamento") // "em_andamento" | "finalizado"
   instancia     String
   imobiliariaId String
   imobiliaria   Imobiliaria @relation(fields: [imobiliariaId], references: [id])
-  criadoEm     DateTime @default(now())
-  atualizadoEm  DateTime @updatedAt
+  criadoEm      DateTime    @default(now())
+  atualizadoEm  DateTime    @updatedAt
 
   @@unique([telefone, imobiliariaId])
 }
@@ -259,7 +262,7 @@ model ChatConversa {
   participante2Id   String
   participante2Tipo String
   imobiliariaId     String
-  criadoEm         DateTime @default(now())
+  criadoEm          DateTime @default(now())
   atualizadoEm      DateTime @updatedAt
 
   mensagens ChatMensagem[]
@@ -268,7 +271,7 @@ model ChatConversa {
 }
 
 model ChatMensagem {
-  id            String      @id @default(uuid())
+  id            String       @id @default(uuid())
   conversaId    String
   conversa      ChatConversa @relation(fields: [conversaId], references: [id])
   remetenteId   String
@@ -277,8 +280,8 @@ model ChatMensagem {
   conteudo      String
   leadId        String?
   leadNome      String?
-  lida          Boolean     @default(false)
-  criadoEm     DateTime    @default(now())
+  lida          Boolean      @default(false)
+  criadoEm      DateTime     @default(now())
 }
 
 model HistoricoDistribuicao {
@@ -288,7 +291,7 @@ model HistoricoDistribuicao {
   leadTelefone       String
   corretorId         String
   corretorNome       String
-  distribuidoPor     String   // "automatico" ou "manual"
+  distribuidoPor     String // "automatico" ou "manual"
   distribuidoPorNome String?
   criadoEm           DateTime @default(now())
 
@@ -296,16 +299,55 @@ model HistoricoDistribuicao {
   imobiliaria   Imobiliaria @relation(fields: [imobiliariaId], references: [id])
 }
 
+model ArquivoImovel {
+  id           String   @id @default(uuid())
+  nome         String
+  tipo         String // "foto", "video", "pdf"
+  filename     String
+  mimetype     String
+  tamanho      Int
+  criadoPorId  String
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  imobiliariaId String
+  imobiliaria   Imobiliaria @relation(fields: [imobiliariaId], references: [id])
+
+  mensagens MensagemLead[]
+}
+
+model MensagemLead {
+  id            String   @id @default(uuid())
+  remetenteTipo String // "lead", "corretor", "sistema"
+  remetenteNome String
+  remetenteId   String?
+  conteudo      String?
+  tipoMidia     String? // "texto", "audio", "video", "pdf", "imagem"
+  urlMidia      String?
+  whatsappMsgId String?
+  lida          Boolean  @default(false)
+  criadoEm      DateTime @default(now())
+
+  leadId String
+  lead   Lead   @relation(fields: [leadId], references: [id])
+
+  arquivoImovelId String?
+  arquivoImovel   ArquivoImovel? @relation(fields: [arquivoImovelId], references: [id])
+
+  imobiliariaId String
+  imobiliaria   Imobiliaria @relation(fields: [imobiliariaId], references: [id])
+}
+
 model ConfigAgente {
-  id                 String  @id @default(uuid())
-  mensagemBoasVindas String  @default("Olá! Tudo bem? Aqui é a Lia, assistente virtual. Que bom que você entrou em contato! Como posso te chamar?")
+  id                 String   @id @default(uuid())
+  mensagemBoasVindas String   @default("Olá! Tudo bem? Aqui é a Lia, assistente virtual. Que bom que você entrou em contato! Como posso te chamar?")
   perguntas          Json
-  nomeAgente         String  @default("Lia")
-  tomAgente          String  @default("profissional mas leve")
-  ativo              Boolean @default(true)
-  distribuicaoManual Boolean @default(false)
-  criadoEm          DateTime @default(now())
-  atualizadoEm      DateTime @updatedAt
+  nomeAgente         String   @default("Lia")
+  tomAgente          String   @default("profissional mas leve")
+  ativo              Boolean  @default(true)
+  distribuicaoManual Boolean  @default(false)
+  criadoEm           DateTime @default(now())
+  atualizadoEm       DateTime @updatedAt
 
   imobiliariaId String      @unique
   imobiliaria   Imobiliaria @relation(fields: [imobiliariaId], references: [id])

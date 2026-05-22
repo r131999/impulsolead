@@ -143,6 +143,40 @@ function cleanupMaps() {
   }
 }
 
+// ── Verificar lead ativo no CRM ────────────────────────────────────────────────
+async function verificarLeadAtivo(phone) {
+  try {
+    const res = await jsonGet(
+      `${CONFIG.apiBase}/webhook/lead-ativo?telefone=${phone}`,
+      { 'x-api-key': CONFIG.apiKey }
+    );
+    if (res.status === 200) {
+      return JSON.parse(res.data);
+    }
+  } catch (err) {
+    tag(`Erro ao verificar lead ativo: ${err.message}`);
+  }
+  return { existe: false, leadId: null };
+}
+
+// ── Salvar mensagem recebida no CRM ───────────────────────────────────────────
+async function salvarMensagemRecebida(leadId, conteudo, msgId, remetenteNome) {
+  try {
+    await jsonPost(
+      `${CONFIG.apiBase}/chat-lead/${leadId}/mensagem-recebida`,
+      {
+        conteudo,
+        whatsappMsgId: msgId,
+        remetenteNome,
+        tipoMidia: 'texto',
+      },
+      { 'x-api-key': CONFIG.apiKey }
+    );
+  } catch (err) {
+    tag(`Erro ao salvar mensagem recebida: ${err.message}`);
+  }
+}
+
 // ── Processamento de mensagens ─────────────────────────────────────────────────
 async function handleMessage(msg) {
   try {
@@ -230,7 +264,16 @@ async function handleMessage(msg) {
       return;
     }
 
-    // Bloquear atendido nas últimas 24h
+    // ── Verificar se já existe lead ativo no CRM ──────────────────────────────
+    // Se existir: armazena a mensagem e para aqui (sem boas-vindas, sem novo lead)
+    const leadAtivoResult = await verificarLeadAtivo(phone);
+    if (leadAtivoResult.existe && leadAtivoResult.leadId) {
+      tag(`Mensagem de lead existente (${phone}) — salvando no chat`);
+      await salvarMensagemRecebida(leadAtivoResult.leadId, text, msgId, nome);
+      return;
+    }
+
+    // ── Bloqueio de 24h — apenas para envio de boas-vindas ───────────────────
     // Verifica tanto o phone extraído quanto o senderPn bruto para cobrir o caso
     // em que o mesmo contato chegou antes como @s.whatsapp.net e agora como @lid
     const senderPnRaw = (key.senderPn || msg.participant || '').split('@')[0].replace(/\D/g, '');
@@ -376,6 +419,48 @@ const server = http.createServer(async (req, res) => {
         console.log('[WhatsApp] Mensagem enviada com sucesso para:', jid);
       } catch (err) {
         console.error('[WhatsApp] Erro ao enviar mensagem para:', jid, '-', err.message);
+        return sendJson(res, 500, { error: err.message });
+      }
+      return sendJson(res, 200, { ok: true });
+    }
+
+    if (req.method === 'POST' && req.url === '/send-media') {
+      const body = await parseBody(req);
+      const { number, mediaUrl, tipo, filename, mimetype, caption } = body;
+
+      if (!number || !mediaUrl || !tipo) {
+        return sendJson(res, 400, { error: 'number, mediaUrl e tipo são obrigatórios' });
+      }
+      if (!isConnected || !sock) {
+        return sendJson(res, 503, { error: 'WhatsApp não conectado' });
+      }
+
+      const jid = number.includes('@') ? number : `${number.replace(/\D/g, '')}@s.whatsapp.net`;
+      const source = { url: mediaUrl };
+      let msgContent;
+
+      if (tipo === 'imagem' || tipo === 'foto') {
+        msgContent = { image: source, caption: caption || '' };
+      } else if (tipo === 'video') {
+        msgContent = { video: source, caption: caption || '' };
+      } else if (tipo === 'audio') {
+        msgContent = { audio: source, mimetype: mimetype || 'audio/mp4', ptt: false };
+      } else {
+        // pdf e demais documentos
+        msgContent = {
+          document: source,
+          mimetype: mimetype || 'application/pdf',
+          fileName: filename || 'arquivo.pdf',
+          caption: caption || '',
+        };
+      }
+
+      console.log('[WhatsApp] Enviando mídia para:', jid, '| tipo:', tipo);
+      try {
+        await sock.sendMessage(jid, msgContent);
+        console.log('[WhatsApp] Mídia enviada com sucesso para:', jid);
+      } catch (err) {
+        console.error('[WhatsApp] Erro ao enviar mídia para:', jid, '-', err.message);
         return sendJson(res, 500, { error: err.message });
       }
       return sendJson(res, 200, { ok: true });
