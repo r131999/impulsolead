@@ -88,6 +88,10 @@ function agrupar(leads) {
     if (aSemCorretor !== bSemCorretor) return aSemCorretor - bSemCorretor
     return new Date(b.criadoEm) - new Date(a.criadoEm)
   })
+  if (grupos.lead.length > 0) {
+    const first = grupos.lead[0]
+    console.log('[DEBUG lead[0]] corretorId:', first.corretorId, '| criadoEm:', first.criadoEm, '| keys:', Object.keys(first))
+  }
   return grupos
 }
 
