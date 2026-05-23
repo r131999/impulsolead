@@ -227,6 +227,7 @@ export default function ChatInterno() {
       <button
         onClick={togglePainel}
         title="Mensagens internas"
+        className="chat-interno-fab"
         style={{
           position: 'fixed',
           bottom: 24,
@@ -338,6 +339,9 @@ export default function ChatInterno() {
             width: 100vw !important;
             height: 90vh !important;
             border-radius: 16px 16px 0 0 !important;
+          }
+          .chat-interno-fab {
+            bottom: 80px !important;
           }
         }
       `}</style>
