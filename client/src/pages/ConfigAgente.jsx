@@ -1,12 +1,12 @@
-import { useEffect, useState } from 'react'
-import { getConfig, atualizarConfig, atualizarDistribuicao } from '../api/config'
+import { useEffect, useRef, useState } from 'react'
+import { getConfig, atualizarConfig, atualizarDistribuicao, atualizarLogo } from '../api/config'
 import { useAuth } from '../context/AuthContext'
 import * as modelosApi from '../api/modelos-mensagem'
 import * as usuariosApi from '../api/usuarios'
 import { Avatar } from '../components/Avatar'
 
 export default function ConfigAgente() {
-  const { usuario } = useAuth()
+  const { usuario, atualizarLogoImobiliaria } = useAuth()
   const [config, setConfig] = useState(null)
   const [form, setForm] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -25,6 +25,14 @@ export default function ConfigAgente() {
   const [salvandoUsuario, setSalvandoUsuario] = useState(false)
   const [erroUsuario, setErroUsuario] = useState('')
   const [salvandoDistribuicao, setSalvandoDistribuicao] = useState(false)
+
+  // Logo
+  const [logoPreview, setLogoPreview] = useState(null)
+  const [logoFile, setLogoFile] = useState(null)
+  const [salvandoLogo, setSalvandoLogo] = useState(false)
+  const [erroLogo, setErroLogo] = useState('')
+  const [sucessoLogo, setSucessoLogo] = useState(false)
+  const logoInputRef = useRef(null)
 
   useEffect(() => {
     getConfig()
@@ -148,6 +156,48 @@ export default function ConfigAgente() {
     }
   }
 
+  const selecionarLogo = (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+    if (file.size > 2 * 1024 * 1024) {
+      setErroLogo('Arquivo muito grande. Limite: 2MB')
+      e.target.value = ''
+      return
+    }
+    setErroLogo('')
+    setLogoFile(file)
+    const reader = new FileReader()
+    reader.onload = (ev) => setLogoPreview(ev.target.result)
+    reader.readAsDataURL(file)
+    e.target.value = ''
+  }
+
+  const confirmarLogo = async () => {
+    if (!logoFile) return
+    setSalvandoLogo(true)
+    setErroLogo('')
+    try {
+      const fd = new FormData()
+      fd.append('logo', logoFile)
+      const res = await atualizarLogo(fd)
+      atualizarLogoImobiliaria(res.data.logoUrl)
+      setLogoPreview(null)
+      setLogoFile(null)
+      setSucessoLogo(true)
+      setTimeout(() => setSucessoLogo(false), 3000)
+    } catch (err) {
+      setErroLogo(err.response?.data?.error || 'Erro ao salvar logo')
+    } finally {
+      setSalvandoLogo(false)
+    }
+  }
+
+  const cancelarLogo = () => {
+    setLogoPreview(null)
+    setLogoFile(null)
+    setErroLogo('')
+  }
+
   const salvar = async (e) => {
     e.preventDefault()
     setErro('')
@@ -192,6 +242,73 @@ export default function ConfigAgente() {
         <p className="text-sm mt-0.5" style={{ color: '#94A3B8' }}>
           Personalize como o agente qualifica seus leads no WhatsApp
         </p>
+      </div>
+
+      {/* Logo da imobiliária */}
+      <div className="card mb-6">
+        <h2 className="font-semibold mb-3" style={{ color: '#F1F5F9' }}>Logo da imobiliária</h2>
+        <div className="flex items-center gap-5">
+          <div
+            className="flex-shrink-0 flex items-center justify-center rounded-xl overflow-hidden"
+            style={{ width: 120, height: 60, backgroundColor: '#1E293B', border: '1px solid #334155' }}
+          >
+            {(logoPreview || usuario?.imobiliaria?.logoUrl) ? (
+              <img
+                src={logoPreview || usuario.imobiliaria.logoUrl}
+                alt="Logo"
+                style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
+              />
+            ) : (
+              <span className="text-xs" style={{ color: '#475569' }}>Sem logo</span>
+            )}
+          </div>
+
+          <div className="flex-1 min-w-0">
+            {!logoFile ? (
+              <div>
+                <button
+                  type="button"
+                  onClick={() => logoInputRef.current?.click()}
+                  className="btn-secondary text-sm"
+                >
+                  {usuario?.imobiliaria?.logoUrl ? 'Alterar logo' : 'Adicionar logo'}
+                </button>
+                <p className="text-xs mt-1.5" style={{ color: '#64748B' }}>
+                  JPG, PNG ou WebP • máx. 2MB
+                </p>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  type="button"
+                  onClick={confirmarLogo}
+                  disabled={salvandoLogo}
+                  className="btn-primary text-sm"
+                >
+                  {salvandoLogo ? 'Salvando...' : 'Confirmar'}
+                </button>
+                <button
+                  type="button"
+                  onClick={cancelarLogo}
+                  disabled={salvandoLogo}
+                  className="btn-secondary text-sm"
+                >
+                  Cancelar
+                </button>
+                <span className="text-xs truncate" style={{ color: '#94A3B8' }}>{logoFile.name}</span>
+              </div>
+            )}
+            {erroLogo && <p className="text-xs mt-1" style={{ color: '#EF4444' }}>{erroLogo}</p>}
+            {sucessoLogo && <p className="text-xs mt-1" style={{ color: '#10B981' }}>Logo atualizada com sucesso!</p>}
+          </div>
+        </div>
+        <input
+          ref={logoInputRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          className="hidden"
+          onChange={selecionarLogo}
+        />
       </div>
 
       {/* API Key */}

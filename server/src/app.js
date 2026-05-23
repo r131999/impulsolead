@@ -41,6 +41,9 @@ app.use(express.json({ limit: '1mb' }));
 const UPLOAD_DIR_IMOVEIS = process.env.UPLOAD_DIR_IMOVEIS || '/opt/uploads/imoveis';
 app.use('/uploads/imoveis', express.static(UPLOAD_DIR_IMOVEIS));
 
+const UPLOAD_DIR_LOGOS = process.env.UPLOAD_DIR_LOGOS || '/opt/uploads/logos';
+app.use('/uploads/logos', express.static(UPLOAD_DIR_LOGOS));
+
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 50,

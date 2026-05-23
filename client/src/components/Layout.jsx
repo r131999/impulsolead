@@ -88,7 +88,11 @@ export default function Layout() {
           )}
 
           <div className="px-5 py-4 border-b border-indigo-800">
-            <img src="/logo-branca.png" alt="ImpulsoLead" style={{ height: '32px' }} />
+            <img
+              src={usuario?.imobiliaria?.logoUrl || '/logo-branca.png'}
+              alt={usuario?.imobiliaria?.nome || 'ImpulsoLead'}
+              style={{ height: '32px', maxWidth: '160px', objectFit: 'contain' }}
+            />
             <p className="text-indigo-300 text-xs mt-0.5 truncate">{usuario?.imobiliaria?.nome}</p>
             {isGerente && (
               <span className="inline-block mt-1 px-2 py-0.5 rounded text-xs font-medium" style={{ backgroundColor: 'rgba(16,185,129,0.15)', color: '#10B981' }}>

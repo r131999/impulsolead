@@ -49,12 +49,19 @@ export function AuthProvider({ children }) {
     setUsuario((prev) => ({ ...prev, fotoPerfil }))
   }
 
+  const atualizarLogoImobiliaria = (logoUrl) => {
+    setUsuario((prev) => ({
+      ...prev,
+      imobiliaria: { ...prev.imobiliaria, logoUrl },
+    }))
+  }
+
   const isCorretor = usuario?.role === 'corretor'
   const isGerente = usuario?.role === 'gerente'
   const isGestor = usuario?.role === 'gestor' || usuario?.role === 'admin'
 
   return (
-    <AuthContext.Provider value={{ usuario, loading, login, loginCorretor, logout, isCorretor, isGerente, isGestor, atualizarFotoPerfil }}>
+    <AuthContext.Provider value={{ usuario, loading, login, loginCorretor, logout, isCorretor, isGerente, isGestor, atualizarFotoPerfil, atualizarLogoImobiliaria }}>
       {children}
     </AuthContext.Provider>
   )
