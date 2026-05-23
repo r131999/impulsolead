@@ -316,6 +316,20 @@ async function handleMessage(msg) {
     recentLeads.set(phone, now);
     if (senderPnRaw && senderPnRaw !== phone) recentLeads.set(senderPnRaw, now);
     tag(`Lead enviado ao CRM — status: ${res.status}`);
+
+    // Salvar a mensagem inicial do lead na conversa
+    if (res.status === 201 && text.trim()) {
+      try {
+        const body = JSON.parse(res.data);
+        const leadId = body?.lead?.id;
+        if (leadId) {
+          await salvarMensagemRecebida(leadId, text, msgId, nome);
+          tag(`Mensagem inicial salva para lead ${leadId}`);
+        }
+      } catch (err) {
+        tag(`Erro ao salvar mensagem inicial: ${err.message}`);
+      }
+    }
   } catch (err) {
     tag(`Erro ao processar mensagem: ${err.message}`);
   }
