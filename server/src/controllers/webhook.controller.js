@@ -1,8 +1,7 @@
-const { PrismaClient } = require('@prisma/client');
-const { proximoCorretor } = require('../services/fila.service');
+﻿const { proximoCorretor } = require('../services/fila.service');
 const { notificarCorretor } = require('../services/notificacao.service');
 
-const prisma = new PrismaClient();
+const prisma = require('../lib/prisma');
 
 function sanitizarTexto(valor) {
   if (valor == null) return null;

@@ -1,7 +1,6 @@
-const { PrismaClient } = require('@prisma/client');
-const { notificarGestorPendencia } = require('./notificacao.service');
+﻿const { notificarGestorPendencia } = require('./notificacao.service');
 
-const prisma = new PrismaClient();
+const prisma = require('../lib/prisma');
 
 const STATUS_VALIDOS = ['lead', 'atendimento', 'em_espera', 'agendamento', 'visita', 'proposta', 'venda', 'perdido'];
 const LIMITE_PENDENCIA_MS = 24 * 60 * 60 * 1000;

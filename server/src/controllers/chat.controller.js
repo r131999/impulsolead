@@ -1,7 +1,6 @@
-const { PrismaClient } = require('@prisma/client');
-const axios = require('axios');
+﻿const axios = require('axios');
 
-const prisma = new PrismaClient();
+const prisma = require('../lib/prisma');
 
 const SYSTEM_PROMPT =
   'Você é um assistente especializado para corretores de imóveis. Você tem acesso ao catálogo completo de imóveis da imobiliária e também dá dicas de vendas, como abordar clientes e como responder mensagens de leads. Responda de forma direta, objetiva e profissional. Se não souber a resposta com base no catálogo, diga claramente.';

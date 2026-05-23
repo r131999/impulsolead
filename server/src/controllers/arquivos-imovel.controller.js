@@ -3,9 +3,8 @@
 const path = require('path');
 const fs = require('fs');
 const multer = require('multer');
-const { PrismaClient } = require('@prisma/client');
 
-const prisma = new PrismaClient();
+const prisma = require('../lib/prisma');
 
 const UPLOAD_DIR = process.env.UPLOAD_DIR_IMOVEIS || '/opt/uploads/imoveis';
 
@@ -20,9 +19,19 @@ const storage = multer.diskStorage({
   },
 });
 
+const ALLOWED_MIMETYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'video/mp4', 'video/quicktime', 'application/pdf'];
+const ALLOWED_EXTS = ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.mp4', '.mov', '.pdf'];
+
 const upload = multer({
   storage,
   limits: { fileSize: 50 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (ALLOWED_MIMETYPES.includes(file.mimetype) && ALLOWED_EXTS.includes(ext)) {
+      return cb(null, true);
+    }
+    cb(new Error('Tipo de arquivo não permitido. Use: JPG, PNG, WebP, GIF, MP4, MOV, PDF'));
+  },
 }).single('arquivo');
 
 function handleUpload(req, res, next) {
@@ -79,50 +88,65 @@ async function enviar(req, res) {
 }
 
 async function listar(req, res) {
-  const { tipo } = req.query;
-  const where = { imobiliariaId: req.imobiliariaId };
-  if (tipo) where.tipo = tipo;
+  try {
+    const { tipo } = req.query;
+    const where = { imobiliariaId: req.imobiliariaId };
+    if (tipo) where.tipo = tipo;
 
-  const arquivos = await prisma.arquivoImovel.findMany({
-    where,
-    orderBy: { criadoEm: 'desc' },
-  });
+    const arquivos = await prisma.arquivoImovel.findMany({
+      where,
+      orderBy: { criadoEm: 'desc' },
+    });
 
-  res.json({ arquivos });
+    res.json({ arquivos });
+  } catch (err) {
+    console.error('[arquivos-imovel] listar:', err.message);
+    res.status(500).json({ error: 'Erro ao listar arquivos' });
+  }
 }
 
 async function remover(req, res) {
-  const { id } = req.params;
+  try {
+    const { id } = req.params;
 
-  const arquivo = await prisma.arquivoImovel.findFirst({
-    where: { id, imobiliariaId: req.imobiliariaId },
-  });
-  if (!arquivo) return res.status(404).json({ error: 'Arquivo não encontrado' });
+    const arquivo = await prisma.arquivoImovel.findFirst({
+      where: { id, imobiliariaId: req.imobiliariaId },
+    });
+    if (!arquivo) return res.status(404).json({ error: 'Arquivo não encontrado' });
 
-  await prisma.arquivoImovel.delete({ where: { id } });
+    await prisma.arquivoImovel.delete({ where: { id } });
 
-  const filePath = path.join(UPLOAD_DIR, arquivo.filename);
-  fs.unlink(filePath, () => {});
+    const filePath = path.join(UPLOAD_DIR, arquivo.filename);
+    fs.unlink(filePath, () => {});
 
-  res.json({ message: 'Arquivo removido' });
+    res.json({ message: 'Arquivo removido' });
+  } catch (err) {
+    console.error('[arquivos-imovel] remover:', err.message);
+    res.status(500).json({ error: 'Erro ao remover arquivo' });
+  }
 }
 
 async function download(req, res) {
-  const { id } = req.params;
+  try {
+    const { id } = req.params;
 
-  const arquivo = await prisma.arquivoImovel.findFirst({
-    where: { id, imobiliariaId: req.imobiliariaId },
-  });
-  if (!arquivo) return res.status(404).json({ error: 'Arquivo não encontrado' });
+    const arquivo = await prisma.arquivoImovel.findFirst({
+      where: { id, imobiliariaId: req.imobiliariaId },
+    });
+    if (!arquivo) return res.status(404).json({ error: 'Arquivo não encontrado' });
 
-  const filePath = path.join(UPLOAD_DIR, arquivo.filename);
-  if (!fs.existsSync(filePath)) {
-    return res.status(404).json({ error: 'Arquivo não encontrado no servidor' });
+    const filePath = path.join(UPLOAD_DIR, arquivo.filename);
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ error: 'Arquivo não encontrado no servidor' });
+    }
+
+    res.setHeader('Content-Type', arquivo.mimetype);
+    res.setHeader('Content-Disposition', `inline; filename="${arquivo.filename}"`);
+    fs.createReadStream(filePath).pipe(res);
+  } catch (err) {
+    console.error('[arquivos-imovel] download:', err.message);
+    res.status(500).json({ error: 'Erro ao baixar arquivo' });
   }
-
-  res.setHeader('Content-Type', arquivo.mimetype);
-  res.setHeader('Content-Disposition', `inline; filename="${arquivo.filename}"`);
-  fs.createReadStream(filePath).pipe(res);
 }
 
 module.exports = { enviar, listar, remover, download };

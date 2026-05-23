@@ -1,8 +1,7 @@
-const bcrypt = require('bcryptjs');
-const { PrismaClient } = require('@prisma/client');
+﻿const bcrypt = require('bcryptjs');
 const { reordenarFila } = require('../services/fila.service');
 
-const prisma = new PrismaClient();
+const prisma = require('../lib/prisma');
 
 async function listar(req, res) {
   const { ativo, disponivel } = req.query;

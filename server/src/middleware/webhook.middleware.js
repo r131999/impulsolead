@@ -1,6 +1,5 @@
-const { PrismaClient } = require('@prisma/client');
-
-const prisma = new PrismaClient();
+﻿
+const prisma = require('../lib/prisma');
 
 async function webhookAuthMiddleware(req, res, next) {
   const apiKey = req.headers['x-api-key'];

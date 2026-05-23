@@ -1,6 +1,5 @@
-const { PrismaClient } = require('@prisma/client');
-
-const prisma = new PrismaClient();
+﻿
+const prisma = require('../lib/prisma');
 
 // Primeiro dia do mês corrente em Brasília (UTC-3) às 03:00 UTC = meia-noite local
 function mesInicioBrasilia(agora) {

@@ -1,8 +1,7 @@
-const { PrismaClient } = require('@prisma/client');
-const { STATUS_VALIDOS, proximoCorretor } = require('../services/fila.service');
+﻿const { STATUS_VALIDOS, proximoCorretor } = require('../services/fila.service');
 const { notificarCorretor } = require('../services/notificacao.service');
 
-const prisma = new PrismaClient();
+const prisma = require('../lib/prisma');
 
 const CAMPOS_QUALIFICACAO = [
   'primeiroImovel', 'tipoRenda', 'rendaMensal', 'restricaoCpf',

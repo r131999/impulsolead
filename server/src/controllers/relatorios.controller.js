@@ -1,6 +1,5 @@
-const { PrismaClient } = require('@prisma/client');
-
-const prisma = new PrismaClient();
+﻿
+const prisma = require('../lib/prisma');
 
 const PERIODOS_VALIDOS = [7, 30, 90];
 const STATUS_ORDEM = ['lead', 'atendimento', 'em_espera', 'agendamento', 'visita', 'proposta', 'venda', 'perdido'];

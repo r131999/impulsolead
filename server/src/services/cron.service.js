@@ -1,8 +1,7 @@
-const cron = require('node-cron');
-const { PrismaClient } = require('@prisma/client');
+﻿const cron = require('node-cron');
 const { enviarWhatsApp } = require('./notificacao.service');
 
-const prisma = new PrismaClient();
+const prisma = require('../lib/prisma');
 
 // Brasília = UTC-3. Midnight Brasília = 03:00 UTC.
 function inicioDiaBrasilia(agora) {

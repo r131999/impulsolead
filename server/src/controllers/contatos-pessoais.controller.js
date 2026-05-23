@@ -1,9 +1,8 @@
-const { PrismaClient } = require('@prisma/client');
-const { parse } = require('csv-parse/sync');
+﻿const { parse } = require('csv-parse/sync');
 const XLSX = require('xlsx');
 const { notificarCorretor } = require('../services/notificacao.service');
 
-const prisma = new PrismaClient();
+const prisma = require('../lib/prisma');
 
 function normalizarTelefone(raw) {
   return raw.toString().replace(/\D/g, '');

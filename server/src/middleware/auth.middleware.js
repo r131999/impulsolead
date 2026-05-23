@@ -1,7 +1,6 @@
-const jwt = require('jsonwebtoken');
-const { PrismaClient } = require('@prisma/client');
+﻿const jwt = require('jsonwebtoken');
 
-const prisma = new PrismaClient();
+const prisma = require('../lib/prisma');
 
 function verificarPlano(imobiliaria) {
   if (imobiliaria.plano === 'cancelado') {

@@ -1,9 +1,8 @@
-const { PrismaClient } = require('@prisma/client');
-const axios = require('axios');
+﻿const axios = require('axios');
 const https = require('https');
 const http = require('http');
 
-const prisma = new PrismaClient();
+const prisma = require('../lib/prisma');
 
 // ─── Mensagens fixas por etapa ────────────────────────────────────────────────
 

@@ -1,6 +1,5 @@
-const { PrismaClient } = require('@prisma/client');
-
-const prisma = new PrismaClient();
+﻿
+const prisma = require('../lib/prisma');
 
 const INCLUDE_FOLLOWUP = {
   lead: { select: { id: true, nome: true, telefone: true, status: true } },
