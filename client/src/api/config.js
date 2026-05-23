@@ -6,3 +6,4 @@ export const atualizarDistribuicao = (distribuicaoManual) => api.put('/config/di
 export const atualizarLogo = (formData) => api.put('/config/logo', formData, {
   headers: { 'Content-Type': 'multipart/form-data' },
 })
+export const getLogoUrl = () => api.get('/config/logo-url')

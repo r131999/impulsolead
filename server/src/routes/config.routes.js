@@ -1,9 +1,13 @@
 const { Router } = require('express');
 const { authMiddleware, requireRole } = require('../middleware/auth.middleware');
-const { getConfigAgente, atualizarConfigAgente, atualizarDistribuicao, atualizarLogo } = require('../controllers/config.controller');
+const { getConfigAgente, atualizarConfigAgente, atualizarDistribuicao, atualizarLogo, getLogoImobiliaria } = require('../controllers/config.controller');
 
 const router = Router();
 router.use(authMiddleware);
+
+// Acessível a todos os roles autenticados (gestor, gerente, corretor)
+router.get('/logo-url', getLogoImobiliaria);
+
 router.use(requireRole('gestor', 'admin'));
 
 router.get('/agente', getConfigAgente);

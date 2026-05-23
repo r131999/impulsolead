@@ -71,6 +71,14 @@ async function atualizarLogo(req, res) {
   });
 }
 
+async function getLogoImobiliaria(req, res) {
+  const imob = await prisma.imobiliaria.findUnique({
+    where: { id: req.imobiliariaId },
+    select: { logoUrl: true },
+  });
+  res.json({ logoUrl: imob?.logoUrl || null });
+}
+
 async function getConfigAgente(req, res) {
   const config = await prisma.configAgente.findUnique({
     where: { imobiliariaId: req.imobiliariaId },
@@ -140,4 +148,4 @@ async function atualizarDistribuicao(req, res) {
   res.json({ ok: true, distribuicaoManual: config.distribuicaoManual });
 }
 
-module.exports = { getConfigAgente, atualizarConfigAgente, atualizarDistribuicao, atualizarLogo };
+module.exports = { getLogoImobiliaria, getConfigAgente, atualizarConfigAgente, atualizarDistribuicao, atualizarLogo };

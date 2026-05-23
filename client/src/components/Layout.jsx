@@ -1,8 +1,9 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { Avatar, redimensionarImagem } from './Avatar'
 import ChatInterno from '../pages/ChatInterno'
+import { getLogoUrl } from '../api/config'
 
 const NAV_GESTOR = [
   { to: '/dashboard',        label: 'Dashboard',         icon: ChartIcon },
@@ -40,7 +41,14 @@ export default function Layout() {
   const navigate = useNavigate()
   const [aberta, setAberta] = useState(false)
   const [salvandoFoto, setSalvandoFoto] = useState(false)
+  const [logoUrl, setLogoUrl] = useState(null)
   const fotoInputRef = useRef(null)
+
+  useEffect(() => {
+    getLogoUrl()
+      .then((res) => setLogoUrl(res.data.logoUrl))
+      .catch(() => {})
+  }, [])
 
   const handleFoto = async (e) => {
     const file = e.target.files[0]
@@ -89,7 +97,7 @@ export default function Layout() {
 
           <div className="px-5 py-4 border-b border-indigo-800">
             <img
-              src={usuario?.imobiliaria?.logoUrl || '/logo-branca.png'}
+              src={logoUrl || '/logo-branca.png'}
               alt={usuario?.imobiliaria?.nome || 'ImpulsoLead'}
               style={{ height: '32px', maxWidth: '160px', objectFit: 'contain' }}
             />
