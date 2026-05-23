@@ -258,14 +258,16 @@ async function handleMessage(msg) {
       ? rawName.trim()
       : 'Lead WhatsApp';
 
-    // Bloquear números de corretores/gestores
+    // Bloquear números de corretores/gestores (aplicado a todos, inclusive leads existentes)
     if (blockedNumbers.has(phone)) {
       tag(`Mensagem ignorada — número bloqueado: ${phone}`);
       return;
     }
 
-    // ── Verificar se já existe lead ativo no CRM ──────────────────────────────
-    // Se existir: armazena a mensagem e para aqui (sem boas-vindas, sem novo lead)
+    // ── CAMINHO 1: Lead existente ─────────────────────────────────────────────
+    // Verificar ANTES de qualquer cache de novo lead.
+    // Se já existe lead ativo no CRM, salva a mensagem e retorna imediatamente.
+    // Nenhum cache (recentLeads ou conteúdo) é aplicado a leads existentes.
     const leadAtivoResult = await verificarLeadAtivo(phone);
     if (leadAtivoResult.existe && leadAtivoResult.leadId) {
       tag(`Mensagem de lead existente (${phone}) — salvando no chat`);
@@ -273,9 +275,9 @@ async function handleMessage(msg) {
       return;
     }
 
-    // ── Bloqueio de 24h — apenas para envio de boas-vindas ───────────────────
-    // Verifica tanto o phone extraído quanto o senderPn bruto para cobrir o caso
-    // em que o mesmo contato chegou antes como @s.whatsapp.net e agora como @lid
+    // ── CAMINHO 2: Novo lead — caches aplicados apenas a partir daqui ─────────
+    // Bloqueio de 24h: evita criar múltiplos leads ou enviar boas-vindas repetidas.
+    // Verifica phone extraído e senderPn bruto para cobrir @s.whatsapp.net e @lid.
     const senderPnRaw = (key.senderPn || msg.participant || '').split('@')[0].replace(/\D/g, '');
     if (recentLeads.has(phone) || (senderPnRaw && recentLeads.has(senderPnRaw))) {
       tag(`Mensagem ignorada — lead recente (24h): ${phone}`);
