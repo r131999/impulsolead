@@ -290,6 +290,12 @@ export default function ChatLead({ lead, onClose }) {
     if (!loading) scrollParaBaixo()
   }, [mensagens, loading, scrollParaBaixo])
 
+  // Oculta o botão hambúrguer enquanto o chat estiver aberto no mobile
+  useEffect(() => {
+    document.body.classList.add('chat-aberto')
+    return () => document.body.classList.remove('chat-aberto')
+  }, [])
+
   // Fechar com Escape
   useEffect(() => {
     const onKey = (e) => { if (e.key === 'Escape') onClose() }

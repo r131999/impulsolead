@@ -124,7 +124,7 @@
     align-items: center;
     justify-content: center;
     position: fixed;
-    top: 48px;
+    top: 10px;
     left: 10px;
     z-index: 9999;
     width: 40px;
@@ -138,6 +138,10 @@
     line-height: 1;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
     -webkit-tap-highlight-color: transparent;
+  }
+
+  body.chat-aberto .hamburger-btn {
+    display: none !important;
   }
 
   .app-sidebar {
