@@ -29,7 +29,8 @@ server {
     }
 
     # Proxy para arquivos de upload do backend
-    location /uploads/ {
+    # ^~ garante prioridade sobre o bloco de assets ~* (regex), evitando 404
+    location ^~ /uploads/ {
         proxy_pass ${BACKEND_URL}/uploads/;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
