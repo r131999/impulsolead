@@ -62,19 +62,31 @@ export default function Layout() {
   return (
     <>
       <div className="app-shell">
-        <button
-          className="hamburger-btn"
-          onClick={() => setAberta(v => !v)}
-          aria-label={aberta ? 'Fechar menu' : 'Abrir menu'}
-        >
-          {aberta ? '✕' : '☰'}
-        </button>
+        {!aberta && (
+          <button
+            className="hamburger-btn"
+            onClick={() => setAberta(true)}
+            aria-label="Abrir menu"
+          >
+            ☰
+          </button>
+        )}
 
         {aberta && (
           <div className="sidebar-overlay" onClick={fechar} />
         )}
 
         <aside className={`app-sidebar${aberta ? ' sidebar-open' : ''}`}>
+          {aberta && (
+            <button
+              className="hamburger-btn-fechar"
+              onClick={fechar}
+              aria-label="Fechar menu"
+            >
+              ✕
+            </button>
+          )}
+
           <div className="px-5 py-4 border-b border-indigo-800">
             <img src="/logo-branca.png" alt="ImpulsoLead" style={{ height: '32px' }} />
             <p className="text-indigo-300 text-xs mt-0.5 truncate">{usuario?.imobiliaria?.nome}</p>
