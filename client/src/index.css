@@ -144,6 +144,18 @@
     display: none !important;
   }
 
+  .chat-lead-modal {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100vw !important;
+    height: 100dvh !important;
+    max-height: 100dvh !important;
+    overflow: hidden !important;
+    touch-action: pan-y;
+    -webkit-overflow-scrolling: touch;
+  }
+
   .hamburger-btn-fechar {
     display: flex;
     align-items: center;

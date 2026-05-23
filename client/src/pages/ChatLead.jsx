@@ -377,13 +377,15 @@ export default function ChatLead({ lead, onClose }) {
         onClick={onClose}
       >
         <div
-          className="relative flex flex-col w-full sm:rounded-2xl shadow-2xl overflow-hidden"
+          className="chat-lead-modal relative flex flex-col w-full sm:rounded-2xl shadow-2xl overflow-hidden"
           style={{
             backgroundColor: '#0B1120',
             border: '1px solid #1E293B',
             maxWidth: 680,
             height: '100dvh',
             maxHeight: '100dvh',
+            touchAction: 'pan-y',
+            WebkitOverflowScrolling: 'touch',
           }}
           onClick={(e) => e.stopPropagation()}
         >
@@ -415,7 +417,11 @@ export default function ChatLead({ lead, onClose }) {
           </div>
 
           {/* ── Mensagens ── */}
-          <div ref={mensagensRef} className="flex-1 overflow-y-auto px-4 py-4">
+          <div
+            ref={mensagensRef}
+            className="flex-1 px-4 py-4"
+            style={{ overflowY: 'scroll', WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' }}
+          >
             {loading && (
               <div className="flex justify-center items-center h-full">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-500" />
