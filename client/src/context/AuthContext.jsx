@@ -20,6 +20,13 @@ export function AuthProvider({ children }) {
     }
   }, [])
 
+  const register = async (data) => {
+    const res = await authApi.register(data)
+    localStorage.setItem('token', res.data.token)
+    setUsuario(res.data.usuario)
+    return res.data
+  }
+
   const login = async (email, senha) => {
     const res = await authApi.login(email, senha)
     localStorage.setItem('token', res.data.token)
@@ -61,7 +68,7 @@ export function AuthProvider({ children }) {
   const isGestor = usuario?.role === 'gestor' || usuario?.role === 'admin'
 
   return (
-    <AuthContext.Provider value={{ usuario, loading, login, loginCorretor, logout, isCorretor, isGerente, isGestor, atualizarFotoPerfil, atualizarLogoImobiliaria }}>
+    <AuthContext.Provider value={{ usuario, loading, register, login, loginCorretor, logout, isCorretor, isGerente, isGestor, atualizarFotoPerfil, atualizarLogoImobiliaria }}>
       {children}
     </AuthContext.Provider>
   )

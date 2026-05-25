@@ -23,6 +23,7 @@ import AdminLogin from './pages/admin/AdminLogin'
 import AdminDashboard from './pages/admin/AdminDashboard'
 import ArquivosImovel from './pages/ArquivosImovel'
 import ConectarWhatsApp from './pages/ConectarWhatsApp'
+import Cadastro from './pages/Cadastro'
 
 function HomeRedirect() {
   const { usuario } = useAuth()
@@ -37,6 +38,7 @@ export default function App() {
       <AuthProvider>
         <Routes>
           <Route path="/login" element={<Login />} />
+          <Route path="/cadastro" element={<Cadastro />} />
           <Route
             path="/"
             element={

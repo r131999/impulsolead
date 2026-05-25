@@ -1,21 +1,13 @@
 import { useState, useEffect } from 'react'
-import { useNavigate, Navigate } from 'react-router-dom'
+import { Link, useNavigate, Navigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { register as registerApi } from '../api/auth'
 
 export default function Login() {
   const { usuario, login, loginCorretor } = useAuth()
   const navigate = useNavigate()
 
-  const [modo, setModo] = useState('login')
   const [perfil, setPerfil] = useState('gestor')
-  const [form, setForm] = useState({
-    email: '',
-    senha: '',
-    nomeUsuario: '',
-    nomeImobiliaria: '',
-    telefone: '',
-  })
+  const [form, setForm] = useState({ email: '', senha: '' })
   const [erro, setErro] = useState('')
   const [loading, setLoading] = useState(false)
   const [mostrarSenha, setMostrarSenha] = useState(false)
@@ -40,28 +32,15 @@ export default function Login() {
     setErro('')
     setLoading(true)
     try {
-      if (modo === 'login') {
-        if (perfil === 'corretor') {
-          await loginCorretor(form.email, form.senha)
-          navigate('/meus-leads')
-        } else {
-          await login(form.email, form.senha)
-          navigate('/dashboard')
-        }
+      if (perfil === 'corretor') {
+        await loginCorretor(form.email, form.senha)
+        navigate('/meus-leads')
       } else {
-        const res = await registerApi({
-          nomeImobiliaria: form.nomeImobiliaria,
-          nomeUsuario: form.nomeUsuario,
-          email: form.email,
-          senha: form.senha,
-          telefone: form.telefone,
-        })
-        localStorage.setItem('token', res.data.token)
         await login(form.email, form.senha)
         navigate('/dashboard')
       }
     } catch (err) {
-      setErro(err.response?.data?.error || 'Erro ao autenticar')
+      setErro(err.response?.data?.error || 'Credenciais inválidas')
     } finally {
       setLoading(false)
     }
@@ -86,13 +65,13 @@ export default function Login() {
         )}
 
         <div className="rounded-2xl shadow-2xl p-8" style={{ backgroundColor: '#111827', border: '1px solid #1E293B' }}>
-          {/* Tabs gestor/corretor/registrar */}
+          {/* Tabs Gestor / Corretor */}
           <div className="flex rounded-lg p-1 mb-6" style={{ backgroundColor: '#0B1120' }}>
             <button
-              onClick={() => { setModo('login'); setPerfil('gestor'); setErro('') }}
+              onClick={() => { setPerfil('gestor'); setErro('') }}
               className="flex-1 py-1.5 text-sm font-medium rounded-md transition-colors"
               style={
-                modo === 'login' && perfil === 'gestor'
+                perfil === 'gestor'
                   ? { backgroundColor: '#1a2332', color: '#F1F5F9', boxShadow: '0 1px 3px rgba(0,0,0,0.4)' }
                   : { color: '#64748B' }
               }
@@ -100,70 +79,25 @@ export default function Login() {
               Gestor
             </button>
             <button
-              onClick={() => { setModo('login'); setPerfil('corretor'); setErro('') }}
+              onClick={() => { setPerfil('corretor'); setErro('') }}
               className="flex-1 py-1.5 text-sm font-medium rounded-md transition-colors"
               style={
-                modo === 'login' && perfil === 'corretor'
+                perfil === 'corretor'
                   ? { backgroundColor: '#1a2332', color: '#F1F5F9', boxShadow: '0 1px 3px rgba(0,0,0,0.4)' }
                   : { color: '#64748B' }
               }
             >
               Corretor
             </button>
-            <button
-              onClick={() => { setModo('register'); setPerfil('gestor'); setErro('') }}
-              className="flex-1 py-1.5 text-sm font-medium rounded-md transition-colors"
-              style={
-                modo === 'register'
-                  ? { backgroundColor: '#1a2332', color: '#F1F5F9', boxShadow: '0 1px 3px rgba(0,0,0,0.4)' }
-                  : { color: '#64748B' }
-              }
-            >
-              Criar conta
-            </button>
           </div>
 
-          {modo === 'login' && perfil === 'corretor' && (
+          {perfil === 'corretor' && (
             <p className="text-xs mb-4 px-3 py-2 rounded-lg" style={{ color: '#818cf8', backgroundColor: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)' }}>
               Acesso para corretores — credenciais fornecidas pelo gestor
             </p>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            {modo === 'register' && (
-              <>
-                <div>
-                  <label className="label">Nome da imobiliária</label>
-                  <input
-                    className="input"
-                    value={form.nomeImobiliaria}
-                    onChange={set('nomeImobiliaria')}
-                    placeholder="Ex: Imobiliária Exemplo"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="label">Seu nome</label>
-                  <input
-                    className="input"
-                    value={form.nomeUsuario}
-                    onChange={set('nomeUsuario')}
-                    placeholder="Ex: João Silva"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="label">Telefone</label>
-                  <input
-                    className="input"
-                    value={form.telefone}
-                    onChange={set('telefone')}
-                    placeholder="(11) 99999-9999"
-                  />
-                </div>
-              </>
-            )}
-
             <div>
               <label className="label">E-mail</label>
               <input
@@ -172,6 +106,7 @@ export default function Login() {
                 value={form.email}
                 onChange={set('email')}
                 placeholder="voce@email.com"
+                autoFocus
                 required
               />
             </div>
@@ -208,19 +143,17 @@ export default function Login() {
             )}
 
             <button type="submit" className="btn-primary w-full py-2.5" disabled={loading}>
-              {loading
-                ? 'Aguarde...'
-                : modo === 'register'
-                ? 'Criar conta'
-                : perfil === 'corretor'
-                ? 'Entrar como corretor'
-                : 'Entrar'}
+              {loading ? 'Entrando…' : perfil === 'corretor' ? 'Entrar como corretor' : 'Entrar'}
             </button>
           </form>
 
-          {modo === 'register' && (
-            <p className="text-xs text-center mt-4" style={{ color: '#64748B' }}>
-              7 dias grátis, sem cartão de crédito
+          {/* Link para cadastro */}
+          {perfil === 'gestor' && (
+            <p className="text-center mt-5 text-sm" style={{ color: '#64748B' }}>
+              Não tem conta?{' '}
+              <Link to="/cadastro" className="font-medium hover:underline" style={{ color: '#818cf8' }}>
+                Criar conta grátis →
+              </Link>
             </p>
           )}
         </div>
