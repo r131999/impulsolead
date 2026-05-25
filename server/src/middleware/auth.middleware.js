@@ -3,16 +3,11 @@
 const prisma = require('../lib/prisma');
 
 function verificarPlano(imobiliaria) {
+  if (imobiliaria.plano === 'legado') return null;
   if (imobiliaria.plano === 'cancelado') {
     return { error: 'Plano cancelado. Entre em contato com o suporte.' };
   }
-  if (
-    imobiliaria.plano === 'trial' &&
-    imobiliaria.trialExpiraEm &&
-    new Date() > new Date(imobiliaria.trialExpiraEm)
-  ) {
-    return { error: 'Período de teste expirado. Entre em contato com o suporte.' };
-  }
+  // planoBloqueadoEm é tratado pelo frontend via planoInfo (overlay completo)
   return null;
 }
 
@@ -44,7 +39,7 @@ async function authMiddleware(req, res, next) {
         where: { id: decoded.corretorId },
         include: {
           imobiliaria: {
-            select: { id: true, nome: true, plano: true, trialExpiraEm: true },
+            select: { id: true, nome: true, plano: true, trialExpiraEm: true, planoExpiraEm: true, planoBloqueadoEm: true, criadoEm: true },
           },
         },
       });
@@ -67,7 +62,7 @@ async function authMiddleware(req, res, next) {
         where: { id: decoded.userId },
         include: {
           imobiliaria: {
-            select: { id: true, nome: true, plano: true, trialExpiraEm: true },
+            select: { id: true, nome: true, plano: true, trialExpiraEm: true, planoExpiraEm: true, planoBloqueadoEm: true, criadoEm: true },
           },
         },
       });

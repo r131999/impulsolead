@@ -24,6 +24,7 @@ import AdminDashboard from './pages/admin/AdminDashboard'
 import ArquivosImovel from './pages/ArquivosImovel'
 import ConectarWhatsApp from './pages/ConectarWhatsApp'
 import Cadastro from './pages/Cadastro'
+import Planos from './pages/Planos'
 
 function HomeRedirect() {
   const { usuario } = useAuth()
@@ -58,6 +59,7 @@ export default function App() {
             <Route path="relatorios" element={<Relatorios />} />
             <Route path="config" element={<ConfigAgente />} />
             <Route path="whatsapp" element={<ConectarWhatsApp />} />
+            <Route path="planos" element={<Planos />} />
 
             {/* Rotas compartilhadas */}
             <Route path="chat" element={<Chat />} />

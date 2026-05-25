@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import * as arquivosApi from '../api/arquivos-imovel'
+import { useAuth } from '../context/AuthContext'
 
 const TIPOS = ['todos', 'foto', 'video', 'pdf']
 const ICONE_TIPO = { foto: '🖼️', video: '🎬', pdf: '📄' }
@@ -141,6 +142,9 @@ function ModalUpload({ onSalvo, onClose }) {
 // ── Página principal ───────────────────────────────────────────────────────────
 
 export default function ArquivosImovel() {
+  const { planoInfo } = useAuth()
+  const precisaUpgrade = planoInfo?.plano === 'gratuito'
+
   const [arquivos, setArquivos] = useState([])
   const [loading, setLoading] = useState(true)
   const [filtro, setFiltro] = useState('todos')
@@ -169,6 +173,27 @@ export default function ArquivosImovel() {
   }
 
   const filtrados = filtro === 'todos' ? arquivos : arquivos.filter((a) => a.tipo === filtro)
+
+  if (precisaUpgrade) {
+    return (
+      <div className="p-4 md:p-6 max-w-3xl mx-auto">
+        <h1 className="text-xl font-bold mb-6" style={{ color: '#F1F5F9' }}>📁 Arquivos de Imóveis</h1>
+        <div style={{ position: 'relative', minHeight: 320, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ position: 'absolute', inset: 0, backdropFilter: 'blur(4px)', backgroundColor: 'rgba(0,0,0,0.4)', borderRadius: 12, zIndex: 10 }} />
+          <div style={{ position: 'relative', zIndex: 20, textAlign: 'center', padding: '2rem' }}>
+            <div style={{ fontSize: 40, marginBottom: 12 }}>🔐</div>
+            <h3 style={{ color: '#F1F5F9', fontSize: 18, fontWeight: 700, marginBottom: 8 }}>
+              Arquivos de Imóveis disponível a partir do plano Starter
+            </h3>
+            <p style={{ color: '#94A3B8', marginBottom: 20, fontSize: 14 }}>Faça upgrade para acessar esta funcionalidade.</p>
+            <a href="/planos" style={{ display: 'inline-block', backgroundColor: '#6366F1', color: '#fff', fontWeight: 700, padding: '10px 24px', borderRadius: 8, textDecoration: 'none', fontSize: 14 }}>
+              Ver planos
+            </a>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-col h-full">

@@ -4,6 +4,7 @@ import {
   Tooltip, ResponsiveContainer, PieChart, Pie, Cell,
 } from 'recharts'
 import { getRelatorios, getRelatoriosEquipes, getRelatoriosOrigem } from '../api/relatorios'
+import { useAuth } from '../context/AuthContext'
 
 const CORES_FUNIL = {
   lead:        '#3b82f6',
@@ -27,7 +28,33 @@ const TOOLTIP_STYLE = {
 
 const LABEL_STYLE = { color: '#94A3B8' }
 
+function OverlayUpgrade({ recurso }) {
+  return (
+    <div style={{ position: 'relative', minHeight: 400, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ position: 'absolute', inset: 0, backdropFilter: 'blur(4px)', backgroundColor: 'rgba(0,0,0,0.4)', borderRadius: 12, zIndex: 10 }} />
+      <div style={{ position: 'relative', zIndex: 20, textAlign: 'center', padding: '2rem' }}>
+        <div style={{ fontSize: 40, marginBottom: 12 }}>🔐</div>
+        <h3 style={{ color: '#F1F5F9', fontSize: 18, fontWeight: 700, marginBottom: 8 }}>
+          {recurso} disponível a partir do plano Starter
+        </h3>
+        <p style={{ color: '#94A3B8', marginBottom: 20, fontSize: 14 }}>
+          Faça upgrade para acessar esta funcionalidade.
+        </p>
+        <a
+          href="/planos"
+          style={{ display: 'inline-block', backgroundColor: '#6366F1', color: '#fff', fontWeight: 700, padding: '10px 24px', borderRadius: 8, textDecoration: 'none', fontSize: 14 }}
+        >
+          Ver planos
+        </a>
+      </div>
+    </div>
+  )
+}
+
 export default function Relatorios() {
+  const { planoInfo } = useAuth()
+  const plano = planoInfo?.plano
+  const precisaUpgrade = plano === 'gratuito'
   const [aba, setAba] = useState('geral')
   const [dados, setDados] = useState(null)
   const [dadosEquipes, setDadosEquipes] = useState(null)
@@ -61,6 +88,15 @@ export default function Relatorios() {
         .finally(() => setLoadingOrigem(false))
     }
   }, [aba, periodo])
+
+  if (precisaUpgrade) {
+    return (
+      <div className="p-4 md:p-6 max-w-3xl mx-auto">
+        <h1 className="text-xl font-bold mb-6" style={{ color: '#F1F5F9' }}>Relatórios</h1>
+        <OverlayUpgrade recurso="Relatórios" />
+      </div>
+    )
+  }
 
   return (
     <div className="p-4 md:p-6 max-w-7xl mx-auto">

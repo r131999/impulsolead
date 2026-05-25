@@ -13,9 +13,12 @@ model Imobiliaria {
   email         String    @unique
   telefone      String?
   logoUrl       String?
-  plano         String    @default("trial")
-  trialExpiraEm DateTime?
-  apiKey        String    @unique
+  plano                 String    @default("trial")
+  trialExpiraEm         DateTime?
+  planoExpiraEm         DateTime?
+  planoBloqueadoEm      DateTime?
+  notificacaoVencimento Boolean   @default(false)
+  apiKey                String    @unique
   criadoEm      DateTime  @default(now())
   atualizadoEm  DateTime  @updatedAt
 

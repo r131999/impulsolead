@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { enviar } from '../api/chat'
+import { useAuth } from '../context/AuthContext'
 
 const SUGESTOES = [
   'Quais imóveis estão disponíveis?',
@@ -9,11 +10,34 @@ const SUGESTOES = [
 ]
 
 export default function Chat() {
+  const { planoInfo } = useAuth()
+  const precisaUpgrade = ['gratuito', 'starter'].includes(planoInfo?.plano)
+
   const [mensagens, setMensagens] = useState([])
   const [texto, setTexto] = useState('')
   const [carregando, setCarregando] = useState(false)
   const fimRef = useRef(null)
   const inputRef = useRef(null)
+
+  if (precisaUpgrade) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', padding: '2rem' }}>
+        <div style={{ textAlign: 'center', maxWidth: 400 }}>
+          <div style={{ fontSize: 48, marginBottom: 16 }}>🤖</div>
+          <h2 style={{ color: '#F1F5F9', fontSize: 20, fontWeight: 700, marginBottom: 8 }}>Assistente IA</h2>
+          <p style={{ color: '#94A3B8', marginBottom: 24, fontSize: 14, lineHeight: 1.6 }}>
+            O Assistente IA está disponível apenas no plano Pro. Faça upgrade para ter acesso a respostas inteligentes e análise de conversas.
+          </p>
+          <a
+            href="/planos"
+            style={{ display: 'inline-block', backgroundColor: '#6366F1', color: '#fff', fontWeight: 700, padding: '12px 28px', borderRadius: 8, textDecoration: 'none', fontSize: 14 }}
+          >
+            Ver planos
+          </a>
+        </div>
+      </div>
+    )
+  }
 
   useEffect(() => {
     fimRef.current?.scrollIntoView({ behavior: 'smooth' })

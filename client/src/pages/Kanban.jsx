@@ -107,7 +107,8 @@ function extrairTimestamp(texto) {
 }
 
 export default function Kanban() {
-  const { isCorretor, isGerente } = useAuth()
+  const { isCorretor, isGerente, isBloqueado, planoInfo } = useAuth()
+  const chatHabilitado = !['gratuito', 'starter'].includes(planoInfo?.plano)
   const [grupos, setGrupos] = useState(() => agrupar([]))
   const [loading, setLoading] = useState(true)
   const [modal, setModal] = useState(null)
@@ -269,7 +270,9 @@ export default function Kanban() {
                     atualizando={atualizando === lead.id}
                     followUp={followUpsMap[lead.id] || null}
                     podeGerenciar={!isCorretor}
-                    onDetalhes={() => setModalDetalhes(lead)}
+                    bloqueado={isBloqueado}
+                    chatHabilitado={chatHabilitado}
+                    onDetalhes={() => !isBloqueado && setModalDetalhes(lead)}
                     onAvancar={() => avancar(lead)}
                     onVoltar={() => voltar(lead)}
                     onPerdido={() => abrirPerda(lead)}
@@ -341,7 +344,7 @@ export default function Kanban() {
   )
 }
 
-function LeadCard({ lead, atualizando, followUp, podeGerenciar, onDetalhes, onAvancar, onVoltar, onPerdido, onFollowUp, onChat, onDistribuir }) {
+function LeadCard({ lead, atualizando, followUp, podeGerenciar, bloqueado, chatHabilitado, onDetalhes, onAvancar, onVoltar, onPerdido, onFollowUp, onChat, onDistribuir }) {
   const proximo = proximoStatus(lead.status)
   const podeAvancar = !!proximo
   const podePerdido = lead.status !== 'venda' && lead.status !== 'perdido'
@@ -358,6 +361,9 @@ function LeadCard({ lead, atualizando, followUp, podeGerenciar, onDetalhes, onAv
         border: pendente ? '1px solid rgba(239,68,68,0.4)' : fuInfo?.cor === '#EF4444' ? '1px solid rgba(239,68,68,0.35)' : '1px solid #1E293B',
         boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
         opacity: atualizando ? 0.6 : 1,
+        filter: bloqueado ? 'blur(6px)' : 'none',
+        pointerEvents: bloqueado ? 'none' : 'auto',
+        userSelect: bloqueado ? 'none' : 'auto',
       }}
     >
       <div className="flex items-start justify-between gap-1">
@@ -380,12 +386,13 @@ function LeadCard({ lead, atualizando, followUp, podeGerenciar, onDetalhes, onAv
             </span>
           )}
           <button
-            onClick={onChat}
+            onClick={chatHabilitado ? onChat : undefined}
+            disabled={!chatHabilitado}
             className="text-sm leading-none flex items-center justify-center rounded transition-colors"
-            style={{ color: '#64748B', minWidth: 36, minHeight: 36 }}
-            onMouseEnter={(e) => { e.currentTarget.style.color = '#94A3B8'; e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.06)' }}
-            onMouseLeave={(e) => { e.currentTarget.style.color = '#64748B'; e.currentTarget.style.backgroundColor = 'transparent' }}
-            title="Abrir chat com lead"
+            style={{ color: chatHabilitado ? '#64748B' : '#374151', minWidth: 36, minHeight: 36, cursor: chatHabilitado ? 'pointer' : 'not-allowed' }}
+            onMouseEnter={(e) => { if (chatHabilitado) { e.currentTarget.style.color = '#94A3B8'; e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.06)' } }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = chatHabilitado ? '#64748B' : '#374151'; e.currentTarget.style.backgroundColor = 'transparent' }}
+            title={chatHabilitado ? 'Abrir chat com lead' : 'Disponível no plano Pro'}
           >
             💬
           </button>

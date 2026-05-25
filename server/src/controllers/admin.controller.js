@@ -81,28 +81,34 @@ async function listarClientes(req, res) {
 
 async function atualizarPlano(req, res) {
   const { id } = req.params;
-  const { plano, diasExtender } = req.body;
+  const { plano, planoExpiraEm, diasExtender } = req.body;
+
+  const validPlanos = ['trial', 'gratuito', 'starter', 'pro', 'legado', 'cancelado'];
+  if (!validPlanos.includes(plano)) {
+    return res.status(400).json({ error: `Plano inválido. Use: ${validPlanos.join(', ')}` });
+  }
 
   const imobiliaria = await prisma.imobiliaria.findUnique({ where: { id } });
   if (!imobiliaria) {
     return res.status(404).json({ error: 'Imobiliária não encontrada' });
   }
 
-  let data = {};
-  if (plano === 'ativo') {
-    data = { plano: 'ativo', trialExpiraEm: null };
-  } else if (plano === 'cancelado') {
-    data = { plano: 'cancelado' };
-  } else if (plano === 'trial') {
+  // Ao atualizar plano pelo admin, sempre limpa o bloqueio
+  const data = { plano, planoBloqueadoEm: null, notificacaoVencimento: false };
+
+  if (plano === 'trial') {
     const dias = diasExtender && Number.isInteger(diasExtender) && diasExtender > 0
-      ? diasExtender
-      : 7;
-    data = {
-      plano: 'trial',
-      trialExpiraEm: new Date(Date.now() + dias * 24 * 60 * 60 * 1000),
-    };
-  } else {
-    return res.status(400).json({ error: 'Plano inválido. Use: trial, ativo ou cancelado' });
+      ? diasExtender : 7;
+    data.trialExpiraEm = new Date(Date.now() + dias * 24 * 60 * 60 * 1000);
+    data.planoExpiraEm = null;
+  } else if (['gratuito', 'starter', 'pro'].includes(plano)) {
+    data.planoExpiraEm = planoExpiraEm
+      ? new Date(planoExpiraEm)
+      : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+    data.trialExpiraEm = null;
+  } else if (plano === 'legado') {
+    data.planoExpiraEm = null;
+    data.trialExpiraEm = null;
   }
 
   const atualizado = await prisma.imobiliaria.update({ where: { id }, data });
@@ -111,7 +117,47 @@ async function atualizarPlano(req, res) {
     nome: atualizado.nome,
     plano: atualizado.plano,
     trialExpiraEm: atualizado.trialExpiraEm,
-    statusPlano: calcStatusPlano(atualizado.plano, atualizado.trialExpiraEm),
+    planoExpiraEm: atualizado.planoExpiraEm,
+    planoBloqueadoEm: atualizado.planoBloqueadoEm,
+  });
+}
+
+async function getPlanoCliente(req, res) {
+  const { id } = req.params;
+  const imobiliaria = await prisma.imobiliaria.findUnique({
+    where: { id },
+    select: {
+      id: true, nome: true, plano: true, trialExpiraEm: true,
+      planoExpiraEm: true, planoBloqueadoEm: true,
+      notificacaoVencimento: true, criadoEm: true,
+    },
+  });
+  if (!imobiliaria) return res.status(404).json({ error: 'Imobiliária não encontrada' });
+
+  const agora = new Date();
+  let expiraEm = null;
+  let diasRestantes = null;
+  if (imobiliaria.plano === 'trial') {
+    expiraEm = imobiliaria.trialExpiraEm
+      ? new Date(imobiliaria.trialExpiraEm)
+      : new Date(new Date(imobiliaria.criadoEm).getTime() + 7 * 24 * 60 * 60 * 1000);
+    diasRestantes = Math.max(0, Math.ceil((expiraEm - agora) / (1000 * 60 * 60 * 24)));
+  } else if (imobiliaria.planoExpiraEm) {
+    expiraEm = new Date(imobiliaria.planoExpiraEm);
+    diasRestantes = Math.max(0, Math.ceil((expiraEm - agora) / (1000 * 60 * 60 * 24)));
+  }
+
+  res.json({
+    id: imobiliaria.id,
+    nome: imobiliaria.nome,
+    plano: imobiliaria.plano,
+    trialExpiraEm: imobiliaria.trialExpiraEm,
+    planoExpiraEm: imobiliaria.planoExpiraEm,
+    planoBloqueadoEm: imobiliaria.planoBloqueadoEm,
+    notificacaoVencimento: imobiliaria.notificacaoVencimento,
+    expiraEm: expiraEm ? expiraEm.toISOString() : null,
+    diasRestantes,
+    bloqueado: !!imobiliaria.planoBloqueadoEm,
   });
 }
 
@@ -235,4 +281,4 @@ async function getStats(req, res) {
   });
 }
 
-module.exports = { listarClientes, atualizarPlano, criarCliente, getStats };
+module.exports = { listarClientes, atualizarPlano, getPlanoCliente, criarCliente, getStats };

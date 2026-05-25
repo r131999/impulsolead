@@ -201,6 +201,75 @@ async function enviarRelatorioSemanal() {
   }
 }
 
+// ── Job 3: verificar planos vencendo / expirados ──────────────────────────────
+
+async function verificarPlanoVencimento() {
+  console.log('[cron] Verificando planos vencendo/vencidos...');
+  const agora = new Date();
+  const em3Dias = new Date(agora.getTime() + 3 * 24 * 60 * 60 * 1000);
+  const ha5Dias = new Date(agora.getTime() - 5 * 24 * 60 * 60 * 1000);
+
+  // 1. Marcar notificacaoVencimento para planos pagos vencendo em <= 3 dias
+  await prisma.imobiliaria.updateMany({
+    where: {
+      plano: { notIn: ['legado', 'cancelado', 'trial'] },
+      planoBloqueadoEm: null,
+      planoExpiraEm: { gte: agora, lte: em3Dias },
+    },
+    data: { notificacaoVencimento: true },
+  });
+
+  // Trials vencendo em <= 3 dias (precisamos fazer em JS pois a data é calculada)
+  const todosTrials = await prisma.imobiliaria.findMany({
+    where: { plano: 'trial', planoBloqueadoEm: null },
+    select: { id: true, trialExpiraEm: true, criadoEm: true },
+  });
+
+  const trialsExpirando = todosTrials.filter((imob) => {
+    const expira = imob.trialExpiraEm
+      ? new Date(imob.trialExpiraEm)
+      : new Date(new Date(imob.criadoEm).getTime() + 7 * 24 * 60 * 60 * 1000);
+    const dias = (expira - agora) / (1000 * 60 * 60 * 24);
+    return dias >= 0 && dias <= 3;
+  }).map((imob) => imob.id);
+
+  if (trialsExpirando.length > 0) {
+    await prisma.imobiliaria.updateMany({
+      where: { id: { in: trialsExpirando } },
+      data: { notificacaoVencimento: true },
+    });
+    console.log(`[cron] ${trialsExpirando.length} trial(s) marcado(s) para notificação`);
+  }
+
+  // 2. Bloquear planos pagos vencidos há mais de 5 dias
+  await prisma.imobiliaria.updateMany({
+    where: {
+      plano: { notIn: ['legado', 'cancelado'] },
+      planoBloqueadoEm: null,
+      planoExpiraEm: { lt: ha5Dias },
+    },
+    data: { planoBloqueadoEm: agora },
+  });
+
+  // 3. Bloquear trials expirados há mais de 5 dias
+  const trialsParaBloquear = todosTrials.filter((imob) => {
+    const expira = imob.trialExpiraEm
+      ? new Date(imob.trialExpiraEm)
+      : new Date(new Date(imob.criadoEm).getTime() + 7 * 24 * 60 * 60 * 1000);
+    return expira < ha5Dias;
+  }).map((imob) => imob.id);
+
+  if (trialsParaBloquear.length > 0) {
+    await prisma.imobiliaria.updateMany({
+      where: { id: { in: trialsParaBloquear } },
+      data: { planoBloqueadoEm: agora },
+    });
+    console.log(`[cron] ${trialsParaBloquear.length} trial(s) bloqueado(s)`);
+  }
+
+  console.log('[cron] Verificação de planos concluída');
+}
+
 // ── Inicialização ─────────────────────────────────────────────────────────────
 
 function iniciarCrons() {
@@ -220,7 +289,16 @@ function iniciarCrons() {
     }
   });
 
-  console.log('[cron] Jobs iniciados: leads-parados (a cada 6h) | relatorio-semanal (dom 8h)');
+  // Job 3: verificação de planos — todo dia às 9h Brasília (12h UTC)
+  cron.schedule('0 12 * * *', async () => {
+    try {
+      await verificarPlanoVencimento();
+    } catch (err) {
+      console.error('[cron] Erro no job plano-vencimento:', err.message);
+    }
+  });
+
+  console.log('[cron] Jobs iniciados: leads-parados (6h) | relatorio-semanal (dom 8h) | plano-vencimento (diário 9h)');
 }
 
 module.exports = { iniciarCrons };

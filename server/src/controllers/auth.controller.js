@@ -8,6 +8,32 @@ function gerarApiKey() {
   return crypto.randomBytes(32).toString('hex');
 }
 
+function calcPlanoInfo(imob) {
+  if (!imob) return null;
+  const agora = new Date();
+  const plano = imob.plano;
+  let expiraEm = null;
+  let diasRestantes = null;
+  if (plano === 'trial') {
+    expiraEm = imob.trialExpiraEm
+      ? new Date(imob.trialExpiraEm)
+      : new Date(new Date(imob.criadoEm).getTime() + 7 * 24 * 60 * 60 * 1000);
+    diasRestantes = Math.max(0, Math.ceil((expiraEm - agora) / (1000 * 60 * 60 * 24)));
+  } else if (imob.planoExpiraEm) {
+    expiraEm = new Date(imob.planoExpiraEm);
+    diasRestantes = Math.max(0, Math.ceil((expiraEm - agora) / (1000 * 60 * 60 * 24)));
+  }
+  return {
+    plano,
+    trialExpiraEm: imob.trialExpiraEm || null,
+    planoExpiraEm: imob.planoExpiraEm || null,
+    planoBloqueadoEm: imob.planoBloqueadoEm || null,
+    expiraEm: expiraEm ? expiraEm.toISOString() : null,
+    diasRestantes,
+    bloqueado: !!imob.planoBloqueadoEm,
+  };
+}
+
 const PERGUNTAS_PADRAO = [
   'É o seu primeiro imóvel?',
   'Qual é o seu tipo de renda? (CLT, autônomo, servidor público)',
@@ -143,7 +169,7 @@ async function login(req, res) {
     where: { email },
     include: {
       imobiliaria: {
-        select: { id: true, nome: true, plano: true, trialExpiraEm: true },
+        select: { id: true, nome: true, plano: true, trialExpiraEm: true, planoExpiraEm: true, planoBloqueadoEm: true, criadoEm: true },
       },
     },
   });
@@ -173,6 +199,7 @@ async function login(req, res) {
       fotoPerfil: usuario.fotoPerfil || null,
       imobiliariaId: usuario.imobiliariaId,
       imobiliaria: usuario.imobiliaria,
+      planoInfo: calcPlanoInfo(usuario.imobiliaria),
     },
   });
 }
@@ -261,7 +288,7 @@ async function me(req, res) {
       where: { id: req.corretorId },
       include: {
         imobiliaria: {
-          select: { id: true, nome: true, plano: true, trialExpiraEm: true },
+          select: { id: true, nome: true, plano: true, trialExpiraEm: true, planoExpiraEm: true, planoBloqueadoEm: true, criadoEm: true },
         },
       },
     });
@@ -277,6 +304,7 @@ async function me(req, res) {
       imobiliariaId: corretor.imobiliariaId,
       imobiliaria: corretor.imobiliaria,
       equipeId: req.equipeId || null,
+      planoInfo: calcPlanoInfo(corretor.imobiliaria),
     });
   }
 
@@ -284,7 +312,7 @@ async function me(req, res) {
     where: { id: req.usuario.id },
     include: {
       imobiliaria: {
-        select: { id: true, nome: true, email: true, telefone: true, logoUrl: true, plano: true, trialExpiraEm: true, apiKey: true },
+        select: { id: true, nome: true, email: true, telefone: true, logoUrl: true, plano: true, trialExpiraEm: true, planoExpiraEm: true, planoBloqueadoEm: true, criadoEm: true, apiKey: true },
       },
     },
   });
@@ -301,6 +329,7 @@ async function me(req, res) {
     fotoPerfil: usuario.fotoPerfil || null,
     imobiliariaId: usuario.imobiliariaId,
     imobiliaria: usuario.imobiliaria,
+    planoInfo: calcPlanoInfo(usuario.imobiliaria),
   });
 }
 
@@ -344,7 +373,7 @@ async function loginCorretor(req, res) {
     where: { email, ativo: true, usuarioAtivo: true },
     include: {
       imobiliaria: {
-        select: { id: true, nome: true, plano: true, trialExpiraEm: true },
+        select: { id: true, nome: true, plano: true, trialExpiraEm: true, planoExpiraEm: true, planoBloqueadoEm: true, criadoEm: true },
       },
     },
   });
@@ -356,14 +385,6 @@ async function loginCorretor(req, res) {
   const senhaValida = await bcrypt.compare(senha, corretor.senhaHash);
   if (!senhaValida) {
     return res.status(401).json({ error: 'Credenciais inválidas' });
-  }
-
-  if (
-    corretor.imobiliaria.plano === 'trial' &&
-    corretor.imobiliaria.trialExpiraEm &&
-    new Date() > new Date(corretor.imobiliaria.trialExpiraEm)
-  ) {
-    return res.status(403).json({ error: 'Período de trial expirado. Entre em contato para contratar o plano.' });
   }
 
   const roleCorretor = corretor.role || 'corretor';
@@ -397,6 +418,8 @@ async function loginCorretor(req, res) {
       role: roleCorretor,
       fotoPerfil: corretor.fotoPerfil || null,
       imobiliariaId: corretor.imobiliariaId,
+      imobiliaria: corretor.imobiliaria,
+      planoInfo: calcPlanoInfo(corretor.imobiliaria),
       ...(equipeId && { equipeId }),
     },
   });

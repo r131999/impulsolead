@@ -37,9 +37,22 @@ const NAV_GERENTE = [
   { to: '/chat',                 label: 'Assistente IA',        icon: ChatIAIcon },
 ]
 
+function calcBanner(planoInfo, isCorretor) {
+  if (isCorretor) return null
+  if (!planoInfo) return null
+  if (planoInfo.plano === 'legado') return null
+  if (planoInfo.bloqueado) return { tipo: 'bloqueado' }
+  const dias = planoInfo.diasRestantes
+  if (dias !== null && dias <= 3) {
+    return { tipo: 'aviso', dias, trial: planoInfo.plano === 'trial' }
+  }
+  return null
+}
+
 export default function Layout() {
-  const { usuario, logout, isCorretor, isGerente, atualizarFotoPerfil } = useAuth()
+  const { usuario, logout, isCorretor, isGerente, atualizarFotoPerfil, planoInfo } = useAuth()
   const navigate = useNavigate()
+  const banner = calcBanner(planoInfo, isCorretor)
   const [aberta, setAberta] = useState(false)
   const [salvandoFoto, setSalvandoFoto] = useState(false)
   const [logoUrl, setLogoUrl] = useState(null)
@@ -70,6 +83,54 @@ export default function Layout() {
 
   return (
     <>
+      {/* Overlay de bloqueio total */}
+      {banner?.tipo === 'bloqueado' && (
+        <div
+          style={{
+            position: 'fixed', inset: 0, zIndex: 9999,
+            backgroundColor: 'rgba(0,0,0,0.92)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}
+        >
+          <div style={{ maxWidth: 480, textAlign: 'center', padding: '2rem' }}>
+            <div style={{ fontSize: 48, marginBottom: 16 }}>🔒</div>
+            <h2 style={{ color: '#F87171', fontSize: 22, fontWeight: 700, marginBottom: 12 }}>
+              Acesso suspenso
+            </h2>
+            <p style={{ color: '#CBD5E1', marginBottom: 24, lineHeight: 1.6 }}>
+              Seu acesso foi suspenso por falta de pagamento. Entre em contato para reativar.
+            </p>
+            <div style={{ backgroundColor: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 12, padding: '1rem', marginBottom: 20 }}>
+              <p style={{ color: '#94A3B8', fontSize: 13, marginBottom: 8 }}>Chave PIX</p>
+              <p style={{ color: '#F1F5F9', fontWeight: 600, fontSize: 15 }}>contato@impulsoslz.com.br</p>
+            </div>
+            <a
+              href="https://wa.me/5598981444954"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                display: 'inline-block', backgroundColor: '#25D366', color: '#fff',
+                fontWeight: 700, padding: '12px 28px', borderRadius: 8, textDecoration: 'none', fontSize: 15,
+              }}
+            >
+              📲 WhatsApp (98) 98144-4954
+            </a>
+          </div>
+        </div>
+      )}
+
+      {/* Banner de aviso de vencimento */}
+      {banner?.tipo === 'aviso' && (
+        <div style={{ backgroundColor: '#92400E', color: '#FEF3C7', padding: '8px 16px', textAlign: 'center', fontSize: 14, fontWeight: 500 }}>
+          {banner.trial
+            ? `⚠️ Seu trial vence em ${banner.dias} dia${banner.dias !== 1 ? 's' : ''}. `
+            : `⚠️ Seu plano vence em ${banner.dias} dia${banner.dias !== 1 ? 's' : ''}. `}
+          {banner.trial
+            ? <a href="/planos" style={{ color: '#FDE68A', textDecoration: 'underline' }}>Escolha um plano para continuar.</a>
+            : <a href="/planos" style={{ color: '#FDE68A', textDecoration: 'underline' }}>Renove para não perder o acesso.</a>}
+        </div>
+      )}
+
       <div className="app-shell">
         {!aberta && (
           <button

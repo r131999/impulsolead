@@ -66,9 +66,12 @@ export function AuthProvider({ children }) {
   const isCorretor = usuario?.role === 'corretor'
   const isGerente = usuario?.role === 'gerente'
   const isGestor = usuario?.role === 'gestor' || usuario?.role === 'admin'
+  const planoInfo = usuario?.planoInfo ?? null
+  const isBloqueado = !!planoInfo?.planoBloqueadoEm
+  const isLegado = planoInfo?.plano === 'legado'
 
   return (
-    <AuthContext.Provider value={{ usuario, loading, register, login, loginCorretor, logout, isCorretor, isGerente, isGestor, atualizarFotoPerfil, atualizarLogoImobiliaria }}>
+    <AuthContext.Provider value={{ usuario, loading, register, login, loginCorretor, logout, isCorretor, isGerente, isGestor, atualizarFotoPerfil, atualizarLogoImobiliaria, planoInfo, isBloqueado, isLegado }}>
       {children}
     </AuthContext.Provider>
   )
