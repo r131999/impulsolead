@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import QRCode from 'react-qr-code'
 import { getStatusWhatsapp, conectarWhatsapp, deletarSessaoWhats } from '../api/whatsapp'
+import { getConfig, atualizarConfig } from '../api/config'
 
 const STATUS_LABEL = {
   conectado:     { txt: 'Conectado',        cor: '#10B981' },
@@ -10,16 +11,22 @@ const STATUS_LABEL = {
 }
 
 export default function ConectarWhatsApp() {
-  const [status, setStatus]       = useState(null)   // string do backend
-  const [qrCode, setQrCode]       = useState(null)   // string bruta do QR
-  const [carregando, setCarregando] = useState(true)
-  const [acao, setAcao]           = useState(null)   // 'conectando' | 'desconectando'
-  const [erro, setErro]           = useState(null)
-  const pollingRef                = useRef(null)
+  const [status, setStatus]         = useState(null)
+  const [qrCode, setQrCode]         = useState(null)
+  const [carregando, setCarregando]  = useState(true)
+  const [acao, setAcao]             = useState(null)   // 'conectando' | 'desconectando'
+  const [erro, setErro]             = useState(null)
+  const [mensagemBV, setMensagemBV]  = useState('')
+  const [salvando, setSalvando]     = useState(false)
+  const [salvoOk, setSalvoOk]       = useState(false)
+  const pollingRef                  = useRef(null)
 
-  // ── Carregar status inicial ───────────────────────────────────────────────
+  // ── Carregar status inicial e mensagem de boas-vindas ────────────────────
   useEffect(() => {
     carregarStatus()
+    getConfig().then(({ data }) => {
+      setMensagemBV(data.config?.mensagemBoasVindas || '')
+    }).catch(() => {})
     return () => pararPolling()
   }, [])
 
@@ -73,6 +80,21 @@ export default function ConectarWhatsApp() {
     } catch (e) {
       setErro(e.response?.data?.error || 'Erro ao iniciar conexão.')
       setAcao(null)
+    }
+  }
+
+  // ── Salvar mensagem de boas-vindas ────────────────────────────────────────
+  async function handleSalvarBV() {
+    setSalvando(true)
+    setSalvoOk(false)
+    try {
+      await atualizarConfig({ mensagemBoasVindas: mensagemBV })
+      setSalvoOk(true)
+      setTimeout(() => setSalvoOk(false), 3000)
+    } catch {
+      // silencia — o erro visual não é crítico aqui
+    } finally {
+      setSalvando(false)
     }
   }
 
@@ -206,6 +228,37 @@ export default function ConectarWhatsApp() {
           </p>
         </div>
       )}
+
+      {/* Card: mensagem de boas-vindas */}
+      <div className="card mb-4">
+        <label className="block text-xs font-medium mb-2" style={{ color: '#64748B' }}>
+          MENSAGEM DE BOAS-VINDAS
+        </label>
+        <textarea
+          rows={3}
+          value={mensagemBV}
+          onChange={(e) => setMensagemBV(e.target.value)}
+          className="w-full rounded-lg px-3 py-2 text-sm resize-none"
+          style={{
+            backgroundColor: 'rgba(255,255,255,0.05)',
+            color: '#F1F5F9',
+            border: '1px solid rgba(255,255,255,0.1)',
+            outline: 'none',
+          }}
+        />
+        <div className="flex items-center justify-end gap-3 mt-3">
+          {salvoOk && (
+            <span className="text-xs" style={{ color: '#10B981' }}>Salvo!</span>
+          )}
+          <button
+            onClick={handleSalvarBV}
+            disabled={salvando}
+            className="btn-primary text-sm"
+          >
+            {salvando ? 'Salvando…' : 'Salvar'}
+          </button>
+        </div>
+      </div>
 
       {/* Card: instruções quando desconectado */}
       {status === 'desconectado' && (

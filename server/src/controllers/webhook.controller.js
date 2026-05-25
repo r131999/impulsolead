@@ -242,4 +242,19 @@ async function leadAtivo(req, res) {
   res.json({ existe: false, leadId: null });
 }
 
-module.exports = { receberLead, numerosBloqueados, leadAtivo };
+async function mensagemBoasVindas(req, res) {
+  try {
+    const config = await prisma.configAgente.findUnique({
+      where: { imobiliariaId: req.imobiliariaId },
+      select: { mensagemBoasVindas: true },
+    });
+    const mensagem = config?.mensagemBoasVindas
+      || 'Em breve um de nossos consultores entrará em contato com você.';
+    res.json({ mensagem });
+  } catch (err) {
+    console.error('[webhook] mensagemBoasVindas:', err.message);
+    res.status(500).json({ error: 'Erro ao buscar mensagem' });
+  }
+}
+
+module.exports = { receberLead, numerosBloqueados, leadAtivo, mensagemBoasVindas };

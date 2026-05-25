@@ -140,6 +140,24 @@ async function fetchBlockedNumbers(tenant) {
   }
 }
 
+// ── Mensagem de boas-vindas ────────────────────────────────────────────────────
+const DEFAULT_BV = 'Em breve um de nossos consultores entrará em contato com você.';
+
+async function fetchMensagemBoasVindas(tenant) {
+  try {
+    const res = await httpReq('GET', `${API_BASE}/webhook/mensagem-boasvindas`, null, {
+      'x-api-key': tenant.apiKey,
+    });
+    if (res.status === 200) {
+      const json = JSON.parse(res.data);
+      if (json.mensagem) return json.mensagem;
+    }
+  } catch (err) {
+    tag(`Erro boas-vindas fetch: ${err.message}`, tenant.imobiliariaId);
+  }
+  return DEFAULT_BV;
+}
+
 // ── Verificar lead ativo ───────────────────────────────────────────────────────
 async function verificarLeadAtivo(tenant, phone) {
   try {
@@ -259,9 +277,8 @@ async function handleMessage(tenant, msg) {
     tag(`Novo lead: ${phone} (${nome})${campanha ? ` | campanha: ${campanha}` : ''}`, tenant.imobiliariaId);
 
     try {
-      await tenant.sock.sendMessage(realJid, {
-        text: 'Em breve um de nossos consultores entrará em contato com você.',
-      });
+      const mensagemBV = await fetchMensagemBoasVindas(tenant);
+      await tenant.sock.sendMessage(realJid, { text: mensagemBV });
     } catch (err) {
       tag(`Erro boas-vindas: ${err.message}`, tenant.imobiliariaId);
     }
