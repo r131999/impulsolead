@@ -189,6 +189,10 @@ async function criarCliente(req, res) {
       ],
     });
 
+    await tx.whatsappInstancia.create({
+      data: { imobiliariaId: imobiliaria.id },
+    });
+
     return { imobiliaria, usuario };
   });
 
