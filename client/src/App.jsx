@@ -22,6 +22,7 @@ import Imoveis from './pages/Imoveis'
 import AdminLogin from './pages/admin/AdminLogin'
 import AdminDashboard from './pages/admin/AdminDashboard'
 import ArquivosImovel from './pages/ArquivosImovel'
+import ConectarWhatsApp from './pages/ConectarWhatsApp'
 
 function HomeRedirect() {
   const { usuario } = useAuth()
@@ -54,6 +55,7 @@ export default function App() {
             <Route path="equipes" element={<Equipes />} />
             <Route path="relatorios" element={<Relatorios />} />
             <Route path="config" element={<ConfigAgente />} />
+            <Route path="whatsapp" element={<ConectarWhatsApp />} />
 
             {/* Rotas compartilhadas */}
             <Route path="chat" element={<Chat />} />

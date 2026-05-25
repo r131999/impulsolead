@@ -32,6 +32,7 @@ model Imobiliaria {
   historicosDistribuicao HistoricoDistribuicao[]
   arquivosImovel         ArquivoImovel[]
   mensagensLead          MensagemLead[]
+  whatsappInstancia      WhatsappInstancia?
 }
 
 model Usuario {
@@ -336,6 +337,17 @@ model MensagemLead {
 
   imobiliariaId String
   imobiliaria   Imobiliaria @relation(fields: [imobiliariaId], references: [id])
+}
+
+model WhatsappInstancia {
+  id            String   @id @default(uuid())
+  imobiliariaId String   @unique
+  imobiliaria   Imobiliaria @relation(fields: [imobiliariaId], references: [id])
+  numero        String?
+  status        String   @default("desconectado") // desconectado | conectando | aguardando_qr | conectado
+  ativo         Boolean  @default(true)
+  criadoEm      DateTime @default(now())
+  atualizadoEm  DateTime @updatedAt
 }
 
 model ConfigAgente {

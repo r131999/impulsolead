@@ -1,3 +1,3 @@
 #!/bin/bash
 cd /app/whatsapp
-node index.js
+node manager.js

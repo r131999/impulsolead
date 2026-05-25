@@ -26,6 +26,8 @@ const adminRoutes = require('./routes/admin.routes');
 const agenteRoutes = require('./routes/agente.routes');
 const arquivosImovelRoutes = require('./routes/arquivos-imovel.routes');
 const chatLeadRoutes = require('./routes/chat-lead.routes');
+const whatsappRoutes = require('./routes/whatsapp.routes');
+const { listarInstanciasInterno } = require('./controllers/whatsapp.controller');
 const { iniciarCrons } = require('./services/cron.service');
 
 const app = express();
@@ -72,6 +74,10 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/agente', agenteRoutes);
 app.use('/api/arquivos-imovel', arquivosImovelRoutes);
 app.use('/api/chat-lead', chatLeadRoutes);
+app.use('/api/whatsapp', whatsappRoutes);
+
+// Endpoint interno: chamado pelo manager para carregar tenants ativos
+app.get('/api/internal/whatsapp-instancias', listarInstanciasInterno);
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });

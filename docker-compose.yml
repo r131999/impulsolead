@@ -20,6 +20,22 @@ services:
       timeout: 5s
       retries: 10
 
+  whatsapp:
+    build:
+      context: ./server
+      dockerfile: Dockerfile.whatsapp
+    container_name: impulsolead-whatsapp
+    restart: unless-stopped
+    environment:
+      API_BASE: ${API_BASE:-https://api-crm.impulsoslz.com.br/api}
+      INTERNAL_KEY: ${INTERNAL_KEY}
+      MANAGER_KEY: ${MANAGER_KEY}
+      HTTP_PORT: 3010
+    volumes:
+      - whatsapp_sessions:/app/whatsapp/sessions
+    depends_on:
+      - server
+
   server:
     build:
       context: .
@@ -36,6 +52,9 @@ services:
       NODE_ENV: production
       CLIENT_URL: ${CLIENT_URL:-http://localhost}
       NOTIFICACAO_WEBHOOK_URL: ${NOTIFICACAO_WEBHOOK_URL:-}
+      BAILEYS_URL: http://impulsolead-whatsapp:3010
+      INTERNAL_KEY: ${INTERNAL_KEY}
+      MANAGER_KEY: ${MANAGER_KEY}
     depends_on:
       postgres:
         condition: service_healthy
@@ -55,3 +74,4 @@ services:
 
 volumes:
   postgres_data:
+  whatsapp_sessions:

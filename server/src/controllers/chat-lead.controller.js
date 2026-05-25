@@ -93,7 +93,7 @@ async function enviarMensagem(req, res) {
     const jid = numero.includes('@') ? numero.split('@')[0] : numero;
 
     axios
-      .post(`${BAILEYS_URL}/send`, { number: jid, text: conteudo.trim() })
+      .post(`${BAILEYS_URL}/send`, { imobiliariaId: lead.imobiliariaId, number: jid, text: conteudo.trim() })
       .catch((err) => console.error('[chat-lead] erro Baileys:', err.message));
 
     emitirMensagem(leadId, mensagem);
@@ -158,6 +158,7 @@ async function enviarArquivo(req, res) {
 
     axios
       .post(`${BAILEYS_URL}/send-media`, {
+        imobiliariaId: lead.imobiliariaId,
         number: jid,
         mediaUrl: urlMidia,
         tipo: tipoMidia,

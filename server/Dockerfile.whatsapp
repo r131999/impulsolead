@@ -12,4 +12,4 @@ COPY . .
 
 EXPOSE 3010
 
-CMD ["node", "whatsapp/index.js"]
+CMD ["node", "whatsapp/manager.js"]
