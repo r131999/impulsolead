@@ -22,6 +22,7 @@ export default function Login() {
   }, [])
 
   if (usuario) {
+    if (usuario.role === 'supremo') return <Navigate to="/admin" replace />
     return <Navigate to={usuario.role === 'corretor' ? '/meus-leads' : '/dashboard'} replace />
   }
 
@@ -36,8 +37,8 @@ export default function Login() {
         await loginCorretor(form.email, form.senha)
         navigate('/meus-leads')
       } else {
-        await login(form.email, form.senha)
-        navigate('/dashboard')
+        const data = await login(form.email, form.senha)
+        navigate(data.usuario.role === 'supremo' ? '/admin' : '/dashboard')
       }
     } catch (err) {
       setErro(err.response?.data?.error || 'Credenciais inválidas')
