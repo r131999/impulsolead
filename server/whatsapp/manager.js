@@ -541,10 +541,13 @@ const server = http.createServer(async (req, res) => {
       }
 
       const jid = number.includes('@') ? number : `${number.replace(/\D/g, '')}@s.whatsapp.net`;
+      console.log('[WA:send] Tentando enviar para', jid, 'via', imobiliariaId);
       try {
         await tenant.sock.sendMessage(jid, { text });
+        console.log('[WA:send] Enviado com sucesso para', jid);
         return sendJson(res, 200, { ok: true });
       } catch (err) {
+        console.error('[WA:send] Erro ao enviar para', jid, ':', err.message);
         return sendJson(res, 500, { error: err.message });
       }
     }
