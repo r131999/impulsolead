@@ -5,7 +5,6 @@ const {
   useMultiFileAuthState,
   DisconnectReason,
   fetchLatestBaileysVersion,
-  makeInMemoryStore,
 } = require('@whiskeysockets/baileys');
 const { Boom } = require('@hapi/boom');
 const pino = require('pino');
@@ -98,7 +97,6 @@ function createTenant(imobiliariaId, apiKey) {
     imobiliariaId,
     apiKey,
     sock: null,
-    store: null,
     isConnected: false,
     connecting: false,
     status: 'desconectado', // desconectado | conectando | aguardando_qr | conectado
@@ -342,9 +340,6 @@ async function connectTenant(tenant) {
 
     tenant.status = 'conectando';
 
-    const store = makeInMemoryStore({ logger });
-    tenant.store = store;
-
     tenant.sock = makeWASocket({
       version,
       logger,
@@ -356,8 +351,6 @@ async function connectTenant(tenant) {
       keepAliveIntervalMs: 25000,
       retryRequestDelayMs: 2000,
     });
-
-    store.bind(tenant.sock.ev);
 
     tenant.sock.ev.on('creds.update', saveCreds);
 
