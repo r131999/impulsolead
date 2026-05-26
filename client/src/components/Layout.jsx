@@ -42,7 +42,7 @@ function calcBanner(planoInfo, isCorretor) {
   if (!planoInfo) return null
   if (planoInfo.plano === 'legado') return null
   if (planoInfo.bloqueado) return { tipo: 'bloqueado' }
-  const dias = planoInfo.diasRestantes
+  const dias = planoInfo.diasParaVencer
   if (dias !== null && dias <= 3) {
     return { tipo: 'aviso', dias, trial: planoInfo.plano === 'trial' }
   }

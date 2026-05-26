@@ -13,24 +13,27 @@ function calcPlanoInfo(imob) {
   const agora = new Date();
   const plano = imob.plano;
   let expiraEm = null;
-  let diasRestantes = null;
+  let diasParaVencer = null;
   if (plano === 'trial') {
     expiraEm = imob.trialExpiraEm
       ? new Date(imob.trialExpiraEm)
       : new Date(new Date(imob.criadoEm).getTime() + 7 * 24 * 60 * 60 * 1000);
-    diasRestantes = Math.max(0, Math.ceil((expiraEm - agora) / (1000 * 60 * 60 * 24)));
+    diasParaVencer = Math.max(0, Math.ceil((expiraEm - agora) / (1000 * 60 * 60 * 24)));
   } else if (imob.planoExpiraEm) {
     expiraEm = new Date(imob.planoExpiraEm);
-    diasRestantes = Math.max(0, Math.ceil((expiraEm - agora) / (1000 * 60 * 60 * 24)));
+    diasParaVencer = Math.max(0, Math.ceil((expiraEm - agora) / (1000 * 60 * 60 * 24)));
   }
+  const bloqueado = !!imob.planoBloqueadoEm;
+  const avisoVencimento = !bloqueado && diasParaVencer !== null && diasParaVencer <= 3;
   return {
     plano,
     trialExpiraEm: imob.trialExpiraEm || null,
     planoExpiraEm: imob.planoExpiraEm || null,
     planoBloqueadoEm: imob.planoBloqueadoEm || null,
     expiraEm: expiraEm ? expiraEm.toISOString() : null,
-    diasRestantes,
-    bloqueado: !!imob.planoBloqueadoEm,
+    diasParaVencer,
+    avisoVencimento,
+    bloqueado,
   };
 }
 
