@@ -20,10 +20,10 @@ function montarMensagem(corretor, lead) {
   );
 }
 
-async function notificarViaEvolution(corretor, lead) {
+async function notificarViaEvolution(corretor, lead, imobiliariaId) {
   const numero = formatarNumero(corretor.whatsapp || corretor.telefone);
   const texto  = montarMensagem(corretor, lead);
-  const body   = JSON.stringify({ number: numero, text: texto });
+  const body   = JSON.stringify({ imobiliariaId, number: numero, text: texto });
 
   await httpPost('http://impulsolead-whatsapp:3010/send', body, {});
   console.log(`[notificacao] WhatsApp enviado para ${corretor.nome} (${numero})`);
@@ -68,7 +68,7 @@ async function notificarViaWebhook(corretor, lead, imobiliaria) {
 // Não bloqueia o fluxo principal: falhas são logadas, não propagadas.
 async function notificarCorretor(corretor, lead, imobiliaria) {
   try {
-    const resultado = await notificarViaEvolution(corretor, lead);
+    const resultado = await notificarViaEvolution(corretor, lead, imobiliaria.id);
     if (resultado.enviado) return resultado;
 
     // Se Baileys falhou, tenta o webhook genérico
@@ -80,10 +80,10 @@ async function notificarCorretor(corretor, lead, imobiliaria) {
   }
 }
 
-async function notificarGestorPendencia(telefoneGestor, nomeCorretor) {
+async function notificarGestorPendencia(telefoneGestor, nomeCorretor, imobiliariaId) {
   const numero = formatarNumero(telefoneGestor);
   const texto  = `⚠️ *${nomeCorretor}* foi pulado na fila.\nMotivo: lead parado há mais de 24h sem observação.`;
-  const body   = JSON.stringify({ number: numero, text: texto });
+  const body   = JSON.stringify({ imobiliariaId, number: numero, text: texto });
 
   try {
     await httpPost('http://impulsolead-whatsapp:3010/send', body, {});
@@ -133,9 +133,9 @@ function httpPost(url, body, extraHeaders = {}) {
 }
 
 // Envio genérico — usado pelos cron jobs
-async function enviarWhatsApp(telefone, texto) {
+async function enviarWhatsApp(telefone, texto, imobiliariaId) {
   const numero = formatarNumero(telefone);
-  const body   = JSON.stringify({ number: numero, text: texto });
+  const body   = JSON.stringify({ imobiliariaId, number: numero, text: texto });
 
   try {
     await httpPost('http://impulsolead-whatsapp:3010/send', body, {});

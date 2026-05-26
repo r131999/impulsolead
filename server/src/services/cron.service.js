@@ -96,7 +96,7 @@ async function verificarLeadsParados() {
       `${linhas}\n\n` +
       `Acesse o CRM para verificar.`;
 
-    await enviarWhatsApp(telefoneGestor, texto);
+    await enviarWhatsApp(telefoneGestor, texto, imobiliaria.id);
 
     await prisma.lead.updateMany({
       where: { id: { in: grupo.map((l) => l.id) } },
@@ -193,7 +193,7 @@ async function enviarRelatorioSemanal() {
         `Acesse o CRM para ver todos os detalhes.`,
       ].join('\n');
 
-      await enviarWhatsApp(telefoneGestor, texto);
+      await enviarWhatsApp(telefoneGestor, texto, imob.id);
       console.log(`[cron] Relatório semanal enviado para ${imob.nome}`);
     } catch (err) {
       console.error(`[cron] Erro no relatório de ${imob.nome}:`, err.message);

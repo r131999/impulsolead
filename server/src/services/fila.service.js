@@ -41,7 +41,7 @@ async function proximoCorretor(imobiliariaId) {
     }
     console.log(`[fila] ${corretor.nome} pulado por pendência de atendimento`);
     if (gestor?.telefone) {
-      notificarGestorPendencia(gestor.telefone, corretor.nome).catch((err) => {
+      notificarGestorPendencia(gestor.telefone, corretor.nome, imobiliariaId).catch((err) => {
         console.error('[fila] Falha ao notificar gestor:', err.message);
       });
     }
