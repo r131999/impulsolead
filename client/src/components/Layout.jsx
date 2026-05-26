@@ -56,6 +56,13 @@ export default function Layout() {
   const [aberta, setAberta] = useState(false)
   const [salvandoFoto, setSalvandoFoto] = useState(false)
   const [logoUrl, setLogoUrl] = useState(null)
+  const [pixCopiado, setPixCopiado] = useState(false)
+
+  const copiarPix = () => {
+    navigator.clipboard.writeText('46.603.732/0001-77')
+    setPixCopiado(true)
+    setTimeout(() => setPixCopiado(false), 2000)
+  }
   const fotoInputRef = useRef(null)
 
   useEffect(() => {
@@ -102,7 +109,26 @@ export default function Layout() {
             </p>
             <div style={{ backgroundColor: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 12, padding: '1rem', marginBottom: 20 }}>
               <p style={{ color: '#94A3B8', fontSize: 13, marginBottom: 8 }}>Chave PIX</p>
-              <p style={{ color: '#F1F5F9', fontWeight: 600, fontSize: 15 }}>46.603.732/0001-77</p>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
+                <p style={{ color: '#F1F5F9', fontWeight: 600, fontSize: 15, margin: 0 }}>46.603.732/0001-77</p>
+                <button
+                  onClick={copiarPix}
+                  style={{
+                    backgroundColor: pixCopiado ? '#22C55E' : '#334155',
+                    color: '#F1F5F9',
+                    border: 'none',
+                    borderRadius: 6,
+                    padding: '4px 12px',
+                    fontSize: 12,
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    transition: 'background-color 0.2s',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {pixCopiado ? 'Copiado!' : 'Copiar'}
+                </button>
+              </div>
             </div>
             <a
               href="https://wa.me/5598981444954"
