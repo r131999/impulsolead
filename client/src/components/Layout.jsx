@@ -102,7 +102,7 @@ export default function Layout() {
             </p>
             <div style={{ backgroundColor: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 12, padding: '1rem', marginBottom: 20 }}>
               <p style={{ color: '#94A3B8', fontSize: 13, marginBottom: 8 }}>Chave PIX</p>
-              <p style={{ color: '#F1F5F9', fontWeight: 600, fontSize: 15 }}>contato@impulsoslz.com.br</p>
+              <p style={{ color: '#F1F5F9', fontWeight: 600, fontSize: 15 }}>46.603.732/0001-77</p>
             </div>
             <a
               href="https://wa.me/5598981444954"

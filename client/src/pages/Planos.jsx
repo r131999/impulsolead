@@ -134,7 +134,7 @@ export default function Planos() {
 
 function ModalPix({ plano, onClose }) {
   const [copiado, setCopiado] = useState(false)
-  const chavePix = 'contato@impulsoslz.com.br'
+  const chavePix = '46.603.732/0001-77'
 
   const copiar = () => {
     navigator.clipboard.writeText(chavePix)
