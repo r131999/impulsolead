@@ -640,7 +640,9 @@ process.on('unhandledRejection', (reason) => console.error('[manager] unhandledR
   }
 
   const instancias = await loadTenants();
-  for (const inst of instancias) {
+  const paraConectar = instancias.filter((i) => i.status === 'conectado');
+  tag(`${paraConectar.length} instância(s) com status=conectado serão reconectadas (${instancias.length - paraConectar.length} ignoradas)`);
+  for (const inst of paraConectar) {
     await startTenant(inst.imobiliariaId, inst.apiKey);
   }
 

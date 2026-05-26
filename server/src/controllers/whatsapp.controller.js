@@ -169,6 +169,7 @@ async function listarInstanciasInterno(req, res) {
     res.json(instancias.map((i) => ({
       imobiliariaId: i.imobiliariaId,
       apiKey: i.imobiliaria.apiKey,
+      status: i.status,
     })));
   } catch (err) {
     console.error('[whatsapp] listarInstanciasInterno:', err.message);
