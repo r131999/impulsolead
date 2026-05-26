@@ -14,13 +14,13 @@ function calcPlanoInfo(imob) {
   const plano = imob.plano;
   let expiraEm = null;
   let diasParaVencer = null;
-  if (plano === 'trial') {
+  if (imob.planoExpiraEm) {
+    expiraEm = new Date(imob.planoExpiraEm);
+    diasParaVencer = Math.max(0, Math.ceil((expiraEm - agora) / (1000 * 60 * 60 * 24)));
+  } else if (plano === 'trial') {
     expiraEm = imob.trialExpiraEm
       ? new Date(imob.trialExpiraEm)
       : new Date(new Date(imob.criadoEm).getTime() + 7 * 24 * 60 * 60 * 1000);
-    diasParaVencer = Math.max(0, Math.ceil((expiraEm - agora) / (1000 * 60 * 60 * 24)));
-  } else if (imob.planoExpiraEm) {
-    expiraEm = new Date(imob.planoExpiraEm);
     diasParaVencer = Math.max(0, Math.ceil((expiraEm - agora) / (1000 * 60 * 60 * 24)));
   }
   const bloqueado = !!imob.planoBloqueadoEm;
