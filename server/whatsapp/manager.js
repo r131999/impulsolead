@@ -227,8 +227,10 @@ async function handleMessage(tenant, msg) {
         phone = String(participant).replace(/\D/g, '');
         realJid = `${phone}@s.whatsapp.net`;
       } else {
-        phone = remoteJid.replace('@lid', '').replace(/\D/g, '');
-        tag(`@lid sem participant: ${phone}`, tenant.imobiliariaId);
+        // @lid sem senderPn — cria identificador temporário para não perder o lead
+        const lidRaw = remoteJid.replace('@lid', '').replace(/\D/g, '');
+        phone = `lid_${lidRaw.slice(-12)}`;
+        tag(`@lid sem participant — identificador temporário: ${phone}`, tenant.imobiliariaId);
       }
     } else {
       phone = remoteJid.split('@')[0].replace(/\D/g, '');
@@ -239,14 +241,15 @@ async function handleMessage(tenant, msg) {
       return;
     }
 
-    phone = normalizarTelefone(phone);
-
-    const phoneValido = phone.startsWith('55')
-      ? phone.length === 12 || phone.length === 13
-      : phone.length >= 10 && phone.length <= 13;
-    if (!phoneValido) {
-      tag(`Número inválido: ${phone}`, tenant.imobiliariaId);
-      return;
+    if (!phone.startsWith('lid_')) {
+      phone = normalizarTelefone(phone);
+      const phoneValido = phone.startsWith('55')
+        ? phone.length === 12 || phone.length === 13
+        : phone.length >= 10 && phone.length <= 13;
+      if (!phoneValido) {
+        tag(`Número inválido: ${phone}`, tenant.imobiliariaId);
+        return;
+      }
     }
 
     const rawName = msg.pushName || '';
