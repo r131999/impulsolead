@@ -630,8 +630,30 @@ const server = http.createServer(async (req, res) => {
       }
 
       const effectiveKey = apiKey || tenants.get(imobiliariaId)?.apiKey;
-      const tenant = await startTenant(imobiliariaId, effectiveKey);
 
+      // Encerra completamente a sessão anterior antes de criar nova,
+      // evitando o erro 440 (stream replaced / múltiplos dispositivos).
+      const existing = tenants.get(imobiliariaId);
+      if (existing) {
+        tag('Encerrando sessão anterior antes de reconectar', imobiliariaId);
+        if (existing.reconnectTimer) {
+          clearTimeout(existing.reconnectTimer);
+          existing.reconnectTimer = null;
+        }
+        if (existing.blockedTimer) {
+          clearInterval(existing.blockedTimer);
+          existing.blockedTimer = null;
+        }
+        if (existing.sock) {
+          try { existing.sock.end(); } catch (_) {}
+          existing.sock = null;
+        }
+        tenants.delete(imobiliariaId);
+        // Aguarda o socket fechar antes de abrir nova conexão
+        await new Promise((r) => setTimeout(r, 500));
+      }
+
+      const tenant = await startTenant(imobiliariaId, effectiveKey);
       return sendJson(res, 200, { ok: true, status: tenant.status });
     }
 
