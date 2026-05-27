@@ -25,6 +25,8 @@ const MSG_DEDUPE_TTL   = 30 * 60 * 1000;  // 30 min
 const RECENT_LEAD_TTL  = 24 * 60 * 60 * 1000; // 24 h
 const CLEANUP_INTERVAL = 5  * 60 * 1000;  // 5 min
 
+const retryQueue = [];
+
 const logger = pino({ level: 'silent' });
 
 function tag(msg, id = '') {
@@ -289,23 +291,61 @@ async function handleMessage(tenant, msg) {
 
     await new Promise((r) => setTimeout(r, 1000));
 
-    const res = await httpReq(
-      'POST',
-      `${API_BASE}/webhook/lead`,
-      {
-        nome,
-        telefone: phone,
-        whatsappJid: realJid,
-        campanha: campanha || undefined,
-        imobiliariaId: tenant.imobiliariaId,
-      },
-      { 'x-api-key': tenant.apiKey },
-    );
-
     const now = Date.now();
     tenant.recentLeads.set(phone, now);
     if (senderPnRaw && senderPnRaw !== phone) tenant.recentLeads.set(senderPnRaw, now);
+
+    let res;
+    try {
+      res = await httpReq(
+        'POST',
+        `${API_BASE}/webhook/lead`,
+        {
+          nome,
+          telefone: phone,
+          whatsappJid: realJid,
+          campanha: campanha || undefined,
+          imobiliariaId: tenant.imobiliariaId,
+        },
+        { 'x-api-key': tenant.apiKey },
+      );
+    } catch (err) {
+      tag(`Erro ao criar lead, adicionando à fila de retry: ${err.message}`, tenant.imobiliariaId);
+      retryQueue.push({
+        phone,
+        nome,
+        text,
+        realJid,
+        campanha,
+        msgId,
+        imobiliariaId: tenant.imobiliariaId,
+        apiKey: tenant.apiKey,
+        tentativas: 0,
+        maxTentativas: 3,
+        proximaTentativa: Date.now() + 30000,
+      });
+      return;
+    }
+
     tag(`Lead enviado — status: ${res.status}`, tenant.imobiliariaId);
+
+    if (res.status >= 500) {
+      tag(`Erro servidor ao criar lead (${res.status}), adicionando à fila de retry`, tenant.imobiliariaId);
+      retryQueue.push({
+        phone,
+        nome,
+        text,
+        realJid,
+        campanha,
+        msgId,
+        imobiliariaId: tenant.imobiliariaId,
+        apiKey: tenant.apiKey,
+        tentativas: 0,
+        maxTentativas: 3,
+        proximaTentativa: Date.now() + 30000,
+      });
+      return;
+    }
 
     if (res.status === 201 && text.trim()) {
       try {
@@ -699,6 +739,59 @@ process.on('unhandledRejection', (reason) => console.error('[manager] unhandledR
   setInterval(() => {
     for (const tenant of tenants.values()) cleanupTenant(tenant);
   }, CLEANUP_INTERVAL);
+
+  // Retry de leads que falharam
+  setInterval(async () => {
+    const now = Date.now();
+    for (const item of retryQueue.filter((i) => i.tentativas < i.maxTentativas && now >= i.proximaTentativa)) {
+      try {
+        const res = await httpReq(
+          'POST',
+          `${API_BASE}/webhook/lead`,
+          {
+            nome: item.nome,
+            telefone: item.phone,
+            whatsappJid: item.realJid,
+            campanha: item.campanha || undefined,
+            imobiliariaId: item.imobiliariaId,
+          },
+          { 'x-api-key': item.apiKey },
+        );
+
+        if (res.status >= 200 && res.status < 300) {
+          const idx = retryQueue.indexOf(item);
+          if (idx !== -1) retryQueue.splice(idx, 1);
+          tag(`Retry lead ${item.phone} — sucesso (status ${res.status})`, item.imobiliariaId);
+
+          if (res.status === 201 && item.text?.trim()) {
+            try {
+              const body = JSON.parse(res.data);
+              const leadId = body?.lead?.id;
+              if (leadId) {
+                const tenant = tenants.get(item.imobiliariaId);
+                if (tenant) await salvarMensagemRecebida(tenant, leadId, item.text, item.msgId, item.nome);
+              }
+            } catch (_) {}
+          }
+        } else {
+          item.tentativas++;
+          item.proximaTentativa = Date.now() + 60000;
+          tag(`Retry lead ${item.phone} — falha (status ${res.status}), tentativa ${item.tentativas}/${item.maxTentativas}`, item.imobiliariaId);
+        }
+      } catch (err) {
+        item.tentativas++;
+        item.proximaTentativa = Date.now() + 60000;
+        tag(`Retry lead ${item.phone} — erro: ${err.message}, tentativa ${item.tentativas}/${item.maxTentativas}`, item.imobiliariaId);
+      }
+    }
+
+    for (let i = retryQueue.length - 1; i >= 0; i--) {
+      if (retryQueue[i].tentativas >= retryQueue[i].maxTentativas) {
+        tag(`Retry lead ${retryQueue[i].phone} — máximo de tentativas atingido, removendo da fila`, retryQueue[i].imobiliariaId);
+        retryQueue.splice(i, 1);
+      }
+    }
+  }, 15000);
 
   server.listen(HTTP_PORT, () => {
     tag(`API HTTP disponível em http://localhost:${HTTP_PORT}`);
