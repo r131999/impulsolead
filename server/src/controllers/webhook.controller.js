@@ -209,10 +209,30 @@ async function numerosBloqueados(req, res) {
 }
 
 async function leadAtivo(req, res) {
-  const { telefone } = req.query;
+  const { telefone, jid } = req.query;
+
+  if (!telefone && !jid) {
+    return res.status(400).json({ error: 'Parâmetro obrigatório: telefone ou jid' });
+  }
+
+  if (jid) {
+    const leadPorJid = await prisma.lead.findFirst({
+      where: {
+        imobiliariaId: req.imobiliariaId,
+        whatsappJid: jid,
+        status: { notIn: ['perdido'] },
+      },
+      select: { id: true },
+      orderBy: { criadoEm: 'desc' },
+    });
+
+    if (leadPorJid) {
+      return res.json({ existe: true, leadId: leadPorJid.id });
+    }
+  }
 
   if (!telefone) {
-    return res.status(400).json({ error: 'Parâmetro obrigatório: telefone' });
+    return res.json({ existe: false, leadId: null });
   }
 
   const digitos = String(telefone).replace(/\D/g, '');

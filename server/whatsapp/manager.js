@@ -162,11 +162,14 @@ async function fetchMensagemBoasVindas(tenant) {
 }
 
 // ── Verificar lead ativo ───────────────────────────────────────────────────────
-async function verificarLeadAtivo(tenant, phone) {
+async function verificarLeadAtivo(tenant, phone, jid = null) {
   try {
+    const query = phone.startsWith('lid_') && jid
+      ? `jid=${encodeURIComponent(jid)}`
+      : `telefone=${phone}`;
     const res = await httpReq(
       'GET',
-      `${API_BASE}/webhook/lead-ativo?telefone=${phone}`,
+      `${API_BASE}/webhook/lead-ativo?${query}`,
       null,
       { 'x-api-key': tenant.apiKey },
     );
@@ -265,7 +268,7 @@ async function handleMessage(tenant, msg) {
     }
 
     // ── CAMINHO 1: Lead existente ─────────────────────────────────────────────
-    const leadAtivo = await verificarLeadAtivo(tenant, phone);
+    const leadAtivo = await verificarLeadAtivo(tenant, phone, realJid);
     if (leadAtivo.existe && leadAtivo.leadId) {
       tag(`Lead existente (${phone}) — salvando mensagem`, tenant.imobiliariaId);
       await salvarMensagemRecebida(tenant, leadAtivo.leadId, text, msgId, nome);
