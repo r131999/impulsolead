@@ -63,6 +63,7 @@ function httpReq(method, url, body = null, headers = {}) {
 
 // ── Detecção de campanha ───────────────────────────────────────────────────────
 const CAMPAIGN_PATTERNS = [
+  /quero mais informa[çc][oõ]es (?:do|sobre o|da)\s+(.+?)\.?$/i,
   /vim\s+pel[ao]\s+(.+)/i,
   /vim\s+d[ao]\s+(.+)/i,
   /interesse\s+n[oa]\s+(.+)/i,
