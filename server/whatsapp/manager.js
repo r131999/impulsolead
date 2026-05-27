@@ -335,6 +335,10 @@ async function connectTenant(tenant) {
       fs.mkdirSync(tenant.authDir, { recursive: true });
     }
 
+    // Detecta se havia sessão anterior antes de criar o socket.
+    // Usado no handler de 401 para distinguir logout forçado de primeira conexão.
+    const hadSession = fs.existsSync(path.join(tenant.authDir, 'creds.json'));
+
     const { state, saveCreds } = await useMultiFileAuthState(tenant.authDir);
     const { version } = await fetchLatestBaileysVersion();
 
@@ -370,8 +374,27 @@ async function connectTenant(tenant) {
         const reason = new Boom(lastDisconnect?.error)?.output?.statusCode;
         tag(`Desconectado. Motivo: ${reason}`, tenant.imobiliariaId);
 
-        // Reagendar reconexão em 3s (exceto se logout explícito sem session)
-        tenant.reconnectTimer = setTimeout(() => connectTenant(tenant), 3000);
+        if (reason === DisconnectReason.loggedOut) {
+          if (hadSession) {
+            // Sessão anterior rejeitada pelo WhatsApp (logout forçado pelo app).
+            // Limpa os arquivos de auth para que a próxima tentativa gere novo QR.
+            tag('Logout forçado — limpando sessão anterior, aguardando ação do gestor', tenant.imobiliariaId);
+            try {
+              fs.rmSync(tenant.authDir, { recursive: true, force: true });
+              fs.mkdirSync(tenant.authDir, { recursive: true });
+            } catch (e) {
+              tag(`Erro ao limpar sessão: ${e.message}`, tenant.imobiliariaId);
+            }
+            // Não reconecta automaticamente — gestor precisa clicar em Conectar
+          } else {
+            // Nova sessão sem arquivos recebeu 401 antes do QR — reconecta para gerar QR
+            tag('Sessão nova recebeu 401 — reconectando para gerar QR Code', tenant.imobiliariaId);
+            tenant.reconnectTimer = setTimeout(() => connectTenant(tenant), 3000);
+          }
+        } else {
+          // Outros erros (queda de rede, timeout etc.) — reconecta normalmente
+          tenant.reconnectTimer = setTimeout(() => connectTenant(tenant), 3000);
+        }
       } else if (connection === 'open') {
         tenant.isConnected = true;
         tenant.connecting = false;
