@@ -26,6 +26,8 @@ const RECENT_LEAD_TTL  = 24 * 60 * 60 * 1000; // 24 h
 const CLEANUP_INTERVAL = 5  * 60 * 1000;  // 5 min
 
 const retryQueue = [];
+const deduplicacaoConteudo = new Map(); // chave → timestamp
+const CONTEUDO_DEDUPE_TTL = 5 * 60 * 1000; // 5 min
 
 const logger = pino({ level: 'silent' });
 
@@ -284,6 +286,14 @@ async function handleMessage(tenant, msg) {
       tag(`Lead recente (24h): ${phone}`, tenant.imobiliariaId);
       return;
     }
+
+    const chaveConteudo = `${tenant.imobiliariaId}:${text.trim().toLowerCase().slice(0, 50)}`;
+    const tsConteudo = deduplicacaoConteudo.get(chaveConteudo);
+    if (tsConteudo && Date.now() - tsConteudo < CONTEUDO_DEDUPE_TTL) {
+      tag(`Conteúdo duplicado (5min) — descartando: ${chaveConteudo}`, tenant.imobiliariaId);
+      return;
+    }
+    deduplicacaoConteudo.set(chaveConteudo, Date.now());
 
     const campanha = detectCampaign(text);
     tag(`Novo lead: ${phone} (${nome})${campanha ? ` | campanha: ${campanha}` : ''}`, tenant.imobiliariaId);
@@ -741,9 +751,13 @@ process.on('unhandledRejection', (reason) => console.error('[manager] unhandledR
     await startTenant(inst.imobiliariaId, inst.apiKey);
   }
 
-  // Limpeza periódica de todos os tenants
+  // Limpeza periódica de todos os tenants e deduplicação de conteúdo
   setInterval(() => {
     for (const tenant of tenants.values()) cleanupTenant(tenant);
+    const now = Date.now();
+    for (const [k, ts] of deduplicacaoConteudo) {
+      if (now - ts > CONTEUDO_DEDUPE_TTL) deduplicacaoConteudo.delete(k);
+    }
   }, CLEANUP_INTERVAL);
 
   // Retry de leads que falharam
