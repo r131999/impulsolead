@@ -1,5 +1,6 @@
 ﻿const { STATUS_VALIDOS, proximoCorretor } = require('../services/fila.service');
 const { notificarCorretor } = require('../services/notificacao.service');
+const { enviarPushCorretor } = require('./push.controller');
 
 const prisma = require('../lib/prisma');
 
@@ -537,6 +538,11 @@ async function distribuir(req, res) {
   });
 
   notificarCorretor(corretorEscolhido, leadAtualizado, req.imobiliaria).catch(() => {});
+  enviarPushCorretor(
+    corretorEscolhido.id,
+    '🏠 Novo lead!',
+    `Nome: ${leadAtualizado.nome} | Tel: ${leadAtualizado.telefone}`,
+  ).catch(() => {});
 
   res.json({ lead: leadAtualizado });
 }

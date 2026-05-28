@@ -1,5 +1,6 @@
 ﻿const { proximoCorretor } = require('../services/fila.service');
 const { notificarCorretor } = require('../services/notificacao.service');
+const { enviarPushCorretor } = require('./push.controller');
 
 const prisma = require('../lib/prisma');
 
@@ -158,6 +159,11 @@ async function receberLead(req, res) {
   // 5. Notifica corretor de forma assíncrona (não bloqueia a resposta)
   if (result.corretor) {
     notificarCorretor(result.corretor, result.lead, req.imobiliaria).catch(() => {});
+    enviarPushCorretor(
+      result.corretor.id,
+      '🏠 Novo lead!',
+      `Nome: ${result.lead.nome} | Tel: ${result.lead.telefone}`,
+    ).catch(() => {});
   }
 
   // 6. Busca o lead completo para retornar

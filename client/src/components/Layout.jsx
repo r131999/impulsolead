@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext'
 import { Avatar, redimensionarImagem } from './Avatar'
 import ChatInterno from '../pages/ChatInterno'
 import { getLogoUrl } from '../api/config'
+import { usePushNotification } from '../hooks/usePushNotification'
 
 const NAV_GESTOR = [
   { to: '/dashboard',        label: 'Dashboard',         icon: ChartIcon },
@@ -57,6 +58,7 @@ export default function Layout() {
   const [salvandoFoto, setSalvandoFoto] = useState(false)
   const [logoUrl, setLogoUrl] = useState(null)
   const [pixCopiado, setPixCopiado] = useState(false)
+  const { permissao, solicitarPermissao } = usePushNotification()
 
   const copiarPix = () => {
     navigator.clipboard.writeText('46.603.732/0001-77')
@@ -154,6 +156,38 @@ export default function Layout() {
           {banner.trial
             ? <a href="/planos" style={{ color: '#FDE68A', textDecoration: 'underline' }}>Escolha um plano para continuar.</a>
             : <a href="/planos" style={{ color: '#FDE68A', textDecoration: 'underline' }}>Renove para não perder o acesso.</a>}
+        </div>
+      )}
+
+      {/* Banner de notificações push — apenas corretores sem permissão */}
+      {isCorretor && permissao !== 'granted' && permissao !== 'denied' && permissao !== 'unsupported' && (
+        <div style={{
+          backgroundColor: '#1E293B',
+          borderBottom: '1px solid #334155',
+          padding: '8px 16px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 12,
+          fontSize: 13,
+          color: '#CBD5E1',
+        }}>
+          <span>🔔 Ative as notificações para receber alertas de novos leads</span>
+          <button
+            onClick={solicitarPermissao}
+            style={{
+              backgroundColor: 'rgba(99,102,241,0.2)',
+              color: '#818cf8',
+              border: '1px solid rgba(99,102,241,0.35)',
+              borderRadius: 6,
+              padding: '3px 12px',
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            Ativar
+          </button>
         </div>
       )}
 

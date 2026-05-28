@@ -77,9 +77,10 @@ model Corretor {
   equipe         Equipe?     @relation("EquipeCorretores", fields: [equipeId], references: [id])
   equipeLiderada Equipe[]    @relation("EquipeLider")
 
-  leads            Lead[]
-  followUps        FollowUp[]
-  contatosPessoais ContatoPessoal[]
+  leads              Lead[]
+  followUps          FollowUp[]
+  contatosPessoais   ContatoPessoal[]
+  pushSubscriptions  PushSubscription[]
 }
 
 model Lead {
@@ -340,6 +341,14 @@ model MensagemLead {
 
   imobiliariaId String
   imobiliaria   Imobiliaria @relation(fields: [imobiliariaId], references: [id])
+}
+
+model PushSubscription {
+  id           String   @id @default(uuid())
+  corretorId   String
+  corretor     Corretor @relation(fields: [corretorId], references: [id], onDelete: Cascade)
+  subscription String
+  criadoEm     DateTime @default(now())
 }
 
 model WhatsappInstancia {
