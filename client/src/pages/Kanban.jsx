@@ -919,6 +919,7 @@ function ModalDistribuir({ lead, corretores, onConfirmar, onClose }) {
   const [selecionado, setSelecionado] = useState(undefined) // undefined = nada selecionado, null = fila, string = corretorId
   const [distribuindo, setDistribuindo] = useState(false)
   const [erro, setErro] = useState('')
+  const [busca, setBusca] = useState('')
 
   const handleConfirmar = async () => {
     if (selecionado === undefined) return
@@ -937,6 +938,11 @@ function ModalDistribuir({ lead, corretores, onConfirmar, onClose }) {
     border: `1px solid ${ativo ? 'rgba(99,102,241,0.45)' : '#1E293B'}`,
   })
 
+  const corretoresFiltrados = corretores
+    .filter((c) => c.ativo)
+    .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' }))
+    .filter((c) => !busca.trim() || c.nome.toLowerCase().includes(busca.trim().toLowerCase()))
+
   return (
     <div className="fixed inset-0 bg-black/60 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
       <div
@@ -951,20 +957,33 @@ function ModalDistribuir({ lead, corretores, onConfirmar, onClose }) {
           <button onClick={onClose} className="text-xl leading-none hover:opacity-80" style={{ color: '#64748B' }}>×</button>
         </div>
 
-        <div className="overflow-y-auto flex-1 px-5 py-4 space-y-2">
-          <button
-            onClick={() => setSelecionado(null)}
-            className="w-full flex items-center gap-3 p-3 rounded-xl transition-colors text-left"
-            style={itemStyle(selecionado === null)}
-          >
-            <span className="flex items-center justify-center w-8 h-8 rounded-full text-base flex-shrink-0" style={{ backgroundColor: 'rgba(99,102,241,0.2)' }}>🔄</span>
-            <div>
-              <p className="text-sm font-semibold" style={{ color: '#818cf8' }}>Fila automática</p>
-              <p className="text-xs" style={{ color: '#64748B' }}>Próximo corretor disponível na fila</p>
-            </div>
-          </button>
+        <div className="px-5 pt-3 flex-shrink-0">
+          <input
+            type="text"
+            value={busca}
+            onChange={(e) => setBusca(e.target.value)}
+            placeholder="Buscar corretor..."
+            className="input w-full text-sm"
+            style={{ backgroundColor: '#0B1120' }}
+          />
+        </div>
 
-          {corretores.filter((c) => c.ativo).map((c) => (
+        <div className="overflow-y-auto flex-1 px-5 py-3 space-y-2">
+          {!busca.trim() && (
+            <button
+              onClick={() => setSelecionado(null)}
+              className="w-full flex items-center gap-3 p-3 rounded-xl transition-colors text-left"
+              style={itemStyle(selecionado === null)}
+            >
+              <span className="flex items-center justify-center w-8 h-8 rounded-full text-base flex-shrink-0" style={{ backgroundColor: 'rgba(99,102,241,0.2)' }}>🔄</span>
+              <div>
+                <p className="text-sm font-semibold" style={{ color: '#818cf8' }}>Fila automática</p>
+                <p className="text-xs" style={{ color: '#64748B' }}>Próximo corretor disponível na fila</p>
+              </div>
+            </button>
+          )}
+
+          {corretoresFiltrados.map((c) => (
             <button
               key={c.id}
               onClick={() => setSelecionado(c.id)}
@@ -980,6 +999,12 @@ function ModalDistribuir({ lead, corretores, onConfirmar, onClose }) {
               </div>
             </button>
           ))}
+
+          {corretoresFiltrados.length === 0 && busca.trim() && (
+            <p className="text-xs text-center py-4" style={{ color: '#64748B' }}>
+              Nenhum corretor encontrado
+            </p>
+          )}
         </div>
 
         <div className="px-5 pb-5 pt-3 flex-shrink-0" style={{ borderTop: '1px solid #1E293B' }}>
