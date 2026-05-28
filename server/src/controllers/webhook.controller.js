@@ -229,6 +229,27 @@ async function leadAtivo(req, res) {
     if (leadPorJid) {
       return res.json({ existe: true, leadId: leadPorJid.id });
     }
+
+    // Busca por sufixo numérico quando o JID é @lid e não houve match exato
+    if (jid.endsWith('@lid')) {
+      const lidDigits = jid.replace('@lid', '').replace(/\D/g, '');
+      const sufixo = lidDigits.slice(-10);
+      if (sufixo.length >= 8) {
+        const leadPorSufixo = await prisma.lead.findFirst({
+          where: {
+            imobiliariaId: req.imobiliariaId,
+            telefone: { endsWith: sufixo },
+            status: { notIn: ['perdido'] },
+          },
+          select: { id: true },
+          orderBy: { criadoEm: 'desc' },
+        });
+
+        if (leadPorSufixo) {
+          return res.json({ existe: true, leadId: leadPorSufixo.id });
+        }
+      }
+    }
   }
 
   if (!telefone) {

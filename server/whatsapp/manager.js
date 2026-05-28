@@ -282,7 +282,13 @@ async function handleMessage(tenant, msg) {
     tag(`Lead novo — criando no CRM`, tenant.imobiliariaId);
     // ── CAMINHO 2: Novo lead ──────────────────────────────────────────────────
     const senderPnRaw = (key.senderPn || msg.participant || '').split('@')[0].replace(/\D/g, '');
-    if (tenant.recentLeads.has(phone) || (senderPnRaw && tenant.recentLeads.has(senderPnRaw))) {
+    const lidSufixo = phone.startsWith('lid_') ? phone.slice('lid_'.length).slice(-10) : null;
+    const isLeadRecente = tenant.recentLeads.has(phone)
+      || (senderPnRaw && tenant.recentLeads.has(senderPnRaw))
+      || (lidSufixo && [...tenant.recentLeads.keys()].some(
+           (k) => !k.startsWith('lid_') && k.endsWith(lidSufixo),
+         ));
+    if (isLeadRecente) {
       tag(`Lead recente (24h): ${phone}`, tenant.imobiliariaId);
       return;
     }
