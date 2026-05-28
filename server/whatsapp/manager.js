@@ -268,13 +268,16 @@ async function handleMessage(tenant, msg) {
     }
 
     // ── CAMINHO 1: Lead existente ─────────────────────────────────────────────
+    tag(`Verificando lead — phone: ${phone}, jid: ${realJid}`, tenant.imobiliariaId);
     const leadAtivo = await verificarLeadAtivo(tenant, phone, realJid);
+    tag(`Lead ativo: ${leadAtivo.existe} | leadId: ${leadAtivo.leadId}`, tenant.imobiliariaId);
     if (leadAtivo.existe && leadAtivo.leadId) {
-      tag(`Lead existente (${phone}) — salvando mensagem`, tenant.imobiliariaId);
+      tag(`Lead já existe — salvando mensagem`, tenant.imobiliariaId);
       await salvarMensagemRecebida(tenant, leadAtivo.leadId, text, msgId, nome);
       return;
     }
 
+    tag(`Lead novo — criando no CRM`, tenant.imobiliariaId);
     // ── CAMINHO 2: Novo lead ──────────────────────────────────────────────────
     const senderPnRaw = (key.senderPn || msg.participant || '').split('@')[0].replace(/\D/g, '');
     if (tenant.recentLeads.has(phone) || (senderPnRaw && tenant.recentLeads.has(senderPnRaw))) {
