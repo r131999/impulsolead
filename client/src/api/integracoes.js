@@ -1,0 +1,5 @@
+import api from './axios'
+
+export const getStatusMeta    = ()          => api.get('/integracoes/meta/status')
+export const conectarMeta     = (data)      => api.post('/integracoes/meta/conectar', data)
+export const desconectarMeta  = ()          => api.delete('/integracoes/meta/desconectar')

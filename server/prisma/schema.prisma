@@ -36,6 +36,7 @@ model Imobiliaria {
   arquivosImovel         ArquivoImovel[]
   mensagensLead          MensagemLead[]
   whatsappInstancia      WhatsappInstancia?
+  metaIntegracao         MetaIntegracao?
 }
 
 model Usuario {
@@ -360,6 +361,17 @@ model WhatsappInstancia {
   ativo         Boolean  @default(true)
   criadoEm      DateTime @default(now())
   atualizadoEm  DateTime @updatedAt
+}
+
+model MetaIntegracao {
+  id            String      @id @default(uuid())
+  imobiliariaId String      @unique
+  imobiliaria   Imobiliaria @relation(fields: [imobiliariaId], references: [id])
+  pageId        String
+  pageToken     String
+  ativo         Boolean     @default(true)
+  criadoEm      DateTime    @default(now())
+  atualizadoEm  DateTime    @updatedAt
 }
 
 model ConfigAgente {
