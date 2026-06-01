@@ -10,8 +10,12 @@ export default function Integracoes() {
   const [salvando, setSalvando]         = useState(false)
   const [erro, setErro]                 = useState(null)
   const [sucesso, setSucesso]           = useState(null)
-  const [pageId, setPageId]             = useState('')
-  const [pageToken, setPageToken]       = useState('')
+
+  // Passo 3
+  const [userToken, setUserToken]           = useState('')
+  const [buscandoPaginas, setBuscandoPaginas] = useState(false)
+  const [paginasDisponiveis, setPaginasDisponiveis] = useState([])
+  const [selectedPageId, setSelectedPageId] = useState('')
 
   useEffect(() => { carregarStatus() }, [])
 
@@ -29,39 +33,60 @@ export default function Integracoes() {
     }
   }
 
-  async function handleConectar() {
-    const tokenLimpo = pageToken.trim()
-    const idLimpo    = pageId.trim()
+  // Quando o token muda, descarta a lista de páginas já carregada
+  function handleUserTokenChange(val) {
+    setUserToken(val)
+    if (paginasDisponiveis.length > 0) setPaginasDisponiveis([])
+  }
+
+  async function handleBuscarPaginas() {
+    const token = userToken.trim()
     setErro(null)
-    setSucesso(null)
+    if (!token) { setErro('Cole o User Access Token antes de buscar.'); return }
 
-    if (!tokenLimpo || !idLimpo) {
-      setErro('Preencha o access token e o Page ID.')
-      return
-    }
-
-    setSalvando(true)
+    setBuscandoPaginas(true)
     try {
-      // Valida o token no Graph API antes de salvar
       const resp = await fetch(
-        `https://graph.facebook.com/me?access_token=${encodeURIComponent(tokenLimpo)}&fields=name,id`
+        `https://graph.facebook.com/me/accounts?access_token=${encodeURIComponent(token)}&fields=id,name`
       )
-      const tokenData = await resp.json()
+      const data = await resp.json()
 
-      if (tokenData.error) {
-        setErro('Token inválido. Verifique se copiou corretamente.')
+      if (data.error) {
+        setErro('Token inválido. Verifique se copiou o token correto do Graph API Explorer.')
         return
       }
 
-      const pageName = tokenData.name || 'Aguardando validação'
+      const pages = data.data || []
+      if (pages.length === 0) {
+        setErro('Nenhuma página encontrada. Certifique-se de ser administrador de pelo menos uma página.')
+        return
+      }
 
-      await selecionarPagina({ pageId: idLimpo, pageName, pageToken: tokenLimpo })
+      setPaginasDisponiveis(pages)
+      setSelectedPageId(pages[0].id)
+    } catch {
+      setErro('Não foi possível contatar o Facebook. Verifique sua conexão.')
+    } finally {
+      setBuscandoPaginas(false)
+    }
+  }
+
+  async function handleConectar() {
+    setErro(null)
+    setSucesso(null)
+    if (!selectedPageId) { setErro('Selecione uma página.'); return }
+
+    setSalvando(true)
+    try {
+      const { data } = await selecionarPagina({ userAccessToken: userToken.trim(), pageId: selectedPageId })
+      const pageName = data.pageName || paginasDisponiveis.find((p) => p.id === selectedPageId)?.name || selectedPageId
+
       setAtivo(true)
-      setPageIdAtual(idLimpo)
+      setPageIdAtual(selectedPageId)
       setPageNameAtual(pageName)
       setCriadoEm(new Date().toISOString())
-      setPageId('')
-      setPageToken('')
+      setUserToken('')
+      setPaginasDisponiveis([])
       setSucesso('Página conectada! Os leads do Facebook/Instagram serão recebidos automaticamente.')
     } catch (e) {
       setErro(e.response?.data?.error || 'Erro ao conectar. Tente novamente.')
@@ -179,14 +204,14 @@ export default function Integracoes() {
         </div>
       )}
 
-      {/* Fluxo guiado de 3 passos (apenas quando desconectado) */}
+      {/* Fluxo guiado de 3 passos */}
       {!ativo && (
         <>
           <p className="text-xs font-semibold uppercase tracking-wide mb-4" style={{ color: '#64748B' }}>
             Como conectar — 3 passos
           </p>
 
-          {/* PASSO 1 */}
+          {/* ── PASSO 1 ── */}
           <div className="flex gap-3">
             <StepSidebar last={false} />
             <div className="card flex-1 mb-4">
@@ -199,68 +224,68 @@ export default function Integracoes() {
                 href="https://developers.facebook.com/tools/explorer/893852687057557/?method=GET&path=me%2Faccounts&version=v19.0"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 text-sm font-semibold rounded-lg px-4 py-2"
-                style={{ backgroundColor: '#1877F2', color: '#fff', textDecoration: 'none', display: 'inline-flex' }}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 6,
+                  backgroundColor: '#1877F2', color: '#fff',
+                  padding: '7px 14px', borderRadius: 8,
+                  fontSize: 13, fontWeight: 600, textDecoration: 'none',
+                }}
               >
                 <FacebookIconSmall />
                 Abrir Graph API Explorer →
               </a>
               <div className="mt-3 rounded-lg px-3 py-2.5 text-xs"
-                style={{ backgroundColor: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.15)', color: '#94A3B8', lineHeight: 1.6 }}>
+                style={{ backgroundColor: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.15)', color: '#94A3B8', lineHeight: 1.7 }}>
                 Após abrir, clique em <strong style={{ color: '#F1F5F9' }}>"Gerar token de acesso"</strong> e marque as
                 permissões:{' '}
                 <Code>pages_show_list</Code>,{' '}
                 <Code>pages_read_engagement</Code>,{' '}
                 <Code>leads_retrieval</Code>,{' '}
                 <Code>pages_manage_metadata</Code>.
-                Depois clique em <strong style={{ color: '#F1F5F9' }}>Enviar</strong>.
               </div>
             </div>
           </div>
 
-          {/* PASSO 2 */}
+          {/* ── PASSO 2 ── */}
           <div className="flex gap-3">
             <StepSidebar last={false} />
             <div className="card flex-1 mb-4">
-              <StepHeader n={2} title="Copie o token da sua página" />
+              <StepHeader n={2} title="Copie o seu User Access Token" />
               <p className="text-xs mb-3" style={{ color: '#94A3B8' }}>
-                No resultado que aparecer, localize o nome da sua página imobiliária e copie o valor
-                do campo <strong style={{ color: '#F1F5F9' }}>access_token</strong>.
+                No topo do Explorer, após gerar o token, copie o token que aparece no campo{' '}
+                <strong style={{ color: '#F1F5F9' }}>"Token de acesso"</strong>.
+                NÃO precisa clicar em Enviar.
               </p>
 
-              {/* Visualização do JSON de resposta */}
-              <div className="rounded-lg px-3 py-2.5 text-xs font-mono"
-                style={{
-                  backgroundColor: 'rgba(0,0,0,0.35)',
-                  border: '1px solid rgba(255,255,255,0.06)',
-                  color: '#94A3B8',
-                  lineHeight: 1.75,
-                  overflowX: 'auto',
-                }}>
-                <div><span style={{ color: '#64748B' }}>{'{'}</span></div>
-                <div style={{ paddingLeft: 14 }}>
-                  <span style={{ color: '#94A3B8' }}>"data"</span>
-                  <span style={{ color: '#64748B' }}>: [{'{'}</span>
+              {/* Mockup visual do campo de token no Explorer */}
+              <div className="rounded-lg overflow-hidden text-xs"
+                style={{ border: '1px solid rgba(255,255,255,0.1)' }}>
+                {/* Barra de título do Explorer */}
+                <div className="flex items-center gap-2 px-3 py-1.5"
+                  style={{ backgroundColor: 'rgba(24,119,242,0.15)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                  <FacebookIconSmall />
+                  <span style={{ color: '#93C5FD', fontWeight: 600 }}>Graph API Explorer</span>
                 </div>
-                <div style={{ paddingLeft: 28 }}>
-                  <span style={{ color: '#94A3B8' }}>"name"</span>
-                  <span style={{ color: '#64748B' }}>: </span>
-                  <span style={{ color: '#86EFAC' }}>"Sua Imobiliária"</span>
-                  <span style={{ color: '#64748B' }}>,</span>
+                {/* Campo Token de acesso */}
+                <div className="px-3 py-2.5" style={{ backgroundColor: 'rgba(0,0,0,0.25)' }}>
+                  <div className="text-xs mb-1" style={{ color: '#64748B' }}>Token de acesso</div>
+                  <div className="flex items-center gap-2 rounded px-2.5 py-1.5"
+                    style={{ backgroundColor: 'rgba(255,255,255,0.05)', border: '1px solid rgba(99,102,241,0.4)' }}>
+                    <span className="flex-1 font-mono truncate" style={{ color: '#FCD34D', fontSize: 11 }}>
+                      EAAb6z4XxBzMBO...
+                    </span>
+                    <span className="flex-shrink-0 rounded px-1.5 py-0.5 font-sans font-semibold"
+                      style={{ backgroundColor: 'rgba(16,185,129,0.2)', color: '#6EE7B7', fontSize: 10 }}>
+                      ← copie aqui
+                    </span>
+                  </div>
                 </div>
-                <div style={{ paddingLeft: 28 }} className="flex items-center flex-wrap gap-x-1">
-                  <span style={{ color: '#818cf8' }}>"access_token"</span>
-                  <span style={{ color: '#64748B' }}>: </span>
-                  <span style={{ color: '#FCD34D' }}>"EAAb..."</span>
-                  <span className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-sans"
-                    style={{ backgroundColor: 'rgba(16,185,129,0.18)', color: '#6EE7B7', marginLeft: 4 }}>
-                    ← copie este
-                  </span>
+                {/* Linha de método/path (decorativa) */}
+                <div className="flex items-center gap-2 px-3 py-2"
+                  style={{ backgroundColor: 'rgba(0,0,0,0.15)', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+                  <span className="rounded px-1.5 py-0.5 font-mono font-bold" style={{ backgroundColor: 'rgba(99,102,241,0.2)', color: '#818cf8', fontSize: 10 }}>GET</span>
+                  <span style={{ color: '#475569', fontSize: 11 }}>v19.0 / me/accounts</span>
                 </div>
-                <div style={{ paddingLeft: 14 }}>
-                  <span style={{ color: '#64748B' }}>{'}]'}</span>
-                </div>
-                <div><span style={{ color: '#64748B' }}>{'}'}</span></div>
               </div>
 
               <p className="text-xs mt-2" style={{ color: '#64748B' }}>
@@ -269,81 +294,123 @@ export default function Integracoes() {
             </div>
           </div>
 
-          {/* PASSO 3 */}
+          {/* ── PASSO 3 ── */}
           <div className="flex gap-3">
             <StepSidebar last={true} />
             <div className="card flex-1 mb-0">
-              <StepHeader n={3} title="Cole o token abaixo" green />
+              <StepHeader n={3} title="Cole o token e selecione sua página" green />
+
               <div className="space-y-3">
+                {/* Textarea do token */}
                 <div>
                   <label className="block text-xs font-medium mb-1" style={{ color: '#64748B' }}>
-                    ACCESS TOKEN
+                    USER ACCESS TOKEN
                   </label>
                   <textarea
                     rows={3}
-                    value={pageToken}
-                    onChange={(e) => setPageToken(e.target.value)}
-                    placeholder="Cole o access_token aqui..."
+                    value={userToken}
+                    onChange={(e) => handleUserTokenChange(e.target.value)}
+                    placeholder="Cole o token copiado do Graph API Explorer..."
                     style={{
-                      width: '100%',
-                      borderRadius: 8,
-                      padding: '8px 12px',
-                      fontSize: 12,
-                      resize: 'none',
+                      width: '100%', boxSizing: 'border-box',
+                      borderRadius: 8, padding: '8px 12px',
+                      fontSize: 11, resize: 'none',
                       backgroundColor: 'rgba(255,255,255,0.05)',
                       color: '#F1F5F9',
-                      border: '1px solid rgba(255,255,255,0.1)',
+                      border: paginasDisponiveis.length > 0
+                        ? '1px solid rgba(16,185,129,0.4)'
+                        : '1px solid rgba(255,255,255,0.1)',
                       outline: 'none',
                       fontFamily: 'monospace',
                       lineHeight: 1.5,
-                      boxSizing: 'border-box',
                     }}
                   />
                 </div>
-                <div>
-                  <label className="block text-xs font-medium mb-1" style={{ color: '#64748B' }}>
-                    PAGE ID
-                  </label>
-                  <input
-                    type="text"
-                    value={pageId}
-                    onChange={(e) => setPageId(e.target.value)}
-                    placeholder="ID da página, ex: 123456789"
+
+                {/* Botão buscar páginas */}
+                {paginasDisponiveis.length === 0 && (
+                  <button
+                    onClick={handleBuscarPaginas}
+                    disabled={buscandoPaginas || !userToken.trim()}
                     style={{
                       width: '100%',
+                      padding: '8px 16px',
                       borderRadius: 8,
-                      padding: '8px 12px',
-                      fontSize: 13,
-                      backgroundColor: 'rgba(255,255,255,0.05)',
-                      color: '#F1F5F9',
-                      border: '1px solid rgba(255,255,255,0.1)',
-                      outline: 'none',
-                      boxSizing: 'border-box',
-                    }}
-                  />
-                </div>
-                <div className="flex justify-end pt-1">
-                  <button
-                    onClick={handleConectar}
-                    disabled={salvando || !pageToken.trim() || !pageId.trim()}
-                    style={{
-                      borderRadius: 8,
-                      padding: '8px 20px',
                       fontSize: 13,
                       fontWeight: 600,
-                      backgroundColor:
-                        salvando || !pageToken.trim() || !pageId.trim()
-                          ? 'rgba(16,185,129,0.35)'
-                          : '#10B981',
-                      color: '#fff',
-                      border: 'none',
-                      cursor: salvando || !pageToken.trim() || !pageId.trim() ? 'not-allowed' : 'pointer',
-                      transition: 'background-color 0.15s',
+                      backgroundColor: buscandoPaginas || !userToken.trim()
+                        ? 'rgba(99,102,241,0.2)'
+                        : 'rgba(99,102,241,0.25)',
+                      color: buscandoPaginas || !userToken.trim() ? '#64748B' : '#A5B4FC',
+                      border: '1px solid rgba(99,102,241,0.3)',
+                      cursor: buscandoPaginas || !userToken.trim() ? 'not-allowed' : 'pointer',
+                      transition: 'all 0.15s',
                     }}
                   >
-                    {salvando ? 'Validando…' : 'Conectar página'}
+                    {buscandoPaginas ? 'Buscando páginas…' : 'Buscar minhas páginas →'}
                   </button>
-                </div>
+                )}
+
+                {/* Dropdown de páginas (após busca bem-sucedida) */}
+                {paginasDisponiveis.length > 0 && (
+                  <>
+                    <div className="flex items-center gap-2 text-xs" style={{ color: '#6EE7B7' }}>
+                      <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                      </svg>
+                      Token válido — {paginasDisponiveis.length} página{paginasDisponiveis.length > 1 ? 's' : ''} encontrada{paginasDisponiveis.length > 1 ? 's' : ''}
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium mb-1" style={{ color: '#64748B' }}>
+                        SELECIONE SUA PÁGINA
+                      </label>
+                      <select
+                        value={selectedPageId}
+                        onChange={(e) => setSelectedPageId(e.target.value)}
+                        style={{
+                          width: '100%', boxSizing: 'border-box',
+                          borderRadius: 8, padding: '8px 12px',
+                          fontSize: 13,
+                          backgroundColor: 'rgba(255,255,255,0.05)',
+                          color: '#F1F5F9',
+                          border: '1px solid rgba(255,255,255,0.15)',
+                          outline: 'none',
+                        }}
+                      >
+                        {paginasDisponiveis.map((p) => (
+                          <option key={p.id} value={p.id} style={{ backgroundColor: '#1E293B' }}>
+                            {p.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="flex items-center justify-between gap-2 pt-1">
+                      <button
+                        onClick={() => { setPaginasDisponiveis([]); setUserToken('') }}
+                        style={{
+                          fontSize: 12, color: '#64748B', background: 'none',
+                          border: 'none', cursor: 'pointer', padding: 0,
+                        }}
+                      >
+                        ← Usar outro token
+                      </button>
+                      <button
+                        onClick={handleConectar}
+                        disabled={salvando || !selectedPageId}
+                        style={{
+                          padding: '8px 20px', borderRadius: 8,
+                          fontSize: 13, fontWeight: 600, border: 'none',
+                          backgroundColor: salvando || !selectedPageId ? 'rgba(16,185,129,0.35)' : '#10B981',
+                          color: '#fff',
+                          cursor: salvando || !selectedPageId ? 'not-allowed' : 'pointer',
+                          transition: 'background-color 0.15s',
+                        }}
+                      >
+                        {salvando ? 'Conectando…' : 'Conectar página'}
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           </div>
@@ -358,9 +425,7 @@ export default function Integracoes() {
 function StepSidebar({ last }) {
   return (
     <div className="flex flex-col items-center" style={{ width: 32, flexShrink: 0 }}>
-      {/* linha de cima (espaçador invisível para alinhar com o círculo do card) */}
       <div style={{ height: 20, width: 2, backgroundColor: 'transparent' }} />
-      {/* linha de baixo conectando ao próximo passo */}
       {!last && (
         <div style={{ flex: 1, width: 2, minHeight: 16, backgroundColor: 'rgba(99,102,241,0.2)', marginBottom: -8 }} />
       )}
