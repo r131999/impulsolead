@@ -221,7 +221,7 @@ export default function Integracoes() {
                 Faça login com o perfil que administra a página.
               </p>
               <a
-                href="https://developers.facebook.com/tools/explorer/893852687057557/?method=GET&path=me%2Faccounts&version=v19.0"
+                href="https://developers.facebook.com/tools/explorer/956548647376263/?method=GET&path=me%2Faccounts&version=v19.0"
                 target="_blank"
                 rel="noopener noreferrer"
                 style={{
