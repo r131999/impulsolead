@@ -10,31 +10,10 @@ export default function Integracoes() {
   const [salvando, setSalvando]         = useState(false)
   const [erro, setErro]                 = useState(null)
   const [sucesso, setSucesso]           = useState(null)
-  const [paginasOAuth, setPaginasOAuth] = useState([])
-  const [selectedPageId, setSelectedPageId] = useState('')
+  const [pageId, setPageId]             = useState('')
+  const [pageToken, setPageToken]       = useState('')
 
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
-    const status = params.get('status')
-
-    if (status === 'paginas_ok') {
-      const paginasJson = params.get('paginas')
-      try {
-        const paginas = JSON.parse(decodeURIComponent(paginasJson || '[]'))
-        setPaginasOAuth(paginas)
-        if (paginas.length > 0) setSelectedPageId(paginas[0].id)
-      } catch {
-        setErro('Erro ao carregar as páginas do Facebook.')
-      }
-      window.history.replaceState({}, '', '/integracoes')
-    } else if (status === 'cancelado') {
-      const erroParam = params.get('erro')
-      setErro(erroParam ? decodeURIComponent(erroParam) : 'Conexão com o Facebook cancelada.')
-      window.history.replaceState({}, '', '/integracoes')
-    }
-
-    carregarStatus()
-  }, [])
+  useEffect(() => { carregarStatus() }, [])
 
   async function carregarStatus() {
     try {
@@ -50,27 +29,42 @@ export default function Integracoes() {
     }
   }
 
-  function handleIniciarOAuth() {
-    const token = localStorage.getItem('token')
-    window.location.href = `/api/integracoes/meta/oauth/iniciar?token=${encodeURIComponent(token)}`
-  }
-
-  async function handleConfirmarPagina() {
-    const page = paginasOAuth.find((p) => p.id === selectedPageId)
-    if (!page) return
+  async function handleConectar() {
+    const tokenLimpo = pageToken.trim()
+    const idLimpo    = pageId.trim()
     setErro(null)
     setSucesso(null)
+
+    if (!tokenLimpo || !idLimpo) {
+      setErro('Preencha o access token e o Page ID.')
+      return
+    }
+
     setSalvando(true)
     try {
-      await selecionarPagina({ pageId: page.id, pageName: page.name, pageToken: page.access_token })
+      // Valida o token no Graph API antes de salvar
+      const resp = await fetch(
+        `https://graph.facebook.com/me?access_token=${encodeURIComponent(tokenLimpo)}&fields=name,id`
+      )
+      const tokenData = await resp.json()
+
+      if (tokenData.error) {
+        setErro('Token inválido. Verifique se copiou corretamente.')
+        return
+      }
+
+      const pageName = tokenData.name || 'Aguardando validação'
+
+      await selecionarPagina({ pageId: idLimpo, pageName, pageToken: tokenLimpo })
       setAtivo(true)
-      setPageIdAtual(page.id)
-      setPageNameAtual(page.name)
+      setPageIdAtual(idLimpo)
+      setPageNameAtual(pageName)
       setCriadoEm(new Date().toISOString())
-      setPaginasOAuth([])
-      setSucesso('Página conectada com sucesso! Os leads do Facebook/Instagram serão recebidos automaticamente.')
+      setPageId('')
+      setPageToken('')
+      setSucesso('Página conectada! Os leads do Facebook/Instagram serão recebidos automaticamente.')
     } catch (e) {
-      setErro(e.response?.data?.error || 'Erro ao confirmar conexão.')
+      setErro(e.response?.data?.error || 'Erro ao conectar. Tente novamente.')
     } finally {
       setSalvando(false)
     }
@@ -110,45 +104,34 @@ export default function Integracoes() {
       <div className="mb-6">
         <div className="flex items-center gap-3 mb-1">
           <MetaIcon />
-          <h1 className="text-xl font-bold" style={{ color: '#F1F5F9' }}>
-            Integrações
-          </h1>
+          <h1 className="text-xl font-bold" style={{ color: '#F1F5F9' }}>Integrações</h1>
         </div>
         <p className="text-sm" style={{ color: '#94A3B8' }}>
           Conecte fontes externas para receber leads automaticamente no CRM.
         </p>
       </div>
 
-      {/* Card Meta Lead Ads */}
+      {/* Card de status */}
       <div className="card mb-4">
-        <div className="flex items-center gap-3 mb-4">
+        <div className="flex items-center gap-3">
           <FacebookIcon />
           <div>
             <p className="font-semibold text-sm" style={{ color: '#F1F5F9' }}>Meta Lead Ads</p>
             <p className="text-xs" style={{ color: '#64748B' }}>Facebook &amp; Instagram Leads</p>
           </div>
           <div className="ml-auto flex items-center gap-2">
-            <span
-              className="inline-block rounded-full"
-              style={{
-                width: 8, height: 8, flexShrink: 0,
-                backgroundColor: ativo ? '#10B981' : paginasOAuth.length > 0 ? '#F59E0B' : '#EF4444',
-              }}
-            />
-            <span className="text-xs font-semibold" style={{
-              color: ativo ? '#10B981' : paginasOAuth.length > 0 ? '#F59E0B' : '#EF4444',
-            }}>
-              {ativo ? 'Conectado' : paginasOAuth.length > 0 ? 'Aguardando seleção' : 'Desconectado'}
+            <span className="inline-block rounded-full"
+              style={{ width: 8, height: 8, flexShrink: 0, backgroundColor: ativo ? '#10B981' : '#EF4444' }} />
+            <span className="text-xs font-semibold" style={{ color: ativo ? '#10B981' : '#EF4444' }}>
+              {ativo ? 'Conectado' : 'Desconectado'}
             </span>
           </div>
         </div>
 
-        {/* ESTADO 3 — Conectado */}
+        {/* Estado conectado */}
         {ativo && pageIdAtual && (
-          <div
-            className="rounded-lg px-4 py-3 mb-2"
-            style={{ backgroundColor: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)' }}
-          >
+          <div className="mt-4 rounded-lg px-4 py-3"
+            style={{ backgroundColor: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)' }}>
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-sm font-semibold truncate" style={{ color: '#10B981' }}>
@@ -156,14 +139,17 @@ export default function Integracoes() {
                 </p>
                 {criadoEm && (
                   <p className="text-xs mt-0.5" style={{ color: '#6EE7B7' }}>
-                    Conectado em {new Date(criadoEm).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}
+                    Conectado em{' '}
+                    {new Date(criadoEm).toLocaleDateString('pt-BR', {
+                      day: '2-digit', month: 'long', year: 'numeric',
+                    })}
                   </p>
                 )}
               </div>
               <button
                 onClick={handleDesconectar}
                 disabled={salvando}
-                className="text-xs px-3 py-1 rounded-lg font-medium transition-colors flex-shrink-0"
+                className="text-xs px-3 py-1 rounded-lg font-medium flex-shrink-0"
                 style={{
                   backgroundColor: 'rgba(239,68,68,0.12)',
                   color: '#F87171',
@@ -177,113 +163,238 @@ export default function Integracoes() {
             </div>
           </div>
         )}
-
-        {/* ESTADO 2 — Selecionar página */}
-        {!ativo && paginasOAuth.length > 0 && (
-          <div className="space-y-3">
-            <div>
-              <label className="block text-xs font-medium mb-1" style={{ color: '#94A3B8' }}>
-                Selecione qual página receberá os leads
-              </label>
-              <select
-                value={selectedPageId}
-                onChange={(e) => setSelectedPageId(e.target.value)}
-                className="w-full rounded-lg px-3 py-2 text-sm"
-                style={{
-                  backgroundColor: 'rgba(255,255,255,0.05)',
-                  color: '#F1F5F9',
-                  border: '1px solid rgba(255,255,255,0.15)',
-                  outline: 'none',
-                }}
-              >
-                {paginasOAuth.map((p) => (
-                  <option key={p.id} value={p.id} style={{ backgroundColor: '#1E293B' }}>
-                    {p.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="flex justify-end">
-              <button
-                onClick={handleConfirmarPagina}
-                disabled={salvando || !selectedPageId}
-                className="btn-primary text-sm"
-              >
-                {salvando ? 'Conectando…' : 'Confirmar conexão'}
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* ESTADO 1 — Desconectado */}
-        {!ativo && paginasOAuth.length === 0 && (
-          <button
-            onClick={handleIniciarOAuth}
-            disabled={salvando}
-            className="w-full flex items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-semibold transition-colors"
-            style={{
-              backgroundColor: '#1877F2',
-              color: '#fff',
-              opacity: salvando ? 0.6 : 1,
-              cursor: salvando ? 'not-allowed' : 'pointer',
-            }}
-          >
-            <FacebookIconSmall />
-            Conectar com Facebook
-          </button>
-        )}
       </div>
 
       {/* Feedback */}
       {sucesso && (
-        <div
-          className="rounded-lg px-4 py-3 text-sm mb-4"
-          style={{ backgroundColor: 'rgba(16,185,129,0.1)', color: '#6EE7B7', border: '1px solid rgba(16,185,129,0.2)' }}
-        >
+        <div className="rounded-lg px-4 py-3 text-sm mb-4"
+          style={{ backgroundColor: 'rgba(16,185,129,0.1)', color: '#6EE7B7', border: '1px solid rgba(16,185,129,0.2)' }}>
           {sucesso}
         </div>
       )}
       {erro && (
-        <div
-          className="rounded-lg px-4 py-3 text-sm mb-4"
-          style={{ backgroundColor: 'rgba(239,68,68,0.1)', color: '#FCA5A5', border: '1px solid rgba(239,68,68,0.2)' }}
-        >
+        <div className="rounded-lg px-4 py-3 text-sm mb-4"
+          style={{ backgroundColor: 'rgba(239,68,68,0.1)', color: '#FCA5A5', border: '1px solid rgba(239,68,68,0.2)' }}>
           {erro}
         </div>
       )}
 
-      {/* Informações do webhook (sempre visível quando não conectado) */}
-      {!ativo && paginasOAuth.length === 0 && (
-        <div className="card">
-          <p className="text-sm font-semibold mb-1" style={{ color: '#F1F5F9' }}>
-            Como funciona
+      {/* Fluxo guiado de 3 passos (apenas quando desconectado) */}
+      {!ativo && (
+        <>
+          <p className="text-xs font-semibold uppercase tracking-wide mb-4" style={{ color: '#64748B' }}>
+            Como conectar — 3 passos
           </p>
-          <p className="text-sm mb-3" style={{ color: '#94A3B8' }}>
-            Clique em "Conectar com Facebook", autorize o acesso às suas páginas e selecione a página que enviará os leads para o CRM.
-          </p>
-          <div
-            className="rounded-lg px-3 py-2 text-xs"
-            style={{ backgroundColor: 'rgba(99,102,241,0.08)', color: '#94A3B8', border: '1px solid rgba(99,102,241,0.15)' }}
-          >
-            <strong style={{ color: '#818cf8' }}>URL do Webhook (Meta App):</strong>{' '}
-            https://api-crm.impulsoslz.com.br/api/integracoes/meta/webhook
+
+          {/* PASSO 1 */}
+          <div className="flex gap-3">
+            <StepSidebar last={false} />
+            <div className="card flex-1 mb-4">
+              <StepHeader n={1} title="Abra o gerador de token" />
+              <p className="text-xs mb-3" style={{ color: '#94A3B8' }}>
+                Clique no botão abaixo. Vai abrir o Graph API Explorer do Facebook já configurado.
+                Faça login com o perfil que administra a página.
+              </p>
+              <a
+                href="https://developers.facebook.com/tools/explorer/893852687057557/?method=GET&path=me%2Faccounts&version=v19.0"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 text-sm font-semibold rounded-lg px-4 py-2"
+                style={{ backgroundColor: '#1877F2', color: '#fff', textDecoration: 'none', display: 'inline-flex' }}
+              >
+                <FacebookIconSmall />
+                Abrir Graph API Explorer →
+              </a>
+              <div className="mt-3 rounded-lg px-3 py-2.5 text-xs"
+                style={{ backgroundColor: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.15)', color: '#94A3B8', lineHeight: 1.6 }}>
+                Após abrir, clique em <strong style={{ color: '#F1F5F9' }}>"Gerar token de acesso"</strong> e marque as
+                permissões:{' '}
+                <Code>pages_show_list</Code>,{' '}
+                <Code>pages_read_engagement</Code>,{' '}
+                <Code>leads_retrieval</Code>,{' '}
+                <Code>pages_manage_metadata</Code>.
+                Depois clique em <strong style={{ color: '#F1F5F9' }}>Enviar</strong>.
+              </div>
+            </div>
           </div>
-        </div>
+
+          {/* PASSO 2 */}
+          <div className="flex gap-3">
+            <StepSidebar last={false} />
+            <div className="card flex-1 mb-4">
+              <StepHeader n={2} title="Copie o token da sua página" />
+              <p className="text-xs mb-3" style={{ color: '#94A3B8' }}>
+                No resultado que aparecer, localize o nome da sua página imobiliária e copie o valor
+                do campo <strong style={{ color: '#F1F5F9' }}>access_token</strong>.
+              </p>
+
+              {/* Visualização do JSON de resposta */}
+              <div className="rounded-lg px-3 py-2.5 text-xs font-mono"
+                style={{
+                  backgroundColor: 'rgba(0,0,0,0.35)',
+                  border: '1px solid rgba(255,255,255,0.06)',
+                  color: '#94A3B8',
+                  lineHeight: 1.75,
+                  overflowX: 'auto',
+                }}>
+                <div><span style={{ color: '#64748B' }}>{'{'}</span></div>
+                <div style={{ paddingLeft: 14 }}>
+                  <span style={{ color: '#94A3B8' }}>"data"</span>
+                  <span style={{ color: '#64748B' }}>: [{'{'}</span>
+                </div>
+                <div style={{ paddingLeft: 28 }}>
+                  <span style={{ color: '#94A3B8' }}>"name"</span>
+                  <span style={{ color: '#64748B' }}>: </span>
+                  <span style={{ color: '#86EFAC' }}>"Sua Imobiliária"</span>
+                  <span style={{ color: '#64748B' }}>,</span>
+                </div>
+                <div style={{ paddingLeft: 28 }} className="flex items-center flex-wrap gap-x-1">
+                  <span style={{ color: '#818cf8' }}>"access_token"</span>
+                  <span style={{ color: '#64748B' }}>: </span>
+                  <span style={{ color: '#FCD34D' }}>"EAAb..."</span>
+                  <span className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-sans"
+                    style={{ backgroundColor: 'rgba(16,185,129,0.18)', color: '#6EE7B7', marginLeft: 4 }}>
+                    ← copie este
+                  </span>
+                </div>
+                <div style={{ paddingLeft: 14 }}>
+                  <span style={{ color: '#64748B' }}>{'}]'}</span>
+                </div>
+                <div><span style={{ color: '#64748B' }}>{'}'}</span></div>
+              </div>
+
+              <p className="text-xs mt-2" style={{ color: '#64748B' }}>
+                O token começa com <Code amber>EAA...</Code> e é bem longo.
+              </p>
+            </div>
+          </div>
+
+          {/* PASSO 3 */}
+          <div className="flex gap-3">
+            <StepSidebar last={true} />
+            <div className="card flex-1 mb-0">
+              <StepHeader n={3} title="Cole o token abaixo" green />
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs font-medium mb-1" style={{ color: '#64748B' }}>
+                    ACCESS TOKEN
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={pageToken}
+                    onChange={(e) => setPageToken(e.target.value)}
+                    placeholder="Cole o access_token aqui..."
+                    style={{
+                      width: '100%',
+                      borderRadius: 8,
+                      padding: '8px 12px',
+                      fontSize: 12,
+                      resize: 'none',
+                      backgroundColor: 'rgba(255,255,255,0.05)',
+                      color: '#F1F5F9',
+                      border: '1px solid rgba(255,255,255,0.1)',
+                      outline: 'none',
+                      fontFamily: 'monospace',
+                      lineHeight: 1.5,
+                      boxSizing: 'border-box',
+                    }}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium mb-1" style={{ color: '#64748B' }}>
+                    PAGE ID
+                  </label>
+                  <input
+                    type="text"
+                    value={pageId}
+                    onChange={(e) => setPageId(e.target.value)}
+                    placeholder="ID da página, ex: 123456789"
+                    style={{
+                      width: '100%',
+                      borderRadius: 8,
+                      padding: '8px 12px',
+                      fontSize: 13,
+                      backgroundColor: 'rgba(255,255,255,0.05)',
+                      color: '#F1F5F9',
+                      border: '1px solid rgba(255,255,255,0.1)',
+                      outline: 'none',
+                      boxSizing: 'border-box',
+                    }}
+                  />
+                </div>
+                <div className="flex justify-end pt-1">
+                  <button
+                    onClick={handleConectar}
+                    disabled={salvando || !pageToken.trim() || !pageId.trim()}
+                    style={{
+                      borderRadius: 8,
+                      padding: '8px 20px',
+                      fontSize: 13,
+                      fontWeight: 600,
+                      backgroundColor:
+                        salvando || !pageToken.trim() || !pageId.trim()
+                          ? 'rgba(16,185,129,0.35)'
+                          : '#10B981',
+                      color: '#fff',
+                      border: 'none',
+                      cursor: salvando || !pageToken.trim() || !pageId.trim() ? 'not-allowed' : 'pointer',
+                      transition: 'background-color 0.15s',
+                    }}
+                  >
+                    {salvando ? 'Validando…' : 'Conectar página'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
       )}
     </div>
   )
 }
 
+/* ── sub-componentes ───────────────────────────────────── */
+
+function StepSidebar({ last }) {
+  return (
+    <div className="flex flex-col items-center" style={{ width: 32, flexShrink: 0 }}>
+      {/* linha de cima (espaçador invisível para alinhar com o círculo do card) */}
+      <div style={{ height: 20, width: 2, backgroundColor: 'transparent' }} />
+      {/* linha de baixo conectando ao próximo passo */}
+      {!last && (
+        <div style={{ flex: 1, width: 2, minHeight: 16, backgroundColor: 'rgba(99,102,241,0.2)', marginBottom: -8 }} />
+      )}
+    </div>
+  )
+}
+
+function StepHeader({ n, title, green }) {
+  const bg    = green ? 'rgba(16,185,129,0.15)' : 'rgba(99,102,241,0.15)'
+  const color = green ? '#10B981' : '#818cf8'
+  return (
+    <div className="flex items-center gap-2 mb-2">
+      <div className="flex items-center justify-center rounded-full text-xs font-bold flex-shrink-0"
+        style={{ width: 24, height: 24, backgroundColor: bg, color }}>
+        {n}
+      </div>
+      <p className="font-semibold text-sm" style={{ color: '#F1F5F9' }}>{title}</p>
+    </div>
+  )
+}
+
+function Code({ children, amber }) {
+  return (
+    <code style={{ color: amber ? '#FCD34D' : '#818cf8', fontSize: 11 }}>{children}</code>
+  )
+}
+
 function MetaIcon() {
   return (
-    <div
-      style={{
-        width: 36, height: 36, borderRadius: 8,
-        background: 'linear-gradient(135deg, #1877F2, #0a5dc2)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        flexShrink: 0,
-      }}
-    >
+    <div style={{
+      width: 36, height: 36, borderRadius: 8,
+      background: 'linear-gradient(135deg, #1877F2, #0a5dc2)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+    }}>
       <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
         <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15v-4H9l3-6 3 6h-2v4h-2z" />
       </svg>
@@ -293,14 +404,11 @@ function MetaIcon() {
 
 function FacebookIcon() {
   return (
-    <div
-      style={{
-        width: 40, height: 40, borderRadius: 10,
-        background: 'linear-gradient(135deg, #1877F2, #0a5dc2)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        flexShrink: 0,
-      }}
-    >
+    <div style={{
+      width: 40, height: 40, borderRadius: 10,
+      background: 'linear-gradient(135deg, #1877F2, #0a5dc2)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+    }}>
       <svg width="22" height="22" viewBox="0 0 24 24" fill="white">
         <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
       </svg>
@@ -310,7 +418,7 @@ function FacebookIcon() {
 
 function FacebookIconSmall() {
   return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="white">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="white">
       <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
     </svg>
   )
