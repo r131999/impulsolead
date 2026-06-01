@@ -169,9 +169,15 @@ async function receberLeadMeta(req, res) {
 async function statusMeta(req, res) {
   const integracao = await prisma.metaIntegracao.findUnique({
     where: { imobiliariaId: req.imobiliariaId },
-    select: { pageId: true, ativo: true },
+    select: { pageId: true, pageName: true, ativo: true, criadoEm: true },
   });
-  res.json({ ativo: !!integracao?.ativo, pageId: integracao?.pageId || null });
+  const conectado = !!integracao?.ativo && !!integracao?.pageId;
+  res.json({
+    ativo: conectado,
+    pageId: conectado ? integracao.pageId : null,
+    pageName: conectado ? (integracao.pageName || null) : null,
+    criadoEm: conectado ? integracao.criadoEm : null,
+  });
 }
 
 // POST /api/integracoes/meta/conectar

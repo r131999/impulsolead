@@ -364,14 +364,16 @@ model WhatsappInstancia {
 }
 
 model MetaIntegracao {
-  id            String      @id @default(uuid())
-  imobiliariaId String      @unique
-  imobiliaria   Imobiliaria @relation(fields: [imobiliariaId], references: [id])
-  pageId        String
-  pageToken     String
-  ativo         Boolean     @default(true)
-  criadoEm      DateTime    @default(now())
-  atualizadoEm  DateTime    @updatedAt
+  id               String      @id @default(uuid())
+  imobiliariaId    String      @unique
+  imobiliaria      Imobiliaria @relation(fields: [imobiliariaId], references: [id])
+  pageId           String
+  pageToken        String
+  pageName         String?
+  paginasPendentes Json?
+  ativo            Boolean     @default(true)
+  criadoEm         DateTime    @default(now())
+  atualizadoEm     DateTime    @updatedAt
 }
 
 model ConfigAgente {

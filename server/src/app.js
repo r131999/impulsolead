@@ -29,6 +29,8 @@ const chatLeadRoutes = require('./routes/chat-lead.routes');
 const whatsappRoutes = require('./routes/whatsapp.routes');
 const pushRoutes = require('./routes/push.routes');
 const integracoesRoutes = require('./routes/integracoes.routes');
+const metaOauthRoutes = require('./routes/meta.oauth.routes');
+const metaPaginaRoutes = require('./routes/meta.pagina.routes');
 const { listarInstanciasInterno } = require('./controllers/whatsapp.controller');
 const { iniciarCrons } = require('./services/cron.service');
 
@@ -79,6 +81,8 @@ app.use('/api/chat-lead', chatLeadRoutes);
 app.use('/api/whatsapp', whatsappRoutes);
 app.use('/api/push', pushRoutes);
 app.use('/api/integracoes', integracoesRoutes);
+app.use('/api/integracoes', metaOauthRoutes);
+app.use('/api/integracoes', metaPaginaRoutes);
 
 // Endpoint interno: chamado pelo manager para carregar tenants ativos
 app.get('/api/internal/whatsapp-instancias', listarInstanciasInterno);

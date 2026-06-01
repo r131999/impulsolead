@@ -1,17 +1,38 @@
 import { useEffect, useState } from 'react'
-import { getStatusMeta, conectarMeta, desconectarMeta } from '../api/integracoes'
+import { getStatusMeta, desconectarMeta, selecionarPagina } from '../api/integracoes'
 
 export default function Integracoes() {
-  const [ativo, setAtivo]           = useState(false)
-  const [pageIdAtual, setPageIdAtual] = useState(null)
-  const [carregando, setCarregando] = useState(true)
-  const [pageId, setPageId]         = useState('')
-  const [pageToken, setPageToken]   = useState('')
-  const [salvando, setSalvando]     = useState(false)
-  const [erro, setErro]             = useState(null)
-  const [sucesso, setSucesso]       = useState(null)
+  const [ativo, setAtivo]               = useState(false)
+  const [pageIdAtual, setPageIdAtual]   = useState(null)
+  const [pageNameAtual, setPageNameAtual] = useState(null)
+  const [criadoEm, setCriadoEm]         = useState(null)
+  const [carregando, setCarregando]     = useState(true)
+  const [salvando, setSalvando]         = useState(false)
+  const [erro, setErro]                 = useState(null)
+  const [sucesso, setSucesso]           = useState(null)
+  const [paginasOAuth, setPaginasOAuth] = useState([])
+  const [selectedPageId, setSelectedPageId] = useState('')
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const status = params.get('status')
+
+    if (status === 'paginas_ok') {
+      const paginasJson = params.get('paginas')
+      try {
+        const paginas = JSON.parse(decodeURIComponent(paginasJson || '[]'))
+        setPaginasOAuth(paginas)
+        if (paginas.length > 0) setSelectedPageId(paginas[0].id)
+      } catch {
+        setErro('Erro ao carregar as páginas do Facebook.')
+      }
+      window.history.replaceState({}, '', '/integracoes')
+    } else if (status === 'cancelado') {
+      const erroParam = params.get('erro')
+      setErro(erroParam ? decodeURIComponent(erroParam) : 'Conexão com o Facebook cancelada.')
+      window.history.replaceState({}, '', '/integracoes')
+    }
+
     carregarStatus()
   }, [])
 
@@ -20,6 +41,8 @@ export default function Integracoes() {
       const { data } = await getStatusMeta()
       setAtivo(data.ativo)
       setPageIdAtual(data.pageId)
+      setPageNameAtual(data.pageName)
+      setCriadoEm(data.criadoEm)
     } catch {
       setAtivo(false)
     } finally {
@@ -27,24 +50,27 @@ export default function Integracoes() {
     }
   }
 
-  async function handleConectar(e) {
-    e.preventDefault()
+  function handleIniciarOAuth() {
+    const token = localStorage.getItem('token')
+    window.location.href = `/api/integracoes/meta/oauth/iniciar?token=${encodeURIComponent(token)}`
+  }
+
+  async function handleConfirmarPagina() {
+    const page = paginasOAuth.find((p) => p.id === selectedPageId)
+    if (!page) return
     setErro(null)
     setSucesso(null)
-    if (!pageId.trim() || !pageToken.trim()) {
-      setErro('Preencha o Page ID e o Page Access Token.')
-      return
-    }
     setSalvando(true)
     try {
-      await conectarMeta({ pageId: pageId.trim(), pageToken: pageToken.trim() })
-      setSucesso('Integração salva com sucesso!')
+      await selecionarPagina({ pageId: page.id, pageName: page.name, pageToken: page.access_token })
       setAtivo(true)
-      setPageIdAtual(pageId.trim())
-      setPageId('')
-      setPageToken('')
+      setPageIdAtual(page.id)
+      setPageNameAtual(page.name)
+      setCriadoEm(new Date().toISOString())
+      setPaginasOAuth([])
+      setSucesso('Página conectada com sucesso! Os leads do Facebook/Instagram serão recebidos automaticamente.')
     } catch (e) {
-      setErro(e.response?.data?.error || 'Erro ao salvar integração.')
+      setErro(e.response?.data?.error || 'Erro ao confirmar conexão.')
     } finally {
       setSalvando(false)
     }
@@ -59,6 +85,8 @@ export default function Integracoes() {
       await desconectarMeta()
       setAtivo(false)
       setPageIdAtual(null)
+      setPageNameAtual(null)
+      setCriadoEm(null)
       setSucesso('Integração removida.')
     } catch (e) {
       setErro(e.response?.data?.error || 'Erro ao remover integração.')
@@ -102,85 +130,107 @@ export default function Integracoes() {
           <div className="ml-auto flex items-center gap-2">
             <span
               className="inline-block rounded-full"
-              style={{ width: 8, height: 8, backgroundColor: ativo ? '#10B981' : '#EF4444', flexShrink: 0 }}
+              style={{
+                width: 8, height: 8, flexShrink: 0,
+                backgroundColor: ativo ? '#10B981' : paginasOAuth.length > 0 ? '#F59E0B' : '#EF4444',
+              }}
             />
-            <span className="text-xs font-semibold" style={{ color: ativo ? '#10B981' : '#EF4444' }}>
-              {ativo ? 'Conectado' : 'Desconectado'}
+            <span className="text-xs font-semibold" style={{
+              color: ativo ? '#10B981' : paginasOAuth.length > 0 ? '#F59E0B' : '#EF4444',
+            }}>
+              {ativo ? 'Conectado' : paginasOAuth.length > 0 ? 'Aguardando seleção' : 'Desconectado'}
             </span>
           </div>
         </div>
 
+        {/* ESTADO 3 — Conectado */}
         {ativo && pageIdAtual && (
           <div
-            className="flex items-center justify-between rounded-lg px-3 py-2 mb-4 text-sm"
+            className="rounded-lg px-4 py-3 mb-2"
             style={{ backgroundColor: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)' }}
           >
-            <span style={{ color: '#10B981' }}>Page ID: <strong>{pageIdAtual}</strong></span>
-            <button
-              onClick={handleDesconectar}
-              disabled={salvando}
-              className="text-xs px-3 py-1 rounded-lg font-medium transition-colors"
-              style={{
-                backgroundColor: 'rgba(239,68,68,0.12)',
-                color: '#F87171',
-                border: '1px solid rgba(239,68,68,0.25)',
-                opacity: salvando ? 0.5 : 1,
-                cursor: salvando ? 'not-allowed' : 'pointer',
-              }}
-            >
-              {salvando ? 'Aguarde…' : 'Desconectar'}
-            </button>
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-sm font-semibold truncate" style={{ color: '#10B981' }}>
+                  {pageNameAtual || pageIdAtual}
+                </p>
+                {criadoEm && (
+                  <p className="text-xs mt-0.5" style={{ color: '#6EE7B7' }}>
+                    Conectado em {new Date(criadoEm).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}
+                  </p>
+                )}
+              </div>
+              <button
+                onClick={handleDesconectar}
+                disabled={salvando}
+                className="text-xs px-3 py-1 rounded-lg font-medium transition-colors flex-shrink-0"
+                style={{
+                  backgroundColor: 'rgba(239,68,68,0.12)',
+                  color: '#F87171',
+                  border: '1px solid rgba(239,68,68,0.25)',
+                  opacity: salvando ? 0.5 : 1,
+                  cursor: salvando ? 'not-allowed' : 'pointer',
+                }}
+              >
+                {salvando ? 'Aguarde…' : 'Desconectar'}
+              </button>
+            </div>
           </div>
         )}
 
-        {!ativo && (
-          <form onSubmit={handleConectar} className="space-y-3">
+        {/* ESTADO 2 — Selecionar página */}
+        {!ativo && paginasOAuth.length > 0 && (
+          <div className="space-y-3">
             <div>
-              <label className="block text-xs font-medium mb-1" style={{ color: '#64748B' }}>
-                PAGE ID
+              <label className="block text-xs font-medium mb-1" style={{ color: '#94A3B8' }}>
+                Selecione qual página receberá os leads
               </label>
-              <input
-                type="text"
-                value={pageId}
-                onChange={(e) => setPageId(e.target.value)}
-                placeholder="Ex: 123456789012345"
+              <select
+                value={selectedPageId}
+                onChange={(e) => setSelectedPageId(e.target.value)}
                 className="w-full rounded-lg px-3 py-2 text-sm"
                 style={{
                   backgroundColor: 'rgba(255,255,255,0.05)',
                   color: '#F1F5F9',
-                  border: '1px solid rgba(255,255,255,0.1)',
+                  border: '1px solid rgba(255,255,255,0.15)',
                   outline: 'none',
                 }}
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium mb-1" style={{ color: '#64748B' }}>
-                PAGE ACCESS TOKEN
-              </label>
-              <input
-                type="password"
-                value={pageToken}
-                onChange={(e) => setPageToken(e.target.value)}
-                placeholder="Cole o token aqui"
-                className="w-full rounded-lg px-3 py-2 text-sm"
-                style={{
-                  backgroundColor: 'rgba(255,255,255,0.05)',
-                  color: '#F1F5F9',
-                  border: '1px solid rgba(255,255,255,0.1)',
-                  outline: 'none',
-                }}
-              />
+              >
+                {paginasOAuth.map((p) => (
+                  <option key={p.id} value={p.id} style={{ backgroundColor: '#1E293B' }}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
             </div>
             <div className="flex justify-end">
               <button
-                type="submit"
-                disabled={salvando}
+                onClick={handleConfirmarPagina}
+                disabled={salvando || !selectedPageId}
                 className="btn-primary text-sm"
               >
-                {salvando ? 'Salvando…' : 'Conectar'}
+                {salvando ? 'Conectando…' : 'Confirmar conexão'}
               </button>
             </div>
-          </form>
+          </div>
+        )}
+
+        {/* ESTADO 1 — Desconectado */}
+        {!ativo && paginasOAuth.length === 0 && (
+          <button
+            onClick={handleIniciarOAuth}
+            disabled={salvando}
+            className="w-full flex items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-semibold transition-colors"
+            style={{
+              backgroundColor: '#1877F2',
+              color: '#fff',
+              opacity: salvando ? 0.6 : 1,
+              cursor: salvando ? 'not-allowed' : 'pointer',
+            }}
+          >
+            <FacebookIconSmall />
+            Conectar com Facebook
+          </button>
         )}
       </div>
 
@@ -202,38 +252,21 @@ export default function Integracoes() {
         </div>
       )}
 
-      {/* Instruções */}
-      {!ativo && (
+      {/* Informações do webhook (sempre visível quando não conectado) */}
+      {!ativo && paginasOAuth.length === 0 && (
         <div className="card">
-          <p className="text-sm font-semibold mb-3" style={{ color: '#F1F5F9' }}>
-            Como obter o Page Access Token
+          <p className="text-sm font-semibold mb-1" style={{ color: '#F1F5F9' }}>
+            Como funciona
           </p>
-          <ol className="space-y-2">
-            {[
-              'Acesse developers.facebook.com e vá em "Meus Apps".',
-              'Selecione seu app ou crie um novo do tipo "Business".',
-              'No menu lateral, acesse "Ferramentas" → "Graph API Explorer".',
-              'Em "Permissões", adicione leads_retrieval e pages_read_engagement.',
-              'Clique em "Gerar Token de Acesso" e copie o token gerado.',
-              'Cole o Page ID da sua página e o token acima.',
-            ].map((step, i) => (
-              <li key={i} className="flex items-start gap-2.5 text-sm" style={{ color: '#94A3B8' }}>
-                <span
-                  className="flex-shrink-0 rounded-full flex items-center justify-center text-xs font-bold"
-                  style={{ width: 20, height: 20, minWidth: 20, backgroundColor: 'rgba(99,102,241,0.2)', color: '#818cf8' }}
-                >
-                  {i + 1}
-                </span>
-                {step}
-              </li>
-            ))}
-          </ol>
+          <p className="text-sm mb-3" style={{ color: '#94A3B8' }}>
+            Clique em "Conectar com Facebook", autorize o acesso às suas páginas e selecione a página que enviará os leads para o CRM.
+          </p>
           <div
-            className="mt-4 rounded-lg px-3 py-2 text-xs"
+            className="rounded-lg px-3 py-2 text-xs"
             style={{ backgroundColor: 'rgba(99,102,241,0.08)', color: '#94A3B8', border: '1px solid rgba(99,102,241,0.15)' }}
           >
-            <strong style={{ color: '#818cf8' }}>URL do Webhook:</strong>{' '}
-            {window.location.origin.replace(':5173', ':3002')}/api/integracoes/meta/webhook
+            <strong style={{ color: '#818cf8' }}>URL do Webhook (Meta App):</strong>{' '}
+            https://api-crm.impulsoslz.com.br/api/integracoes/meta/webhook
           </div>
         </div>
       )}
@@ -272,5 +305,13 @@ function FacebookIcon() {
         <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
       </svg>
     </div>
+  )
+}
+
+function FacebookIconSmall() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="white">
+      <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
+    </svg>
   )
 }
