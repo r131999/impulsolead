@@ -32,6 +32,7 @@ function mesAnteriorInicioBrasilia(agora) {
 async function getDashboard(req, res) {
   try {
     const imobiliariaId = req.imobiliariaId;
+    console.log('[dashboard] imobiliariaId:', imobiliariaId);
     const agora = new Date();
 
     const hojeInicio = inicioDiaBrasilia(agora);
@@ -49,7 +50,8 @@ async function getDashboard(req, res) {
       leadsHoje,
       leadsOntem,
       emAtendimento,
-      visitasAgendadas,
+      agendamentos,
+      visitas,
       fechadosMes,
       fechadosMesPassado,
       totalLeadsMes,
@@ -63,6 +65,7 @@ async function getDashboard(req, res) {
       prisma.lead.count({ where: { imobiliariaId, criadoEm: { gte: ontemInicio, lte: ontemFim } } }),
       prisma.lead.count({ where: { imobiliariaId, status: 'atendimento' } }),
       prisma.lead.count({ where: { imobiliariaId, status: 'agendamento' } }),
+      prisma.lead.count({ where: { imobiliariaId, status: 'visita' } }),
       prisma.lead.count({ where: { imobiliariaId, status: 'venda', criadoEm: { gte: mesInicio } } }),
       prisma.lead.count({ where: { imobiliariaId, status: 'venda', criadoEm: { gte: mesPassadoInicio, lte: mesPassadoFim } } }),
       prisma.lead.count({ where: { imobiliariaId, status: { not: 'perdido' }, criadoEm: { gte: mesInicio } } }),
@@ -121,7 +124,8 @@ async function getDashboard(req, res) {
       leadsHoje,
       leadsHojeVariacao,
       emAtendimento,
-      visitasAgendadas,
+      agendamentos,
+      visitas,
       fechadosMes,
       taxaConversao,
       taxaConversaoVariacao,
