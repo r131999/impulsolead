@@ -11,6 +11,7 @@ const CAMPOS_QUALIFICACAO = [
 
 async function listar(req, res) {
   const { status, corretorId, dataInicio, dataFim, busca, page = 1, limit = 50 } = req.query;
+  console.log('[leads] listar imobiliariaId:', req.imobiliariaId);
 
   const where = { imobiliariaId: req.imobiliariaId };
 
@@ -61,7 +62,7 @@ async function listar(req, res) {
         primeiroImovel: true, tipoRenda: true, rendaMensal: true,
         restricaoCpf: true, valorEntrada: true,
         urgencia: true, regiao: true, faixaValor: true,
-        observacoes: true, criadoEm: true, atualizadoEm: true,
+        observacoes: true, criadoEm: true, atualizadoEm: true, etapaEntradaEm: true,
         temConversa: true,
         corretor: { select: { id: true, nome: true } },
       },
@@ -351,6 +352,7 @@ async function mudarStatus(req, res) {
       where: { id },
       data: {
         status,
+        etapaEntradaEm: new Date(),
         ...(status === 'perdido' && { motivoPerda }),
         ...(observacao && { observacoes: observacao }),
       },

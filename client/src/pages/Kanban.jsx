@@ -25,8 +25,9 @@ const URGENCIA_COR = {
   baixa: '#10B981',
 }
 
-function tempoNaEtapa(atualizadoEm) {
-  const diffMs = Date.now() - new Date(atualizadoEm).getTime()
+function tempoNaEtapa(etapaEntradaEm, atualizadoEm) {
+  const referencia = etapaEntradaEm || atualizadoEm
+  const diffMs = Date.now() - new Date(referencia).getTime()
   const h = diffMs / 3600000
   if (h < 24) {
     const horas = Math.max(1, Math.floor(h))
@@ -123,7 +124,7 @@ export default function Kanban() {
 
   const carregar = useCallback(() => {
     leadsApi
-      .listar({ limit: 300 })
+      .listar({ limit: 5000 })
       .then((res) => setGrupos(agrupar(res.data.leads)))
       .finally(() => setLoading(false))
   }, [])
@@ -350,7 +351,7 @@ function LeadCard({ lead, atualizando, followUp, podeGerenciar, bloqueado, chatH
   const podePerdido = lead.status !== 'venda' && lead.status !== 'perdido'
   const podeVoltar = podeGerenciar && !!statusAnterior(lead.status) && lead.status !== 'venda'
   const pendente = podeGerenciar && temPendenciaLocal(lead)
-  const tempo = lead.atualizadoEm ? tempoNaEtapa(lead.atualizadoEm) : null
+  const tempo = (lead.etapaEntradaEm || lead.atualizadoEm) ? tempoNaEtapa(lead.etapaEntradaEm, lead.atualizadoEm) : null
   const fuInfo = followUp ? formatarFollowUp(followUp.dataHora) : null
 
   return (

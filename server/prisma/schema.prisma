@@ -121,6 +121,7 @@ model Lead {
   mensagens MensagemLead[]
 
   ultimaNotificacaoGestor DateTime?
+  etapaEntradaEm          DateTime?
 
   criadoEm     DateTime @default(now())
   atualizadoEm DateTime @updatedAt
