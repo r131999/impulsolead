@@ -8,8 +8,8 @@ router.use(authMiddleware);
 router.post('/chunk', requireRole('gestor', 'admin', 'gerente'), receberChunk);
 router.post('/chunk/finalizar', requireRole('gestor', 'admin', 'gerente'), finalizarChunk);
 router.post('/', requireRole('gestor', 'admin', 'gerente'), enviar);
-router.get('/', listar);
-router.get('/:id/download', download);
+router.get('/', requireRole('gestor', 'admin', 'gerente', 'corretor'), listar);
+router.get('/:id/download', requireRole('gestor', 'admin', 'gerente', 'corretor'), download);
 router.delete('/:id', requireRole('gestor', 'admin', 'gerente'), remover);
 
 module.exports = router;

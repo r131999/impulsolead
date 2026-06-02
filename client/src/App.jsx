@@ -22,6 +22,7 @@ import Imoveis from './pages/Imoveis'
 import AdminLogin from './pages/admin/AdminLogin'
 import AdminDashboard from './pages/admin/AdminDashboard'
 import ArquivosImovel from './pages/ArquivosImovel'
+import MateriaisCorretor from './pages/MateriaisCorretor'
 import ConectarWhatsApp from './pages/ConectarWhatsApp'
 import Cadastro from './pages/Cadastro'
 import Planos from './pages/Planos'
@@ -72,6 +73,7 @@ export default function App() {
             <Route path="meus-leads" element={<Kanban />} />
             <Route path="meu-desempenho" element={<DesempenhoCorretor />} />
             <Route path="meus-contatos" element={<MeusContatos />} />
+            <Route path="materiais" element={<MateriaisCorretor />} />
 
             {/* Rotas do gerente */}
             <Route path="gerente/dashboard" element={<DashboardGerente />} />
