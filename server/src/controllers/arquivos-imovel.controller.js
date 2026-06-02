@@ -24,7 +24,7 @@ const ALLOWED_EXTS = ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.mp4', '.mov', 
 
 const upload = multer({
   storage,
-  limits: { fileSize: 50 * 1024 * 1024 },
+  limits: { fileSize: 100 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
     const ext = path.extname(file.originalname).toLowerCase();
     if (ALLOWED_MIMETYPES.includes(file.mimetype) && ALLOWED_EXTS.includes(ext)) {
@@ -38,7 +38,7 @@ function handleUpload(req, res, next) {
   upload(req, res, (err) => {
     if (err instanceof multer.MulterError) {
       if (err.code === 'LIMIT_FILE_SIZE') {
-        return res.status(400).json({ error: 'Arquivo muito grande. Limite: 50MB' });
+        return res.status(400).json({ error: 'Arquivo muito grande. Limite: 100MB' });
       }
       return res.status(400).json({ error: err.message });
     }

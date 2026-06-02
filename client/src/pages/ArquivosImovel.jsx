@@ -96,7 +96,7 @@ function ModalUpload({ onSalvo, onClose }) {
           </div>
 
           <div>
-            <label className="text-xs font-medium block mb-1" style={{ color: '#94A3B8' }}>Arquivo (max 50MB)</label>
+            <label className="text-xs font-medium block mb-1" style={{ color: '#94A3B8' }}>Arquivo (max 100MB)</label>
             <div
               className="rounded-lg p-4 text-center cursor-pointer transition-colors"
               style={{ border: '2px dashed #1E293B', backgroundColor: '#0B1120' }}
