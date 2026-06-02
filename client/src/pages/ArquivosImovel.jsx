@@ -223,6 +223,39 @@ export default function ArquivosImovel() {
   const [filtro, setFiltro] = useState('todos')
   const [modalUpload, setModalUpload] = useState(false)
   const [deletando, setDeletando] = useState(null)
+  const [abrindo, setAbrindo] = useState(null)
+  const [erroDownload, setErroDownload] = useState('')
+
+  const downloadArquivo = async (arquivo) => {
+    setAbrindo(arquivo.id)
+    setErroDownload('')
+    try {
+      const token = localStorage.getItem('token')
+      const resp = await fetch(`/api/arquivos-imovel/${arquivo.id}/download`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!resp.ok) throw new Error()
+      const blob = await resp.blob()
+      const url = URL.createObjectURL(blob)
+      const inline = blob.type.startsWith('image/') || blob.type === 'application/pdf'
+      if (inline) {
+        window.open(url, '_blank')
+      } else {
+        const ext = arquivo.filename ? `.${arquivo.filename.split('.').pop()}` : ''
+        const link = document.createElement('a')
+        link.href = url
+        link.download = arquivo.nome + ext
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+      }
+      setTimeout(() => URL.revokeObjectURL(url), 60000)
+    } catch {
+      setErroDownload('Erro ao abrir arquivo. Tente novamente.')
+    } finally {
+      setAbrindo(null)
+    }
+  }
 
   const carregar = async () => {
     setLoading(true)
@@ -314,6 +347,17 @@ export default function ArquivosImovel() {
         ))}
       </div>
 
+      {/* Erro de download */}
+      {erroDownload && (
+        <div
+          className="mx-4 mt-3 p-3 rounded-lg flex items-center justify-between flex-shrink-0"
+          style={{ backgroundColor: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)' }}
+        >
+          <p className="text-xs" style={{ color: '#EF4444' }}>{erroDownload}</p>
+          <button onClick={() => setErroDownload('')} className="text-xs ml-3 leading-none" style={{ color: '#EF4444' }}>✕</button>
+        </div>
+      )}
+
       {/* Conteúdo */}
       <div className="flex-1 overflow-y-auto p-4">
         {loading && (
@@ -365,17 +409,16 @@ export default function ArquivosImovel() {
                 </p>
 
                 <div className="flex gap-2 mt-auto pt-1" style={{ borderTop: '1px solid #1E293B' }}>
-                  <a
-                    href={arquivosApi.downloadUrl(a.id)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex-1 text-center text-xs py-1.5 rounded-lg transition-colors"
+                  <button
+                    onClick={() => downloadArquivo(a)}
+                    disabled={abrindo === a.id}
+                    className="flex-1 text-center text-xs py-1.5 rounded-lg transition-colors disabled:opacity-50"
                     style={{ backgroundColor: '#1E293B', color: '#94A3B8' }}
-                    onMouseEnter={(e) => { e.currentTarget.style.color = '#F1F5F9' }}
+                    onMouseEnter={(e) => { if (abrindo !== a.id) e.currentTarget.style.color = '#F1F5F9' }}
                     onMouseLeave={(e) => { e.currentTarget.style.color = '#94A3B8' }}
                   >
-                    Abrir
-                  </a>
+                    {abrindo === a.id ? '...' : 'Abrir'}
+                  </button>
                   <button
                     onClick={() => deletar(a.id)}
                     disabled={deletando === a.id}
