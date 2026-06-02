@@ -18,11 +18,22 @@ function formatarData(iso) {
 
 // ── Modal de upload ────────────────────────────────────────────────────────────
 
+const CHUNK_THRESHOLD = 10 * 1024 * 1024 // arquivos >= 10 MB usam chunks
+const CHUNK_SIZE = 5 * 1024 * 1024        // cada parte = 5 MB
+
+function gerarUploadId() {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID()
+  }
+  return `${Date.now()}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`
+}
+
 function ModalUpload({ onSalvo, onClose }) {
   const [nome, setNome] = useState('')
   const [tipo, setTipo] = useState('foto')
   const [arquivo, setArquivo] = useState(null)
   const [salvando, setSalvando] = useState(false)
+  const [progresso, setProgresso] = useState(0)
   const [erro, setErro] = useState('')
   const fileRef = useRef(null)
 
@@ -30,21 +41,57 @@ function ModalUpload({ onSalvo, onClose }) {
     if (!nome.trim()) return setErro('Nome é obrigatório')
     if (!arquivo) return setErro('Selecione um arquivo')
 
-    const fd = new FormData()
-    fd.append('nome', nome.trim())
-    fd.append('tipo', tipo)
-    fd.append('arquivo', arquivo)
-
     setSalvando(true)
     setErro('')
+    setProgresso(0)
+
     try {
-      await arquivosApi.upload(fd)
+      if (arquivo.size >= CHUNK_THRESHOLD) {
+        // ── Upload em chunks ──────────────────────────────────────────────────
+        const uploadId = gerarUploadId()
+        const totalChunks = Math.ceil(arquivo.size / CHUNK_SIZE)
+
+        for (let i = 0; i < totalChunks; i++) {
+          const start = i * CHUNK_SIZE
+          const end = Math.min(start + CHUNK_SIZE, arquivo.size)
+
+          const fd = new FormData()
+          fd.append('uploadId', uploadId)
+          fd.append('chunkIndex', String(i))
+          fd.append('totalChunks', String(totalChunks))
+          fd.append('fileName', arquivo.name)
+          fd.append('chunk', arquivo.slice(start, end))
+
+          await arquivosApi.uploadChunk(fd)
+          setProgresso(Math.round(((i + 1) / totalChunks) * 90))
+        }
+
+        await arquivosApi.finalizarUploadChunk({
+          uploadId,
+          fileName: arquivo.name,
+          nome: nome.trim(),
+          tipo,
+          totalChunks,
+        })
+        setProgresso(100)
+      } else {
+        // ── Upload simples (fallback para arquivos < 10 MB) ───────────────────
+        const fd = new FormData()
+        fd.append('nome', nome.trim())
+        fd.append('tipo', tipo)
+        fd.append('arquivo', arquivo)
+        await arquivosApi.upload(fd)
+      }
+
       onSalvo()
     } catch (e) {
       setErro(e.response?.data?.error || 'Erro ao fazer upload')
       setSalvando(false)
+      setProgresso(0)
     }
   }
+
+  const usandoChunks = arquivo && arquivo.size >= CHUNK_THRESHOLD
 
   return (
     <div
@@ -105,7 +152,14 @@ function ModalUpload({ onSalvo, onClose }) {
               onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#1E293B' }}
             >
               {arquivo ? (
-                <p className="text-sm font-medium truncate" style={{ color: '#818cf8' }}>{arquivo.name}</p>
+                <div>
+                  <p className="text-sm font-medium truncate" style={{ color: '#818cf8' }}>{arquivo.name}</p>
+                  {usandoChunks && (
+                    <p className="text-xs mt-1" style={{ color: '#475569' }}>
+                      Upload em partes de 5 MB ({Math.ceil(arquivo.size / CHUNK_SIZE)} partes)
+                    </p>
+                  )}
+                </div>
               ) : (
                 <p className="text-sm" style={{ color: '#475569' }}>Clique para selecionar</p>
               )}
@@ -114,15 +168,32 @@ function ModalUpload({ onSalvo, onClose }) {
               ref={fileRef}
               type="file"
               className="hidden"
-              onChange={(e) => setArquivo(e.target.files[0] || null)}
+              onChange={(e) => { setArquivo(e.target.files[0] || null); setProgresso(0) }}
             />
           </div>
+
+          {salvando && usandoChunks && (
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs" style={{ color: '#94A3B8' }}>
+                  {progresso < 100 ? `Enviando partes... ${progresso}%` : 'Finalizando...'}
+                </span>
+                <span className="text-xs font-medium" style={{ color: '#818cf8' }}>{progresso}%</span>
+              </div>
+              <div className="h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: '#1E293B' }}>
+                <div
+                  className="h-full rounded-full transition-all duration-300"
+                  style={{ width: `${progresso}%`, backgroundColor: '#818cf8' }}
+                />
+              </div>
+            </div>
+          )}
         </div>
 
         {erro && <p className="text-xs mt-3" style={{ color: '#EF4444' }}>{erro}</p>}
 
         <div className="flex gap-2 mt-4">
-          <button onClick={onClose} className="btn-secondary flex-1">Cancelar</button>
+          <button onClick={onClose} disabled={salvando} className="btn-secondary flex-1">Cancelar</button>
           <button
             onClick={handleSubmit}
             disabled={salvando}
@@ -131,7 +202,9 @@ function ModalUpload({ onSalvo, onClose }) {
             onMouseEnter={(e) => { if (!salvando) e.currentTarget.style.backgroundColor = 'rgba(99,102,241,0.3)' }}
             onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'rgba(99,102,241,0.2)' }}
           >
-            {salvando ? 'Enviando...' : 'Fazer upload'}
+            {salvando
+              ? (usandoChunks ? `Enviando... ${progresso}%` : 'Enviando...')
+              : 'Fazer upload'}
           </button>
         </div>
       </div>

@@ -7,6 +7,14 @@ export const upload = (formData) =>
     headers: { 'Content-Type': 'multipart/form-data' },
   })
 
+export const uploadChunk = (formData) =>
+  api.post('/arquivos-imovel/chunk', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })
+
+export const finalizarUploadChunk = (data) =>
+  api.post('/arquivos-imovel/chunk/finalizar', data)
+
 export const deletar = (id) => api.delete(`/arquivos-imovel/${id}`)
 
 export const downloadUrl = (id) => `/api/arquivos-imovel/${id}/download`
