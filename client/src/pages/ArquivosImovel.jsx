@@ -237,18 +237,13 @@ export default function ArquivosImovel() {
       if (!resp.ok) throw new Error()
       const blob = await resp.blob()
       const url = URL.createObjectURL(blob)
-      const inline = blob.type.startsWith('image/') || blob.type === 'application/pdf'
-      if (inline) {
-        window.open(url, '_blank')
-      } else {
-        const ext = arquivo.filename ? `.${arquivo.filename.split('.').pop()}` : ''
-        const link = document.createElement('a')
-        link.href = url
-        link.download = arquivo.nome + ext
-        document.body.appendChild(link)
-        link.click()
-        document.body.removeChild(link)
-      }
+      const ext = arquivo.filename ? `.${arquivo.filename.split('.').pop()}` : ''
+      const link = document.createElement('a')
+      link.href = url
+      link.download = arquivo.nome + ext
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
       setTimeout(() => URL.revokeObjectURL(url), 60000)
     } catch {
       setErroDownload('Erro ao abrir arquivo. Tente novamente.')
