@@ -7,11 +7,17 @@ export default function DesempenhoCorretor() {
   const [dados, setDados] = useState(null)
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
+  const carregarDados = () => {
     getDashboardCorretor()
       .then((res) => setDados(res.data))
       .finally(() => setLoading(false))
-  }, [])
+  }
+
+  useEffect(() => {
+    carregarDados()
+    const intervalo = setInterval(carregarDados, 30000)
+    return () => clearInterval(intervalo)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   if (loading) {
     return (
@@ -24,10 +30,11 @@ export default function DesempenhoCorretor() {
   const cards = [
     { label: 'Leads recebidos', value: dados?.leadsAtribuidos ?? 0, sub: `${dados?.leadsHoje ?? 0} hoje`, cor: '#3B82F6' },
     { label: 'Em atendimento', value: dados?.emAtendimento ?? 0, cor: '#F59E0B' },
-    { label: 'Visitas agendadas', value: dados?.visitasAgendadas ?? 0, cor: '#f97316' },
+    { label: 'Agendamentos', value: dados?.agendamentos ?? 0, cor: '#8B5CF6' },
+    { label: 'Visitas', value: dados?.visitas ?? 0, cor: '#f97316' },
     { label: 'Fechamentos no mês', value: dados?.fechadosMes ?? 0, cor: '#10B981' },
-    { label: 'Taxa de conversão', value: `${dados?.taxaConversaoPessoal ?? 0}%`, cor: '#8B5CF6' },
-    { label: 'Posição na fila', value: `#${dados?.posicaoNaFila ?? '—'}`, cor: '#6366f1' },
+    { label: 'Taxa de conversão', value: `${dados?.taxaConversaoPessoal ?? 0}%`, cor: '#6366f1' },
+    { label: 'Posição na fila', value: `#${dados?.posicaoNaFila ?? '—'}`, cor: '#818cf8' },
   ]
 
   const STATUS_LABEL = {
