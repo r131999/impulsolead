@@ -3,6 +3,7 @@
 const path = require('path');
 const fs = require('fs');
 const multer = require('multer');
+const sharp = require('sharp');
 const prisma = require('../lib/prisma');
 
 const UPLOAD_DIR_TOURS = process.env.UPLOAD_DIR_TOURS || '/opt/uploads/tours';
@@ -270,6 +271,20 @@ async function uploadFotoComodo(req, res) {
   handleFotoUpload(req, res, async () => {
     try {
       if (!req.file) return res.status(400).json({ error: 'Arquivo ausente' });
+
+      const isHeic = ['.heic', '.heif'].includes(path.extname(req.file.originalname).toLowerCase())
+        || req.file.mimetype === 'image/heic'
+        || req.file.mimetype === 'image/heif';
+
+      if (isHeic) {
+        const novoNome = req.file.filename.replace(/\.(heic|heif)$/i, '.jpg');
+        const novoCaminho = path.join(path.dirname(req.file.path), novoNome);
+        await sharp(req.file.path).jpeg({ quality: 85 }).toFile(novoCaminho);
+        fs.unlinkSync(req.file.path);
+        req.file.path = novoCaminho;
+        req.file.filename = novoNome;
+        req.file.mimetype = 'image/jpeg';
+      }
 
       const { id: tourId, comodoId } = req.params;
 
