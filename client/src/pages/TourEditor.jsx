@@ -2,6 +2,15 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import * as tourApi from '../api/tour'
 
+async function converterSeHeic(file) {
+  const ext = file.name.split('.').pop().toLowerCase()
+  if (ext !== 'heic' && ext !== 'heif') return file
+  const heic2any = (await import('heic2any')).default
+  const blob = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.85 })
+  const nomeJpeg = file.name.replace(/\.(heic|heif)$/i, '.jpg')
+  return new File([blob], nomeJpeg, { type: 'image/jpeg' })
+}
+
 export default function TourEditor() {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -15,6 +24,7 @@ export default function TourEditor() {
   const [novoNomeComodo, setNovoNomeComodo] = useState('')
   const [salvandoComodo, setSalvandoComodo] = useState(false)
   const [uploadProgress, setUploadProgress] = useState({})
+  const [convertendo, setConvertendo] = useState(null)
   const [dragSrcIdx, setDragSrcIdx] = useState(null)
   const [dragOverIdx, setDragOverIdx] = useState(null)
   const [dragSrcFotoIdx, setDragSrcFotoIdx] = useState(null)
@@ -134,7 +144,15 @@ export default function TourEditor() {
     if (!files.length || !comodoAtivo) return
     e.target.value = ''
 
-    for (const file of files) {
+    for (let i = 0; i < files.length; i++) {
+      let file = files[i]
+      const ext = file.name.split('.').pop().toLowerCase()
+      if (ext === 'heic' || ext === 'heif') {
+        setConvertendo(`Convertendo ${i + 1} de ${files.length}...`)
+        try { file = await converterSeHeic(file) } catch {}
+        setConvertendo(null)
+      }
+
       const key = `${file.name}-${Date.now()}`
       setUploadProgress((prev) => ({ ...prev, [key]: 0 }))
       try {
@@ -370,9 +388,15 @@ export default function TourEditor() {
 
               {/* Grid de fotos */}
               <div className="flex-1 overflow-y-auto p-4">
-                {/* Uploads em progresso */}
-                {uploading.length > 0 && (
+                {/* Uploads em progresso / conversão HEIC */}
+                {(convertendo || uploading.length > 0) && (
                   <div className="mb-4 space-y-2">
+                    {convertendo && (
+                      <div className="flex items-center gap-2 text-xs py-1" style={{ color: '#94A3B8' }}>
+                        <div className="animate-spin rounded-full h-3 w-3 border-b border-indigo-400 flex-shrink-0" />
+                        <span>{convertendo}</span>
+                      </div>
+                    )}
                     {uploading.map(([key, pct]) => (
                       <div key={key}>
                         <div className="flex justify-between text-xs mb-1" style={{ color: '#94A3B8' }}>
