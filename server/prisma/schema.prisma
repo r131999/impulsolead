@@ -37,6 +37,7 @@ model Imobiliaria {
   mensagensLead          MensagemLead[]
   whatsappInstancia      WhatsappInstancia?
   metaIntegracao         MetaIntegracao?
+  tours                  TourVirtual[]
 }
 
 model Usuario {
@@ -375,6 +376,41 @@ model MetaIntegracao {
   ativo            Boolean     @default(true)
   criadoEm         DateTime    @default(now())
   atualizadoEm     DateTime    @updatedAt
+}
+
+model TourVirtual {
+  id               String      @id @default(uuid())
+  imobiliariaId    String
+  imobiliaria      Imobiliaria @relation(fields: [imobiliariaId], references: [id])
+  nome             String
+  descricao        String?
+  slug             String      @unique
+  publicado        Boolean     @default(false)
+  whatsappCorretor String?
+  nomeCorretor     String?
+  comodos          Comodo[]
+  criadoEm         DateTime    @default(now())
+  atualizadoEm     DateTime    @updatedAt
+}
+
+model Comodo {
+  id       String      @id @default(uuid())
+  tourId   String
+  tour     TourVirtual @relation(fields: [tourId], references: [id], onDelete: Cascade)
+  nome     String
+  ordem    Int
+  fotos    FotoComodo[]
+  criadoEm DateTime    @default(now())
+}
+
+model FotoComodo {
+  id       String   @id @default(uuid())
+  comodoId String
+  comodo   Comodo   @relation(fields: [comodoId], references: [id], onDelete: Cascade)
+  url      String
+  tamanho  Int
+  ordem    Int
+  criadoEm DateTime @default(now())
 }
 
 model ConfigAgente {

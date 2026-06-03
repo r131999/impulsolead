@@ -25,6 +25,7 @@ const chatInternoRoutes = require('./routes/chat-interno.routes');
 const adminRoutes = require('./routes/admin.routes');
 const agenteRoutes = require('./routes/agente.routes');
 const arquivosImovelRoutes = require('./routes/arquivos-imovel.routes');
+const tourRoutes = require('./routes/tour.routes');
 const chatLeadRoutes = require('./routes/chat-lead.routes');
 const whatsappRoutes = require('./routes/whatsapp.routes');
 const pushRoutes = require('./routes/push.routes');
@@ -49,6 +50,9 @@ app.use('/uploads/imoveis', express.static(UPLOAD_DIR_IMOVEIS));
 
 const UPLOAD_DIR_LOGOS = process.env.UPLOAD_DIR_LOGOS || '/opt/uploads/logos';
 app.use('/uploads/logos', express.static(UPLOAD_DIR_LOGOS));
+
+const UPLOAD_DIR_TOURS = process.env.UPLOAD_DIR_TOURS || '/opt/uploads/tours';
+app.use('/uploads/tours', express.static(UPLOAD_DIR_TOURS));
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -77,6 +81,7 @@ app.use('/api/chat-interno', chatInternoRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/agente', agenteRoutes);
 app.use('/api/arquivos-imovel', arquivosImovelRoutes);
+app.use('/api/tours', tourRoutes);
 app.use('/api/chat-lead', chatLeadRoutes);
 app.use('/api/whatsapp', whatsappRoutes);
 app.use('/api/push', pushRoutes);
