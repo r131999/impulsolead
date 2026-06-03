@@ -50,6 +50,7 @@ export default function MateriaisCorretor() {
   const [loading, setLoading] = useState(true)
   const [filtro, setFiltro] = useState('todos')
   const [baixando, setBaixando] = useState(null)
+  const [progressoBaixando, setProgressoBaixando] = useState(0)
   const [erroDownload, setErroDownload] = useState('')
 
   useEffect(() => {
@@ -61,6 +62,7 @@ export default function MateriaisCorretor() {
 
   const baixarArquivo = async (arquivo) => {
     setBaixando(arquivo.id)
+    setProgressoBaixando(0)
     setErroDownload('')
     try {
       const token = localStorage.getItem('token')
@@ -68,7 +70,21 @@ export default function MateriaisCorretor() {
         headers: { Authorization: `Bearer ${token}` },
       })
       if (!resp.ok) throw new Error()
-      const blob = await resp.blob()
+
+      const total = Number(resp.headers.get('content-length')) || 0
+      const reader = resp.body.getReader()
+      const chunks = []
+      let recebido = 0
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        chunks.push(value)
+        recebido += value.length
+        if (total > 0) setProgressoBaixando(Math.round((recebido / total) * 100))
+      }
+
+      const blob = new Blob(chunks, { type: resp.headers.get('content-type') || 'application/octet-stream' })
       const url = URL.createObjectURL(blob)
       const ext = arquivo.filename ? `.${arquivo.filename.split('.').pop()}` : ''
       const link = document.createElement('a')
@@ -82,6 +98,7 @@ export default function MateriaisCorretor() {
       setErroDownload('Erro ao baixar arquivo. Tente novamente.')
     } finally {
       setBaixando(null)
+      setProgressoBaixando(0)
     }
   }
 
@@ -206,7 +223,9 @@ export default function MateriaisCorretor() {
                     onMouseEnter={(e) => { if (baixando !== a.id) e.currentTarget.style.backgroundColor = 'rgba(99,102,241,0.28)' }}
                     onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'rgba(99,102,241,0.15)' }}
                   >
-                    {baixando === a.id ? 'Baixando...' : '⬇ Baixar'}
+                    {baixando === a.id
+                      ? `Baixando... ${progressoBaixando > 0 ? progressoBaixando + '%' : ''}`
+                      : '⬇ Baixar'}
                   </button>
                 </div>
               )

@@ -284,9 +284,15 @@ async function download(req, res) {
       return res.status(404).json({ error: 'Arquivo não encontrado no servidor' });
     }
 
+    const { size } = fs.statSync(filePath);
     res.setHeader('Content-Type', arquivo.mimetype);
-    res.setHeader('Content-Disposition', `inline; filename="${arquivo.filename}"`);
-    fs.createReadStream(filePath).pipe(res);
+    res.setHeader('Content-Disposition', `attachment; filename="${arquivo.nome || arquivo.filename}"`);
+    res.setHeader('Content-Length', size);
+    res.setHeader('Accept-Ranges', 'bytes');
+
+    const stream = fs.createReadStream(filePath);
+    stream.on('error', () => { if (!res.headersSent) res.status(500).json({ error: 'Erro ao ler arquivo' }); });
+    stream.pipe(res);
   } catch (err) {
     console.error('[arquivos-imovel] download:', err.message);
     res.status(500).json({ error: 'Erro ao baixar arquivo' });

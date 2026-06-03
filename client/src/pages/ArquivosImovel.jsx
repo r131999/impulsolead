@@ -224,10 +224,12 @@ export default function ArquivosImovel() {
   const [modalUpload, setModalUpload] = useState(false)
   const [deletando, setDeletando] = useState(null)
   const [abrindo, setAbrindo] = useState(null)
+  const [progressoAbrindo, setProgressoAbrindo] = useState(0)
   const [erroDownload, setErroDownload] = useState('')
 
   const downloadArquivo = async (arquivo) => {
     setAbrindo(arquivo.id)
+    setProgressoAbrindo(0)
     setErroDownload('')
     try {
       const token = localStorage.getItem('token')
@@ -235,7 +237,21 @@ export default function ArquivosImovel() {
         headers: { Authorization: `Bearer ${token}` },
       })
       if (!resp.ok) throw new Error()
-      const blob = await resp.blob()
+
+      const total = Number(resp.headers.get('content-length')) || 0
+      const reader = resp.body.getReader()
+      const chunks = []
+      let recebido = 0
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        chunks.push(value)
+        recebido += value.length
+        if (total > 0) setProgressoAbrindo(Math.round((recebido / total) * 100))
+      }
+
+      const blob = new Blob(chunks, { type: resp.headers.get('content-type') || 'application/octet-stream' })
       const url = URL.createObjectURL(blob)
       const ext = arquivo.filename ? `.${arquivo.filename.split('.').pop()}` : ''
       const link = document.createElement('a')
@@ -249,6 +265,7 @@ export default function ArquivosImovel() {
       setErroDownload('Erro ao abrir arquivo. Tente novamente.')
     } finally {
       setAbrindo(null)
+      setProgressoAbrindo(0)
     }
   }
 
@@ -412,7 +429,9 @@ export default function ArquivosImovel() {
                     onMouseEnter={(e) => { if (abrindo !== a.id) e.currentTarget.style.color = '#F1F5F9' }}
                     onMouseLeave={(e) => { e.currentTarget.style.color = '#94A3B8' }}
                   >
-                    {abrindo === a.id ? '...' : 'Abrir'}
+                    {abrindo === a.id
+                      ? `${progressoAbrindo > 0 ? progressoAbrindo + '%' : '...'}`
+                      : 'Abrir'}
                   </button>
                   <button
                     onClick={() => deletar(a.id)}
