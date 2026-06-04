@@ -4,6 +4,7 @@ const { Router } = require('express');
 const axios = require('axios');
 const jwt = require('jsonwebtoken');
 const prisma = require('../lib/prisma');
+const { buscarTodasPaginas } = require('../lib/metaBuscarPaginas');
 
 const router = Router();
 
@@ -91,12 +92,8 @@ router.get('/meta/oauth/callback', async (req, res) => {
       },
     });
 
-    // Busca as páginas que o usuário administra
-    const { data: accountsData } = await axios.get('https://graph.facebook.com/me/accounts', {
-      params: { access_token: longData.access_token },
-    });
-
-    const pages = accountsData.data || [];
+    // Busca páginas diretas + via Business Manager
+    const pages = await buscarTodasPaginas(longData.access_token);
 
     if (pages.length === 0) {
       return res.redirect(

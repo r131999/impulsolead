@@ -4,6 +4,7 @@ const { Router } = require('express');
 const axios = require('axios');
 const prisma = require('../lib/prisma');
 const { authMiddleware, requireRole } = require('../middleware/auth.middleware');
+const { buscarTodasPaginas } = require('../lib/metaBuscarPaginas');
 
 const router = Router();
 
@@ -36,13 +37,9 @@ router.post(
 
       const longLivedUserToken = longTokenData.access_token;
 
-      // 2. Busca as páginas com o long-lived token para obter o page token permanente
-      const { data: accountsData } = await axios.get(
-        'https://graph.facebook.com/v19.0/me/accounts',
-        { params: { access_token: longLivedUserToken } }
-      );
-
-      const page = (accountsData.data || []).find((p) => p.id === pageId);
+      // 2. Busca páginas diretas + via Business Manager para obter o page token permanente
+      const todasPaginas = await buscarTodasPaginas(longLivedUserToken);
+      const page = todasPaginas.find((p) => p.id === pageId);
 
       if (!page) {
         return res.status(400).json({
