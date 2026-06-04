@@ -46,7 +46,28 @@ async function receberLeadMeta(req, res) {
       for (const change of (entry.changes || [])) {
         if (change.field !== 'leadgen') continue;
         const value = change.value || {};
-        const fieldData = value.field_data || [];
+
+        const leadgenId = value.leadgen_id;
+        if (!leadgenId) continue;
+
+        console.log(`[meta-webhook] Recebido leadgen_id: ${leadgenId} página: ${pageId}`);
+
+        let leadData;
+        try {
+          const r = await fetch(
+            `https://graph.facebook.com/v19.0/${leadgenId}?fields=field_data,created_time,ad_name,form_id&access_token=${integracao.pageToken}`
+          );
+          leadData = await r.json();
+          if (leadData.error) {
+            console.error(`[meta-webhook] Erro ao buscar lead ${leadgenId}:`, leadData.error.message);
+            continue;
+          }
+        } catch (e) {
+          console.error(`[meta-webhook] Erro ao buscar lead ${leadgenId}:`, e.message);
+          continue;
+        }
+
+        const fieldData = leadData.field_data || [];
 
         const getField = (...names) => {
           for (const n of names) {
@@ -58,7 +79,9 @@ async function receberLeadMeta(req, res) {
 
         const nome = getField('full_name', 'nome');
         const telefone = getField('phone_number', 'telefone');
-        const campanha = sanitizarTexto(value.ad_name || value.form_name || null);
+        const campanha = sanitizarTexto(leadData.ad_name || value.ad_name || null);
+
+        console.log(`[meta-webhook] Dados do lead buscados: ${nome} ${telefone}`);
 
         if (!nome || !telefone) continue;
 
@@ -149,6 +172,8 @@ async function receberLeadMeta(req, res) {
 
           return { lead, corretor };
         });
+
+        console.log(`[meta-webhook] Lead criado: ${result.lead.id}`);
 
         if (result.corretor) {
           notificarCorretor(result.corretor, result.lead, imobiliaria).catch(() => {});
