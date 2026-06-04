@@ -23,9 +23,6 @@ import AdminLogin from './pages/admin/AdminLogin'
 import AdminDashboard from './pages/admin/AdminDashboard'
 import ArquivosImovel from './pages/ArquivosImovel'
 import MateriaisCorretor from './pages/MateriaisCorretor'
-import TourVirtual from './pages/TourVirtual'
-import TourEditor from './pages/TourEditor'
-import TourPublico from './pages/TourPublico'
 import ConectarWhatsApp from './pages/ConectarWhatsApp'
 import Cadastro from './pages/Cadastro'
 import Planos from './pages/Planos'
@@ -43,7 +40,6 @@ export default function App() {
     <BrowserRouter>
       <AuthProvider>
         <Routes>
-          <Route path="/tour/:slug" element={<TourPublico />} />
           <Route path="/login" element={<Login />} />
           <Route path="/cadastro" element={<Cadastro />} />
           <Route
@@ -67,10 +63,6 @@ export default function App() {
             <Route path="whatsapp" element={<ConectarWhatsApp />} />
             <Route path="planos" element={<Planos />} />
             <Route path="integracoes" element={<Integracoes />} />
-
-            {/* Tour Virtual */}
-            <Route path="tours" element={<TourVirtual />} />
-            <Route path="tours/:id/editar" element={<TourEditor />} />
 
             {/* Rotas compartilhadas */}
             <Route path="chat" element={<Chat />} />
