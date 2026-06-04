@@ -14,8 +14,9 @@ const NAV_GESTOR = [
   { to: '/equipes',          label: 'Equipes',            icon: EquipeIcon },
   { to: '/relatorios',       label: 'Relatórios',         icon: BarChartIcon },
   { to: '/imoveis',          label: 'Imóveis',            icon: BuildingIcon },
-  { to: '/arquivos-imoveis', label: 'Arquivos de Imóveis', icon: FolderIcon },
-  { to: '/config',           label: 'Agente IA',          icon: BotIcon },
+  { to: '/arquivos-imoveis',  label: 'Arquivos de Imóveis', icon: FolderIcon },
+  { to: '/apresentacoes',    label: 'Apresentações',       icon: ApresentacaoIcon },
+  { to: '/config',           label: 'Agente IA',           icon: BotIcon },
   { to: '/whatsapp',         label: 'WhatsApp',           icon: WhatsAppNavIcon },
   { to: '/integracoes',      label: 'Integrações',         icon: IntegracaoIcon },
   { to: '/chat',             label: 'Assistente IA',      icon: ChatIAIcon },
@@ -25,8 +26,9 @@ const NAV_CORRETOR = [
   { to: '/meus-leads',     label: 'Meus Leads',        icon: KanbanIcon },
   { to: '/meu-desempenho', label: 'Meu Desempenho',    icon: ChartIcon },
   { to: '/meus-contatos',  label: 'Meus Contatos',     icon: ContactIcon },
-  { to: '/materiais',      label: 'Materiais',          icon: DownloadIcon },
-  { to: '/chat',           label: 'Assistente IA',     icon: ChatIAIcon },
+  { to: '/materiais',       label: 'Materiais',          icon: DownloadIcon },
+  { to: '/apresentacoes',  label: 'Apresentações',      icon: ApresentacaoIcon },
+  { to: '/chat',           label: 'Assistente IA',      icon: ChatIAIcon },
 ]
 
 const NAV_GERENTE = [
@@ -395,6 +397,14 @@ function IntegracaoIcon({ className }) {
   return (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+    </svg>
+  )
+}
+
+function ApresentacaoIcon({ className }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M7 4v16M17 4v16M3 8h4m10 0h4M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z" />
     </svg>
   )
 }

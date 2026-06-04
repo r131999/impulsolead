@@ -23,6 +23,9 @@ import AdminLogin from './pages/admin/AdminLogin'
 import AdminDashboard from './pages/admin/AdminDashboard'
 import ArquivosImovel from './pages/ArquivosImovel'
 import MateriaisCorretor from './pages/MateriaisCorretor'
+import Apresentacoes from './pages/Apresentacoes'
+import ApresentacaoFotos from './pages/ApresentacaoFotos'
+import ApresentacaoPublica from './pages/ApresentacaoPublica'
 import ConectarWhatsApp from './pages/ConectarWhatsApp'
 import Cadastro from './pages/Cadastro'
 import Planos from './pages/Planos'
@@ -40,6 +43,7 @@ export default function App() {
     <BrowserRouter>
       <AuthProvider>
         <Routes>
+          <Route path="/ap/:slug" element={<ApresentacaoPublica />} />
           <Route path="/login" element={<Login />} />
           <Route path="/cadastro" element={<Cadastro />} />
           <Route
@@ -63,6 +67,10 @@ export default function App() {
             <Route path="whatsapp" element={<ConectarWhatsApp />} />
             <Route path="planos" element={<Planos />} />
             <Route path="integracoes" element={<Integracoes />} />
+
+            {/* Apresentações */}
+            <Route path="apresentacoes" element={<Apresentacoes />} />
+            <Route path="apresentacoes/:id/fotos" element={<ApresentacaoFotos />} />
 
             {/* Rotas compartilhadas */}
             <Route path="chat" element={<Chat />} />

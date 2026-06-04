@@ -38,6 +38,7 @@ model Imobiliaria {
   whatsappInstancia      WhatsappInstancia?
   metaIntegracao         MetaIntegracao?
   tours                  TourVirtual[]
+  apresentacoes          Apresentacao[]
 }
 
 model Usuario {
@@ -411,6 +412,40 @@ model FotoComodo {
   tamanho  Int
   ordem    Int
   criadoEm DateTime @default(now())
+}
+
+model Apresentacao {
+  id                    String             @id @default(uuid())
+  imobiliariaId         String
+  imobiliaria           Imobiliaria        @relation(fields: [imobiliariaId], references: [id])
+  corretorId            String?
+  nomeImóvel            String
+  nomeLocal             String?
+  descricao             String?
+  valor                 String?
+  quartos               Int?
+  banheiros             Int?
+  vagas                 Int?
+  areaM2                Float?
+  slug                  String             @unique
+  publicado             Boolean            @default(false)
+  nomeLeadPersonalizado String?
+  whatsappCorretor      String?
+  nomeCorretor          String?
+  fotos                 FotoApresentacao[]
+  criadoEm              DateTime           @default(now())
+  atualizadoEm          DateTime           @updatedAt
+}
+
+model FotoApresentacao {
+  id              String       @id @default(uuid())
+  apresentacaoId  String
+  apresentacao    Apresentacao @relation(fields: [apresentacaoId], references: [id], onDelete: Cascade)
+  url             String
+  tamanho         Int
+  ambiente        String
+  ordem           Int
+  criadoEm        DateTime     @default(now())
 }
 
 model ConfigAgente {
