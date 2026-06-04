@@ -6,6 +6,17 @@ const multer = require('multer');
 const sharp = require('sharp');
 const prisma = require('../lib/prisma');
 
+const BOT_UA_RE = /whatsapp|facebookexternalhit|twitterbot|telegrambot|linkedinbot|slackbot|bot|crawler|spider/i;
+const APP_URL = process.env.APP_URL || 'https://crm.impulsoslz.com.br';
+
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
 const UPLOAD_DIR = process.env.UPLOAD_DIR_APRESENTACOES || '/opt/uploads/apresentacoes';
 try { fs.mkdirSync(UPLOAD_DIR, { recursive: true }); } catch {}
 
@@ -265,6 +276,59 @@ async function excluirFoto(req, res) {
   }
 }
 
+// ── Open Graph ─────────────────────────────────────────────────────────────────
+
+async function ogApresentacao(req, res) {
+  const { slug } = req.params;
+  const ua = req.headers['user-agent'] || '';
+  const pageUrl = `${APP_URL}/ap/${slug}`;
+
+  if (!BOT_UA_RE.test(ua)) {
+    return res.redirect(302, pageUrl);
+  }
+
+  try {
+    const ap = await prisma.apresentacao.findUnique({
+      where: { slug },
+      include: { fotos: { orderBy: { ordem: 'asc' }, take: 1 } },
+    });
+
+    if (!ap || !ap.publicado) return res.redirect(302, pageUrl);
+
+    const title = ap.nomeImóvel;
+    const description = ap.descricao
+      || (ap.nomeLeadPersonalizado ? `Apresentação exclusiva preparada para ${ap.nomeLeadPersonalizado}` : 'Apresentação exclusiva de imóvel');
+    const imageUrl = ap.fotos.length > 0 ? `${APP_URL}${ap.fotos[0].url}` : null;
+
+    const ogImageTags = imageUrl
+      ? `\n  <meta property="og:image" content="${escapeHtml(imageUrl)}">\n  <meta name="twitter:image" content="${escapeHtml(imageUrl)}">`
+      : '';
+
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta property="og:title" content="${escapeHtml(title)}">
+  <meta property="og:description" content="${escapeHtml(description)}">
+  <meta property="og:url" content="${pageUrl}">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="ImpulsoLead">${ogImageTags}
+  <meta name="twitter:card" content="summary_large_image">
+  <meta http-equiv="refresh" content="0;url=${pageUrl}">
+</head>
+<body>
+  <p>Redirecionando...</p>
+</body>
+</html>`;
+
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.send(html);
+  } catch (err) {
+    console.error('[apresentacao] ogApresentacao:', err.message);
+    res.redirect(302, pageUrl);
+  }
+}
+
 // ── Vídeo ──────────────────────────────────────────────────────────────────────
 
 const ALLOWED_VIDEO_EXTS = ['.mp4', '.mov', '.avi'];
@@ -330,4 +394,4 @@ async function uploadVideo(req, res) {
   });
 }
 
-module.exports = { listar, criar, buscar, atualizar, excluir, buscarPublico, uploadFoto, excluirFoto, uploadVideo };
+module.exports = { listar, criar, buscar, atualizar, excluir, buscarPublico, ogApresentacao, uploadFoto, excluirFoto, uploadVideo };

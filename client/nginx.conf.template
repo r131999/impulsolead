@@ -56,6 +56,15 @@ server {
         proxy_cache_bypass $http_upgrade;
     }
 
+    # Open Graph para bots/crawlers — redireciona internamente para a API
+    location ~ ^/ap/(.+)$ {
+        set $slug $1;
+        if ($http_user_agent ~* "(whatsapp|facebookexternalhit|twitterbot|telegrambot|linkedinbot|slackbot|bot|crawler|spider)") {
+            rewrite ^ /api/og/ap/$slug last;
+        }
+        try_files $uri /index.html;
+    }
+
     # React Router — SPA fallback
     location / {
         try_files $uri $uri/ /index.html;

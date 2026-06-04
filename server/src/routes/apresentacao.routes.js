@@ -4,8 +4,9 @@ const ctrl = require('../controllers/apresentacao.controller');
 
 const router = Router();
 
-// Rota pública — sem autenticação
+// Rotas públicas — sem autenticação
 router.get('/publico/:slug', ctrl.buscarPublico);
+router.get('/og/ap/:slug', ctrl.ogApresentacao);
 
 // Rotas autenticadas
 router.use(authMiddleware);
