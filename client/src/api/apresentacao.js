@@ -14,3 +14,9 @@ export const uploadFoto = (apId, formData, onUploadProgress) =>
 
 export const excluirFoto = (apId, fotoId) =>
   api.delete(`/apresentacoes/${apId}/fotos/${fotoId}`)
+
+export const uploadVideo = (apId, formData, onUploadProgress) =>
+  api.post(`/apresentacoes/${apId}/video`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    onUploadProgress,
+  })

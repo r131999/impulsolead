@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import * as apApi from '../api/apresentacao'
 
+const MAX_VIDEO_MB = 100
+
 async function converterSeHeic(file) {
   const ext = file.name.split('.').pop().toLowerCase()
   if (ext !== 'heic' && ext !== 'heif') return file
@@ -15,6 +17,7 @@ export default function ApresentacaoFotos() {
   const { id } = useParams()
   const navigate = useNavigate()
   const fotoInputRef = useRef(null)
+  const videoInputRef = useRef(null)
 
   const [ap, setAp] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -22,6 +25,7 @@ export default function ApresentacaoFotos() {
   const [uploadProgress, setUploadProgress] = useState({})
   const [convertendo, setConvertendo] = useState(null)
   const [excluindo, setExcluindo] = useState(null)
+  const [videoProgress, setVideoProgress] = useState(null)
 
   const carregar = async () => {
     try {
@@ -64,6 +68,23 @@ export default function ApresentacaoFotos() {
       } catch {}
       setUploadProgress((p) => { const n = { ...p }; delete n[key]; return n })
     }
+  }
+
+  const handleAdicionarVideo = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    e.target.value = ''
+    if (file.size > MAX_VIDEO_MB * 1024 * 1024) { alert(`Vídeo muito grande. Limite: ${MAX_VIDEO_MB}MB`); return }
+    setVideoProgress(0)
+    try {
+      const fd = new FormData()
+      fd.append('video', file)
+      const res = await apApi.uploadVideo(id, fd, (ev) => {
+        if (ev.total) setVideoProgress(Math.round((ev.loaded / ev.total) * 100))
+      })
+      setAp((prev) => ({ ...prev, videoUrl: res.data.videoUrl }))
+    } catch { alert('Erro ao enviar vídeo') }
+    finally { setVideoProgress(null) }
   }
 
   const excluirFoto = async (fotoId) => {
@@ -143,7 +164,7 @@ export default function ApresentacaoFotos() {
         )}
       </div>
 
-      {/* Galeria por ambiente */}
+      {/* Galeria por ambiente + Vídeo */}
       <div className="flex-1 overflow-y-auto p-4">
         {ap.fotos.length === 0 && (
           <div className="flex flex-col items-center justify-center h-48 gap-3">
@@ -180,6 +201,47 @@ export default function ApresentacaoFotos() {
             </div>
           )
         })}
+
+        {/* Vídeo de apresentação */}
+        <div className="mt-2 pt-4" style={{ borderTop: '1px solid #1E293B' }}>
+          <p className="text-xs font-medium mb-3" style={{ color: '#94A3B8' }}>Vídeo de apresentação</p>
+
+          {ap.videoUrl && (
+            <video
+              src={ap.videoUrl}
+              controls
+              className="w-full rounded-lg mb-3"
+              style={{ maxHeight: 220, backgroundColor: '#0B1120' }}
+            />
+          )}
+
+          {videoProgress !== null ? (
+            <div>
+              <div className="flex justify-between text-xs mb-1" style={{ color: '#94A3B8' }}>
+                <span>Enviando vídeo...</span><span>{videoProgress}%</span>
+              </div>
+              <div className="h-1 rounded-full overflow-hidden" style={{ backgroundColor: '#1E293B' }}>
+                <div className="h-full rounded-full transition-all" style={{ width: `${videoProgress}%`, backgroundColor: '#818cf8' }} />
+              </div>
+            </div>
+          ) : (
+            <button
+              onClick={() => videoInputRef.current?.click()}
+              className="text-sm px-4 py-2 rounded-lg font-medium"
+              style={{ backgroundColor: 'rgba(99,102,241,0.2)', color: '#818cf8', border: '1px solid rgba(99,102,241,0.3)' }}
+            >
+              {ap.videoUrl ? 'Substituir vídeo' : 'Adicionar vídeo'}
+            </button>
+          )}
+
+          <input
+            ref={videoInputRef}
+            type="file"
+            accept="video/mp4,video/quicktime,video/x-msvideo,.mp4,.mov,.avi"
+            className="hidden"
+            onChange={handleAdicionarVideo}
+          />
+        </div>
       </div>
     </div>
   )

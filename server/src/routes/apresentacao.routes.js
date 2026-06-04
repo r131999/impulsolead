@@ -19,5 +19,6 @@ router.put('/:id', requireRole(...roles), ctrl.atualizar);
 router.delete('/:id', requireRole(...roles), ctrl.excluir);
 router.post('/:id/fotos', requireRole(...roles), ctrl.uploadFoto);
 router.delete('/:id/fotos/:fotoId', requireRole(...roles), ctrl.excluirFoto);
+router.post('/:id/video', requireRole(...roles), ctrl.uploadVideo);
 
 module.exports = router;

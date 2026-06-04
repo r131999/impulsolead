@@ -14,6 +14,8 @@ const CSS = `
   .ap-wpp:hover { transform: scale(1.05); box-shadow: 0 8px 28px rgba(37,211,102,0.5) !important; }
   .ap-scroll-x::-webkit-scrollbar { display: none; }
   .ap-scroll-x { scrollbar-width: none; }
+  .ap-foto-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  @media (max-width: 640px) { .ap-foto-grid { grid-template-columns: repeat(2, 1fr); } }
 `
 
 function IcQuartos() {
@@ -125,7 +127,7 @@ export default function ApresentacaoPublica() {
         {heroFoto && (
           <img src={heroFoto} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: 0.55 }} />
         )}
-        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0.2) 50%, rgba(0,0,0,0.85) 100%)' }} />
+        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0.6) 50%, rgba(0,0,0,0.85) 100%)' }} />
 
         <div className="ap-fadein" style={{ position: 'relative', zIndex: 2, textAlign: 'center', padding: '40px 24px', maxWidth: 700, width: '100%' }}>
           {ap.nomeLeadPersonalizado && (
@@ -134,9 +136,12 @@ export default function ApresentacaoPublica() {
             </p>
           )}
           {ap.nomeLeadPersonalizado && (
-            <h1 style={{ color: '#fff', fontSize: 'clamp(2rem, 7vw, 3.5rem)', fontWeight: 700, margin: '0 0 16px', lineHeight: 1.1 }}>
-              {ap.nomeLeadPersonalizado}
-            </h1>
+            <>
+              <div style={{ width: 48, height: 1, background: 'rgba(255,255,255,0.3)', margin: '0 auto 20px' }} />
+              <h1 style={{ color: '#fff', fontSize: 'clamp(2.5rem, 8vw, 4.5rem)', fontWeight: 700, margin: '0 0 16px', lineHeight: 1.1 }}>
+                {ap.nomeLeadPersonalizado}
+              </h1>
+            </>
           )}
           <p style={{ color: ap.nomeLeadPersonalizado ? 'rgba(255,255,255,0.75)' : '#fff', fontSize: ap.nomeLeadPersonalizado ? 'clamp(1rem, 3vw, 1.4rem)' : 'clamp(2rem, 7vw, 3.5rem)', fontWeight: ap.nomeLeadPersonalizado ? 300 : 600, margin: '0 0 12px', lineHeight: 1.3 }}>
             {ap.nomeImóvel}
@@ -158,6 +163,25 @@ export default function ApresentacaoPublica() {
           )}
         </div>
       </section>
+
+      {/* ── VÍDEO ─────────────────────────────────────────────────────────── */}
+      {ap.videoUrl && (
+        <section style={{ background: '#080808', padding: '60px 0', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+          <div style={{ maxWidth: 900, margin: '0 auto', padding: '0 20px' }}>
+            <h2 style={{ color: 'rgba(255,255,255,0.9)', fontSize: 'clamp(1.2rem, 3vw, 1.6rem)', fontWeight: 300, marginBottom: 24, letterSpacing: '0.02em' }}>
+              Conheça o imóvel
+            </h2>
+            <video
+              src={ap.videoUrl}
+              controls
+              autoPlay
+              muted
+              playsInline
+              style={{ width: '100%', borderRadius: 12, boxShadow: '0 8px 32px rgba(0,0,0,0.5)', display: 'block' }}
+            />
+          </div>
+        </section>
+      )}
 
       {/* ── GALERIA ────────────────────────────────────────────────────────── */}
       {fotos.length > 0 && (
@@ -195,7 +219,7 @@ export default function ApresentacaoPublica() {
             )}
 
             {/* Grid de fotos */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 10 }}>
+            <div className="ap-foto-grid">
               {fotosDoAmb.map((foto, idx) => (
                 <div
                   key={foto.id}
@@ -223,7 +247,7 @@ export default function ApresentacaoPublica() {
               <div style={{ marginBottom: 36 }}>
                 <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: 12, letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: 6 }}>Valor</p>
                 <p style={{ color: '#fff', fontSize: 'clamp(1.8rem, 5vw, 2.6rem)', fontWeight: 700, letterSpacing: '-0.02em', margin: 0 }}>
-                  {ap.valor}
+                  {(() => { try { const n = Number(ap.valor.replace(/[^\d.,]/g, '').replace(',', '.')); return isNaN(n) ? ap.valor : n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) } catch { return ap.valor } })()}
                 </p>
               </div>
             )}

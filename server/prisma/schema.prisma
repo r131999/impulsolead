@@ -432,6 +432,7 @@ model Apresentacao {
   nomeLeadPersonalizado String?
   whatsappCorretor      String?
   nomeCorretor          String?
+  videoUrl              String?
   fotos                 FotoApresentacao[]
   criadoEm              DateTime           @default(now())
   atualizadoEm          DateTime           @updatedAt

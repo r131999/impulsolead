@@ -265,4 +265,69 @@ async function excluirFoto(req, res) {
   }
 }
 
-module.exports = { listar, criar, buscar, atualizar, excluir, buscarPublico, uploadFoto, excluirFoto };
+// ── Vídeo ──────────────────────────────────────────────────────────────────────
+
+const ALLOWED_VIDEO_EXTS = ['.mp4', '.mov', '.avi'];
+
+const videoStorage = multer.diskStorage({
+  destination: (req, _file, cb) => {
+    const dir = path.join(UPLOAD_DIR, req.params.id);
+    fs.mkdirSync(dir, { recursive: true });
+    cb(null, dir);
+  },
+  filename: (_req, file, cb) => {
+    const unique = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    cb(null, `video-${unique}${path.extname(file.originalname)}`);
+  },
+});
+
+const videoUploadMiddleware = multer({
+  storage: videoStorage,
+  limits: { fileSize: 100 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (file.mimetype.startsWith('video/') && ALLOWED_VIDEO_EXTS.includes(ext)) cb(null, true);
+    else cb(new Error('Apenas vídeos mp4, mov ou avi são permitidos'));
+  },
+}).single('video');
+
+function handleVideoUpload(req, res, next) {
+  videoUploadMiddleware(req, res, (err) => {
+    if (err instanceof multer.MulterError) {
+      if (err.code === 'LIMIT_FILE_SIZE') return res.status(400).json({ error: 'Vídeo muito grande. Limite: 100MB' });
+      return res.status(400).json({ error: err.message });
+    }
+    if (err) return res.status(400).json({ error: err.message });
+    next();
+  });
+}
+
+async function uploadVideo(req, res) {
+  handleVideoUpload(req, res, async () => {
+    try {
+      if (!req.file) return res.status(400).json({ error: 'Arquivo ausente' });
+
+      const { id } = req.params;
+      const ap = await prisma.apresentacao.findFirst({ where: whereAutorizado(req, id) });
+      if (!ap) {
+        fs.unlink(req.file.path, () => {});
+        return res.status(404).json({ error: 'Apresentação não encontrada' });
+      }
+
+      if (ap.videoUrl) {
+        fs.unlink(path.join(UPLOAD_DIR, id, path.basename(ap.videoUrl)), () => {});
+      }
+
+      const videoUrl = `/uploads/apresentacoes/${id}/${req.file.filename}`;
+      await prisma.apresentacao.update({ where: { id }, data: { videoUrl } });
+
+      res.json({ videoUrl });
+    } catch (err) {
+      if (req.file) fs.unlink(req.file.path, () => {});
+      console.error('[apresentacao] uploadVideo:', err.message);
+      res.status(500).json({ error: 'Erro ao salvar vídeo' });
+    }
+  });
+}
+
+module.exports = { listar, criar, buscar, atualizar, excluir, buscarPublico, uploadFoto, excluirFoto, uploadVideo };
