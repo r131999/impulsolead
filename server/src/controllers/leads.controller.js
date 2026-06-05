@@ -58,7 +58,7 @@ async function listar(req, res) {
       orderBy: { criadoEm: 'desc' },
       select: {
         id: true, nome: true, nomeEditado: true, telefone: true, status: true,
-        origem: true, campanha: true, interesse: true,
+        origem: true, campanha: true, conjuntoName: true, anuncioName: true, interesse: true,
         primeiroImovel: true, tipoRenda: true, rendaMensal: true,
         restricaoCpf: true, valorEntrada: true,
         urgencia: true, regiao: true, faixaValor: true,
