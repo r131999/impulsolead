@@ -400,12 +400,12 @@ function LeadCard({ lead, atualizando, followUp, podeGerenciar, bloqueado, chatH
         </div>
       </div>
       <p className="text-xs mt-0.5" style={{ color: '#64748B' }}>{lead.telefone}</p>
-      {lead.campanha && (
+      {(lead.conjuntoName || lead.campanha) && (
         <span
           className="inline-block text-xs font-medium px-1.5 py-0.5 rounded mt-1"
           style={{ backgroundColor: 'rgba(245,158,11,0.18)', color: '#F59E0B' }}
         >
-          📣 {lead.campanha}
+          📣 {lead.conjuntoName || lead.campanha}
         </span>
       )}
       {lead.interesse && (
@@ -750,12 +750,12 @@ function ModalDetalhes({ lead, onClose, onSalvo }) {
             {lead.corretor && (
               <p className="text-xs mt-1.5" style={{ color: '#60A5FA' }}>👤 {lead.corretor.nome}</p>
             )}
-            {lead.campanha && (
+            {(lead.conjuntoName || lead.campanha) && (
               <span
                 className="inline-block mt-1.5 text-xs font-medium px-2 py-0.5 rounded-full"
                 style={{ backgroundColor: 'rgba(59,130,246,0.15)', color: '#60A5FA' }}
               >
-                📣 {lead.campanha}
+                📣 {lead.conjuntoName || lead.campanha}
               </span>
             )}
           </div>
