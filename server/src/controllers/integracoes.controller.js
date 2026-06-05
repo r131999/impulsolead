@@ -77,8 +77,9 @@ async function receberLeadMeta(req, res) {
           return null;
         };
 
-        const nome = getField('full_name', 'nome');
-        const telefone = getField('phone_number', 'telefone');
+        const nome = getField('full_name', 'nome', 'nome_completo', 'name');
+        const telefone = getField('phone_number', 'telefone', 'número_do_whatsapp', 'numero_do_whatsapp', 'whatsapp', 'celular');
+        const email = getField('email');
         const campanha = sanitizarTexto(leadData.campaign_name || getField('campaign_name') || value.campaign_name || null);
         const conjuntoName = sanitizarTexto(leadData.adset_name || getField('adset_name') || value.adset_name || null);
         const anuncioName = sanitizarTexto(leadData.ad_name || getField('ad_name') || value.ad_name || null);
