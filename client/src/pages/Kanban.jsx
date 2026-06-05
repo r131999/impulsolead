@@ -788,6 +788,35 @@ function ModalDetalhes({ lead, onClose, onSalvo }) {
             </select>
           </div>
 
+          {/* Detalhes da campanha Meta Ads — visível apenas para gestor/gerente */}
+          {!isCorretor && lead.origem === 'Meta Ads' && (lead.campanha || lead.conjuntoName || lead.anuncioName) && (
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: '#64748B' }}>
+                Detalhes da campanha
+              </p>
+              <div className="rounded-lg px-3 py-3 space-y-2" style={{ backgroundColor: '#0B1120', border: '1px solid #1E293B' }}>
+                {lead.campanha && (
+                  <div>
+                    <p className="text-xs" style={{ color: '#64748B' }}>Campanha</p>
+                    <p className="text-sm font-medium break-words" style={{ color: '#E2E8F0' }}>{lead.campanha}</p>
+                  </div>
+                )}
+                {lead.conjuntoName && (
+                  <div>
+                    <p className="text-xs" style={{ color: '#64748B' }}>Conjunto</p>
+                    <p className="text-sm font-medium break-words" style={{ color: '#E2E8F0' }}>{lead.conjuntoName}</p>
+                  </div>
+                )}
+                {lead.anuncioName && (
+                  <div>
+                    <p className="text-xs" style={{ color: '#64748B' }}>Anúncio</p>
+                    <p className="text-sm font-medium break-words" style={{ color: '#E2E8F0' }}>{lead.anuncioName}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Lead de Campanha — visível apenas para gestor e gerente */}
           {!isCorretor && (
             <div>

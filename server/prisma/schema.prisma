@@ -101,8 +101,10 @@ model Lead {
   regiao         String?
   faixaValor     String?
 
-  origem      String?
-  campanha    String?
+  origem       String?
+  campanha     String?
+  conjuntoName String?
+  anuncioName  String?
   interesse   String?
   nomeEditado String?
 

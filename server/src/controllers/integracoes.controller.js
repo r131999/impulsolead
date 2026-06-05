@@ -55,7 +55,7 @@ async function receberLeadMeta(req, res) {
         let leadData;
         try {
           const r = await fetch(
-            `https://graph.facebook.com/v19.0/${leadgenId}?fields=field_data,created_time,ad_name,form_id&access_token=${integracao.pageToken}`
+            `https://graph.facebook.com/v19.0/${leadgenId}?fields=field_data,created_time,ad_name,adset_name,campaign_name,form_id&access_token=${integracao.pageToken}`
           );
           leadData = await r.json();
           if (leadData.error) {
@@ -79,7 +79,9 @@ async function receberLeadMeta(req, res) {
 
         const nome = getField('full_name', 'nome');
         const telefone = getField('phone_number', 'telefone');
-        const campanha = sanitizarTexto(leadData.ad_name || value.ad_name || null);
+        const campanha = sanitizarTexto(leadData.campaign_name || getField('campaign_name') || value.campaign_name || null);
+        const conjuntoName = sanitizarTexto(leadData.adset_name || getField('adset_name') || value.adset_name || null);
+        const anuncioName = sanitizarTexto(leadData.ad_name || getField('ad_name') || value.ad_name || null);
 
         console.log(`[meta-webhook] Dados do lead buscados: ${nome} ${telefone}`);
 
@@ -103,8 +105,10 @@ async function receberLeadMeta(req, res) {
               telefone: digitos,
               whatsappJid: `${digitos}@s.whatsapp.net`,
               status: 'lead',
+              origem: 'Meta Ads',
               campanha: campanha || null,
-              origem: 'Meta Lead Ads',
+              conjuntoName: conjuntoName || null,
+              anuncioName: anuncioName || null,
               imobiliariaId,
             },
           });
