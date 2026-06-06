@@ -1,5 +1,6 @@
 ﻿const cron = require('node-cron');
 const { enviarWhatsApp } = require('./notificacao.service');
+const { sincronizarGastoAnuncios } = require('./adSpend.service');
 
 const prisma = require('../lib/prisma');
 
@@ -298,7 +299,16 @@ function iniciarCrons() {
     }
   });
 
-  console.log('[cron] Jobs iniciados: leads-parados (6h) | relatorio-semanal (dom 8h) | plano-vencimento (diário 9h)');
+  // Job 4: sincronizar gasto de anúncios Meta — todo dia às 2h Brasília (5h UTC)
+  cron.schedule('0 5 * * *', async () => {
+    try {
+      await sincronizarGastoAnuncios();
+    } catch (err) {
+      console.error('[cron] Erro no job ad-spend:', err.message);
+    }
+  });
+
+  console.log('[cron] Jobs iniciados: leads-parados (6h) | relatorio-semanal (dom 8h) | plano-vencimento (diário 9h) | ad-spend (diário 2h Brasília)');
 }
 
 module.exports = { iniciarCrons };
