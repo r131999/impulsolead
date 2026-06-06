@@ -299,8 +299,8 @@ function iniciarCrons() {
     }
   });
 
-  // Job 4: sincronizar gasto de anúncios Meta — todo dia às 2h Brasília (5h UTC)
-  cron.schedule('0 5 * * *', async () => {
+  // Job 4: sincronizar gasto de anúncios Meta — a cada 3 horas
+  cron.schedule('0 */3 * * *', async () => {
     try {
       await sincronizarGastoAnuncios();
     } catch (err) {
@@ -308,7 +308,7 @@ function iniciarCrons() {
     }
   });
 
-  console.log('[cron] Jobs iniciados: leads-parados (6h) | relatorio-semanal (dom 8h) | plano-vencimento (diário 9h) | ad-spend (diário 2h Brasília)');
+  console.log('[cron] Jobs iniciados: leads-parados (6h) | relatorio-semanal (dom 8h) | plano-vencimento (diário 9h) | ad-spend (3h)');
 }
 
 module.exports = { iniciarCrons };
