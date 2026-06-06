@@ -4,7 +4,7 @@
  */
 const prisma = require('../lib/prisma');
 
-const META_VERSION = 'v19.0';
+const META_VERSION = 'v21.0';
 
 function isoDate(offsetDays = 0) {
   const d = new Date();
@@ -64,6 +64,8 @@ async function main() {
         access_token: integracao.adsToken,
       });
 
+      const urlSemToken = `https://graph.facebook.com/${META_VERSION}/${integracao.adAccountId}/insights?level=ad&fields=ad_id,ad_name,spend&time_increment=1&...`;
+      console.log(`  URL chamada: ${urlSemToken}`);
       const url = `https://graph.facebook.com/${META_VERSION}/${integracao.adAccountId}/insights?${params}`;
       const rows = await buscarPaginado(url);
 
