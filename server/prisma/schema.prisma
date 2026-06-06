@@ -8,19 +8,19 @@ datasource db {
 }
 
 model Imobiliaria {
-  id            String    @id @default(uuid())
-  nome          String
-  email         String    @unique
-  telefone      String?
-  logoUrl       String?
+  id                    String    @id @default(uuid())
+  nome                  String
+  email                 String    @unique
+  telefone              String?
+  logoUrl               String?
   plano                 String    @default("trial")
   trialExpiraEm         DateTime?
   planoExpiraEm         DateTime?
   planoBloqueadoEm      DateTime?
   notificacaoVencimento Boolean   @default(false)
   apiKey                String    @unique
-  criadoEm      DateTime  @default(now())
-  atualizadoEm  DateTime  @updatedAt
+  criadoEm              DateTime  @default(now())
+  atualizadoEm          DateTime  @updatedAt
 
   usuarios               Usuario[]
   corretores             Corretor[]
@@ -39,6 +39,7 @@ model Imobiliaria {
   metaIntegracao         MetaIntegracao?
   tours                  TourVirtual[]
   apresentacoes          Apresentacao[]
+  adSpends               AdSpend[]
 }
 
 model Usuario {
@@ -80,10 +81,10 @@ model Corretor {
   equipe         Equipe?     @relation("EquipeCorretores", fields: [equipeId], references: [id])
   equipeLiderada Equipe[]    @relation("EquipeLider")
 
-  leads              Lead[]
-  followUps          FollowUp[]
-  contatosPessoais   ContatoPessoal[]
-  pushSubscriptions  PushSubscription[]
+  leads             Lead[]
+  followUps         FollowUp[]
+  contatosPessoais  ContatoPessoal[]
+  pushSubscriptions PushSubscription[]
 }
 
 model Lead {
@@ -105,8 +106,12 @@ model Lead {
   campanha     String?
   conjuntoName String?
   anuncioName  String?
-  interesse   String?
-  nomeEditado String?
+  adId         String?
+  adsetId      String?
+  campaignId   String?
+  valorVenda   Decimal? @db.Decimal(12, 2)
+  interesse    String?
+  nomeEditado  String?
 
   status            String  @default("lead")
   motivoPerda       String?
@@ -358,14 +363,14 @@ model PushSubscription {
 }
 
 model WhatsappInstancia {
-  id            String   @id @default(uuid())
-  imobiliariaId String   @unique
+  id            String      @id @default(uuid())
+  imobiliariaId String      @unique
   imobiliaria   Imobiliaria @relation(fields: [imobiliariaId], references: [id])
   numero        String?
-  status        String   @default("desconectado") // desconectado | conectando | aguardando_qr | conectado
-  ativo         Boolean  @default(true)
-  criadoEm      DateTime @default(now())
-  atualizadoEm  DateTime @updatedAt
+  status        String      @default("desconectado") // desconectado | conectando | aguardando_qr | conectado
+  ativo         Boolean     @default(true)
+  criadoEm      DateTime    @default(now())
+  atualizadoEm  DateTime    @updatedAt
 }
 
 model MetaIntegracao {
@@ -375,6 +380,7 @@ model MetaIntegracao {
   pageId           String
   pageToken        String
   pageName         String?
+  adAccountId      String?
   paginasPendentes Json?
   ativo            Boolean     @default(true)
   criadoEm         DateTime    @default(now())
@@ -397,13 +403,13 @@ model TourVirtual {
 }
 
 model Comodo {
-  id       String      @id @default(uuid())
+  id       String       @id @default(uuid())
   tourId   String
-  tour     TourVirtual @relation(fields: [tourId], references: [id], onDelete: Cascade)
+  tour     TourVirtual  @relation(fields: [tourId], references: [id], onDelete: Cascade)
   nome     String
   ordem    Int
   fotos    FotoComodo[]
-  criadoEm DateTime    @default(now())
+  criadoEm DateTime     @default(now())
 }
 
 model FotoComodo {
@@ -421,7 +427,7 @@ model Apresentacao {
   imobiliariaId         String
   imobiliaria           Imobiliaria        @relation(fields: [imobiliariaId], references: [id])
   corretorId            String?
-  nomeImóvel            String
+  nomeImóvel           String
   nomeLocal             String?
   descricao             String?
   valor                 String?
@@ -441,14 +447,30 @@ model Apresentacao {
 }
 
 model FotoApresentacao {
-  id              String       @id @default(uuid())
-  apresentacaoId  String
-  apresentacao    Apresentacao @relation(fields: [apresentacaoId], references: [id], onDelete: Cascade)
-  url             String
-  tamanho         Int
-  ambiente        String
-  ordem           Int
-  criadoEm        DateTime     @default(now())
+  id             String       @id @default(uuid())
+  apresentacaoId String
+  apresentacao   Apresentacao @relation(fields: [apresentacaoId], references: [id], onDelete: Cascade)
+  url            String
+  tamanho        Int
+  ambiente       String
+  ordem          Int
+  criadoEm       DateTime     @default(now())
+}
+
+model AdSpend {
+  id            String      @id @default(uuid())
+  imobiliariaId String
+  imobiliaria   Imobiliaria @relation(fields: [imobiliariaId], references: [id])
+  adId          String
+  date          DateTime    @db.Date
+  spend         Decimal     @db.Decimal(12, 2)
+  currency      String      @default("BRL")
+  accountId     String
+  criadoEm      DateTime    @default(now())
+  atualizadoEm  DateTime    @updatedAt
+
+  @@unique([imobiliariaId, adId, date])
+  @@index([imobiliariaId, date])
 }
 
 model ConfigAgente {
