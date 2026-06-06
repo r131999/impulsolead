@@ -85,10 +85,11 @@ async function main() {
               date: new Date(row.date_start),
             },
           },
-          update: { spend: row.spend, accountId: integracao.adAccountId },
+          update: { spend: row.spend, adName: row.ad_name || null, accountId: integracao.adAccountId },
           create: {
             imobiliariaId: integracao.imobiliariaId,
             adId: row.ad_id,
+            adName: row.ad_name || null,
             date: new Date(row.date_start),
             spend: row.spend,
             accountId: integracao.adAccountId,
