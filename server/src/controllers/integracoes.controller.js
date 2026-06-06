@@ -55,7 +55,7 @@ async function receberLeadMeta(req, res) {
         let leadData;
         try {
           const r = await fetch(
-            `https://graph.facebook.com/v19.0/${leadgenId}?fields=field_data,created_time,ad_name,adset_name,campaign_name,form_id&access_token=${integracao.pageToken}`
+            `https://graph.facebook.com/v19.0/${leadgenId}?fields=field_data,created_time,ad_name,adset_name,campaign_name,form_id,ad_id,adset_id,campaign_id&access_token=${integracao.pageToken}`
           );
           leadData = await r.json();
           if (leadData.error) {
@@ -110,6 +110,9 @@ async function receberLeadMeta(req, res) {
               campanha: campanha || null,
               conjuntoName: conjuntoName || null,
               anuncioName: anuncioName || null,
+              adId: leadData.ad_id || null,
+              adsetId: leadData.adset_id || null,
+              campaignId: leadData.campaign_id || null,
               imobiliariaId,
             },
           });
