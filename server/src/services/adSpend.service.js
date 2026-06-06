@@ -31,8 +31,8 @@ async function sincronizarGastoAnuncios() {
   console.log('[adspend] Iniciando sincronização de gastos de anúncios...');
 
   const integracoes = await prisma.metaIntegracao.findMany({
-    where: { ativo: true, adAccountId: { not: null } },
-    select: { imobiliariaId: true, adAccountId: true, pageToken: true },
+    where: { ativo: true, adAccountId: { not: null }, adsToken: { not: null } },
+    select: { imobiliariaId: true, adAccountId: true, adsToken: true },
   });
 
   console.log(`[adspend] ${integracoes.length} integração(ões) ativa(s) com adAccountId.`);
@@ -48,7 +48,7 @@ async function sincronizarGastoAnuncios() {
         time_increment: '1',
         time_range: JSON.stringify({ since, until }),
         limit: '500',
-        access_token: integracao.pageToken,
+        access_token: integracao.adsToken,
       });
 
       const url = `https://graph.facebook.com/${META_VERSION}/${integracao.adAccountId}/insights?${params}`;

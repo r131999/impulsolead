@@ -381,6 +381,7 @@ model MetaIntegracao {
   pageToken        String
   pageName         String?
   adAccountId      String?
+  adsToken         String?
   paginasPendentes Json?
   ativo            Boolean     @default(true)
   criadoEm         DateTime    @default(now())

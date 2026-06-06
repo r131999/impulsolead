@@ -41,8 +41,8 @@ async function main() {
   console.log(`Janela: ${isoDate(-30)} → ${isoDate(0)}\n`);
 
   const integracoes = await prisma.metaIntegracao.findMany({
-    where: { ativo: true, adAccountId: { not: null } },
-    select: { imobiliariaId: true, adAccountId: true, pageToken: true },
+    where: { ativo: true, adAccountId: { not: null }, adsToken: { not: null } },
+    select: { imobiliariaId: true, adAccountId: true, adsToken: true },
   });
 
   console.log(`Integrações encontradas: ${integracoes.length}\n`);
@@ -61,7 +61,7 @@ async function main() {
         time_increment: '1',
         time_range: JSON.stringify({ since, until }),
         limit: '500',
-        access_token: integracao.pageToken,
+        access_token: integracao.adsToken,
       });
 
       const url = `https://graph.facebook.com/${META_VERSION}/${integracao.adAccountId}/insights?${params}`;
