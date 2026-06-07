@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { getDashboard, getFunil } from '../api/dashboard'
 import { pendentes as followUpsPendentes, atualizar as atualizarFollowUp } from '../api/followups'
 import { useNavigate } from 'react-router-dom'
+import DesempenhoAnuncios from '../components/DesempenhoAnuncios'
 
 const STATUS_BADGE = {
   lead:        'text-[#60A5FA]',
@@ -89,6 +90,8 @@ export default function Dashboard() {
 
   return (
     <div className="p-4 md:p-6 max-w-7xl mx-auto">
+      <DesempenhoAnuncios />
+
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
         <div>
           <h1 className="text-xl md:text-2xl font-bold" style={{ color: '#F1F5F9' }}>Dashboard</h1>
