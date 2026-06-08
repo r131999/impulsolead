@@ -55,6 +55,7 @@ function DesempenhoAnunciosInner() {
   const [erro, setErro] = useState(false)
   const [dias, setDias] = useState(30)
   const [sortBy, setSortBy] = useState('cpv')
+  const [filtro, setFiltro] = useState('ativas')
 
   useEffect(() => {
     setLoading(true)
@@ -65,6 +66,24 @@ function DesempenhoAnunciosInner() {
       .catch(() => setErro(true))
       .finally(() => setLoading(false))
   }, [dias])
+
+  // Filtro client-side — não refaz chamada ao alternar
+  const anunciosFiltrados = dados
+    ? filtro === 'ativas'
+      ? dados.anuncios.filter((a) => a.ativo)
+      : dados.anuncios
+    : []
+
+  // Totais recalculados dos anúncios visíveis (batem sempre com a tabela)
+  const totaisVisiveis = anunciosFiltrados.reduce(
+    (acc, a) => ({
+      gasto: acc.gasto + a.gasto,
+      leads: acc.leads + a.leads,
+      vendas: acc.vendas + a.vendas,
+      valorVendido: acc.valorVendido + a.valorVendido,
+    }),
+    { gasto: 0, leads: 0, vendas: 0, valorVendido: 0 }
+  )
 
   return (
     <div className="mb-8">
@@ -78,22 +97,44 @@ function DesempenhoAnunciosInner() {
             Origem: Meta Lead Ads
           </p>
         </div>
-        <div className="flex gap-1 flex-shrink-0">
-          {PERIODOS.map((p) => (
-            <button
-              key={p.dias}
-              onClick={() => setDias(p.dias)}
-              disabled={loading}
-              className="text-xs px-3 py-1.5 rounded-lg font-medium transition-colors disabled:opacity-60"
-              style={
-                dias === p.dias
-                  ? { backgroundColor: '#6366f1', color: '#fff' }
-                  : { backgroundColor: '#1E293B', color: '#94A3B8' }
-              }
-            >
-              {p.label}
-            </button>
-          ))}
+
+        <div className="flex items-center gap-2 flex-shrink-0 flex-wrap justify-end">
+          {/* Toggle Ativas / Todas */}
+          <div className="flex rounded-lg overflow-hidden" style={{ border: '1px solid #1E293B' }}>
+            {['ativas', 'todas'].map((f) => (
+              <button
+                key={f}
+                onClick={() => setFiltro(f)}
+                className="text-xs px-3 py-1.5 font-medium transition-colors"
+                style={
+                  filtro === f
+                    ? { backgroundColor: '#6366f1', color: '#fff' }
+                    : { backgroundColor: '#111827', color: '#94A3B8' }
+                }
+              >
+                {f === 'ativas' ? 'Ativas' : 'Todas'}
+              </button>
+            ))}
+          </div>
+
+          {/* Seletor de período */}
+          <div className="flex gap-1">
+            {PERIODOS.map((p) => (
+              <button
+                key={p.dias}
+                onClick={() => setDias(p.dias)}
+                disabled={loading}
+                className="text-xs px-3 py-1.5 rounded-lg font-medium transition-colors disabled:opacity-60"
+                style={
+                  dias === p.dias
+                    ? { backgroundColor: '#6366f1', color: '#fff' }
+                    : { backgroundColor: '#1E293B', color: '#94A3B8' }
+                }
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -135,36 +176,36 @@ function DesempenhoAnunciosInner() {
       {/* Conteúdo */}
       {!loading && !erro && dados && (
         <>
-          {/* Cards resumo */}
+          {/* Cards resumo — refletem os anúncios visíveis */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-5">
             {[
               {
                 label: 'Investido',
-                value: brl(dados.totais.gasto),
+                value: brl(totaisVisiveis.gasto),
                 cor: '#60A5FA',
               },
               {
                 label: 'Leads',
-                value: intBr(dados.totais.leads),
+                value: intBr(totaisVisiveis.leads),
                 cor: '#818cf8',
               },
               {
                 label: 'Vendas',
-                value: intBr(dados.totais.vendas),
+                value: intBr(totaisVisiveis.vendas),
                 cor: '#10B981',
               },
               {
                 label: 'Valor vendido',
-                value: brl(dados.totais.valorVendido),
+                value: brl(totaisVisiveis.valorVendido),
                 cor: '#10B981',
               },
               {
                 label: 'Custo por venda',
                 value:
-                  dados.totais.vendas > 0
-                    ? brl(dados.totais.gasto / dados.totais.vendas)
+                  totaisVisiveis.vendas > 0
+                    ? brl(totaisVisiveis.gasto / totaisVisiveis.vendas)
                     : '—',
-                cor: dados.totais.vendas > 0 ? '#F59E0B' : '#64748B',
+                cor: totaisVisiveis.vendas > 0 ? '#F59E0B' : '#64748B',
               },
             ].map(({ label, value, cor }) => (
               <div
@@ -215,10 +256,12 @@ function DesempenhoAnunciosInner() {
           </div>
 
           {/* Tabela */}
-          {dados.anuncios.length === 0 ? (
+          {anunciosFiltrados.length === 0 ? (
             <div className="card">
               <p className="text-sm text-center py-6" style={{ color: '#64748B' }}>
-                Nenhum dado de anúncio encontrado no período.
+                {filtro === 'ativas'
+                  ? 'Nenhum anúncio ativo no período. Alterne para "Todas" para ver todos.'
+                  : 'Nenhum dado de anúncio encontrado no período.'}
               </p>
             </div>
           ) : (
@@ -253,7 +296,7 @@ function DesempenhoAnunciosInner() {
                     </tr>
                   </thead>
                   <tbody>
-                    {sortAnuncios(dados.anuncios, sortBy).map((ad, idx) => {
+                    {sortAnuncios(anunciosFiltrados, sortBy).map((ad, idx) => {
                       const qualifPct =
                         ad.leads > 0
                           ? `${((ad.qualificados / ad.leads) * 100).toFixed(1)}%`

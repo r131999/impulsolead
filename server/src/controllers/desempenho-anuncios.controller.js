@@ -35,7 +35,7 @@ async function getDesempenhoAnuncios(req, res) {
   const dataFimExclusivo = new Date(dataFim);
   dataFimExclusivo.setDate(dataFimExclusivo.getDate() + 1);
 
-  const [spendPorAd, adNames, leadsNoPeriodo] = await Promise.all([
+  const [spendPorAd, adNames, leadsNoPeriodo, adStatuses] = await Promise.all([
     prisma.adSpend.groupBy({
       by: ['adId'],
       where: { imobiliariaId, date: { gte: dataInicio, lte: dataFim } },
@@ -54,7 +54,14 @@ async function getDesempenhoAnuncios(req, res) {
       },
       select: { adId: true, status: true, valorVenda: true, anuncioName: true },
     }),
+    prisma.adStatus.findMany({
+      where: { imobiliariaId },
+      select: { adId: true, effectiveStatus: true },
+    }),
   ]);
+
+  // adId → effectiveStatus map
+  const statusMap = new Map(adStatuses.map((s) => [s.adId, s.effectiveStatus]));
 
   // adId → adName map (from AdSpend)
   const adNameMap = new Map(adNames.map((r) => [r.adId, r.adName]));
@@ -99,6 +106,7 @@ async function getDesempenhoAnuncios(req, res) {
       visitas: leadsData?.visitas ?? 0,
       vendas: leadsData?.vendas ?? 0,
       valorVendido: leadsData?.valorVendido ?? 0,
+      ativo: statusMap.get(adId) === 'ACTIVE',
     });
   }
 

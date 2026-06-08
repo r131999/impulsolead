@@ -88,6 +88,38 @@ async function sincronizarGastoAnuncios() {
     } catch (err) {
       console.error(`[adspend] Erro na integração ${integracao.imobiliariaId}:`, err.message);
     }
+
+    // Busca de status dos anúncios — isolada, falha aqui não afeta o gasto
+    try {
+      const statusParams = new URLSearchParams({
+        fields: 'id,effective_status',
+        limit: '500',
+        access_token: integracao.adsToken,
+      });
+      const statusUrl = `https://graph.facebook.com/${META_VERSION}/${integracao.adAccountId}/ads?${statusParams}`;
+      const ads = await buscarPaginado(statusUrl);
+
+      for (const ad of ads) {
+        if (!ad.id) continue;
+        await prisma.adStatus.upsert({
+          where: {
+            imobiliariaId_adId: {
+              imobiliariaId: integracao.imobiliariaId,
+              adId: ad.id,
+            },
+          },
+          update: { effectiveStatus: ad.effective_status || null },
+          create: {
+            imobiliariaId: integracao.imobiliariaId,
+            adId: ad.id,
+            effectiveStatus: ad.effective_status || null,
+          },
+        });
+      }
+      console.log(`[adspend] ${integracao.imobiliariaId}: ${ads.length} status de anúncio(s) sincronizado(s).`);
+    } catch (err) {
+      console.error(`[adspend] Erro ao sincronizar status ${integracao.imobiliariaId}:`, err.message);
+    }
   }
 
   console.log('[adspend] Sincronização concluída.');

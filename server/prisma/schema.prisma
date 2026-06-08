@@ -40,6 +40,7 @@ model Imobiliaria {
   tours                  TourVirtual[]
   apresentacoes          Apresentacao[]
   adSpends               AdSpend[]
+  adStatuses             AdStatus[]
 }
 
 model Usuario {
@@ -473,6 +474,17 @@ model AdSpend {
 
   @@unique([imobiliariaId, adId, date])
   @@index([imobiliariaId, date])
+}
+
+model AdStatus {
+  id              String      @id @default(uuid())
+  imobiliariaId   String
+  imobiliaria     Imobiliaria @relation(fields: [imobiliariaId], references: [id])
+  adId            String
+  effectiveStatus String?
+  atualizadoEm    DateTime    @updatedAt
+
+  @@unique([imobiliariaId, adId])
 }
 
 model ConfigAgente {
