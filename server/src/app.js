@@ -94,7 +94,7 @@ app.use('/api/push', pushRoutes);
 app.use('/api/integracoes', integracoesRoutes);
 app.use('/api/integracoes', metaOauthRoutes);
 app.use('/api/integracoes', metaPaginaRoutes);
-app.use('/api/anuncios', desempenhoAnunciosRoutes);
+app.use('/api/desempenho-anuncios', desempenhoAnunciosRoutes);
 
 // Endpoint interno: chamado pelo manager para carregar tenants ativos
 app.get('/api/internal/whatsapp-instancias', listarInstanciasInterno);
