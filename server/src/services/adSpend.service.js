@@ -27,11 +27,14 @@ async function buscarPaginado(url) {
   return rows;
 }
 
-async function sincronizarGastoAnuncios() {
+async function sincronizarGastoAnuncios(imobiliariaIdFiltro = null) {
   console.log('[adspend] Iniciando sincronização de gastos de anúncios...');
 
+  const where = { ativo: true, adAccountId: { not: null }, adsToken: { not: null } };
+  if (imobiliariaIdFiltro) where.imobiliariaId = imobiliariaIdFiltro;
+
   const integracoes = await prisma.metaIntegracao.findMany({
-    where: { ativo: true, adAccountId: { not: null }, adsToken: { not: null } },
+    where,
     select: { imobiliariaId: true, adAccountId: true, adsToken: true },
   });
 

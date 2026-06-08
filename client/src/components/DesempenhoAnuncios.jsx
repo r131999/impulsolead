@@ -56,16 +56,35 @@ function DesempenhoAnunciosInner() {
   const [dias, setDias] = useState(30)
   const [sortBy, setSortBy] = useState('cpv')
   const [filtro, setFiltro] = useState('ativas')
+  const [sincronizando, setSincronizando] = useState(false)
+  const [erroSync, setErroSync] = useState(null)
 
-  useEffect(() => {
+  function carregarDados(diasParam) {
     setLoading(true)
     setErro(false)
     api
-      .get('/desempenho-anuncios', { params: { dias } })
+      .get('/desempenho-anuncios', { params: { dias: diasParam } })
       .then((res) => setDados(res.data))
       .catch(() => setErro(true))
       .finally(() => setLoading(false))
+  }
+
+  useEffect(() => {
+    carregarDados(dias)
   }, [dias])
+
+  async function handleSincronizar() {
+    setSincronizando(true)
+    setErroSync(null)
+    try {
+      await api.post('/desempenho-anuncios/sincronizar')
+      carregarDados(dias)
+    } catch {
+      setErroSync('Falha ao sincronizar. Tente novamente.')
+    } finally {
+      setSincronizando(false)
+    }
+  }
 
   // Filtro client-side — não refaz chamada ao alternar
   const anunciosFiltrados = dados
@@ -135,8 +154,23 @@ function DesempenhoAnunciosInner() {
               </button>
             ))}
           </div>
+
+          {/* Botão Atualizar */}
+          <button
+            onClick={handleSincronizar}
+            disabled={sincronizando || loading}
+            className="text-xs px-3 py-1.5 rounded-lg font-medium transition-colors disabled:opacity-60"
+            style={{ backgroundColor: '#1E293B', color: sincronizando ? '#64748B' : '#94A3B8', border: '1px solid #334155' }}
+          >
+            {sincronizando ? 'Atualizando…' : '↻ Atualizar'}
+          </button>
         </div>
       </div>
+
+      {/* Erro de sincronização sob demanda */}
+      {erroSync && (
+        <p className="text-xs mb-3" style={{ color: '#EF4444' }}>{erroSync}</p>
+      )}
 
       {/* Skeleton */}
       {loading && (

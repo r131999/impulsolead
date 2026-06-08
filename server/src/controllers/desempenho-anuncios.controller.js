@@ -1,4 +1,5 @@
 const prisma = require('../lib/prisma');
+const { sincronizarGastoAnuncios } = require('../services/adSpend.service');
 
 const QUALIFICADOS_STATUS = ['agendamento', 'visita', 'venda'];
 const VISITA_STATUS = ['visita', 'venda'];
@@ -134,4 +135,14 @@ async function getDesempenhoAnuncios(req, res) {
   });
 }
 
-module.exports = { getDesempenhoAnuncios };
+async function sincronizarAnuncios(req, res) {
+  try {
+    await sincronizarGastoAnuncios(req.imobiliariaId);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('[desempenho] Erro na sincronização sob demanda:', err.message);
+    res.status(500).json({ error: 'Falha ao sincronizar anúncios. Tente novamente.' });
+  }
+}
+
+module.exports = { getDesempenhoAnuncios, sincronizarAnuncios };
