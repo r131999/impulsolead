@@ -86,10 +86,16 @@ async function receberLeadMeta(req, res) {
 
         console.log(`[meta-webhook] Dados do lead buscados: ${nome} ${telefone}`);
 
-        if (!nome || !telefone) continue;
+        if (!nome || !telefone) {
+          console.warn(`[meta-webhook] Lead ${leadgenId} descartado: nome="${nome}" telefone="${telefone}" (campo não encontrado no field_data)`);
+          continue;
+        }
 
         const digitos = String(telefone).replace(/\D/g, '');
-        if (digitos.length < 10 || digitos.length > 15) continue;
+        if (digitos.length < 10 || digitos.length > 15) {
+          console.warn(`[meta-webhook] Lead ${leadgenId} descartado: telefone "${telefone}" tem ${digitos.length} dígitos (fora do range 10–15)`);
+          continue;
+        }
 
         const nomeSanitizado = sanitizarTexto(nome);
 
