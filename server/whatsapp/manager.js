@@ -599,6 +599,27 @@ function checkManagerKey(req, res) {
   return true;
 }
 
+// Resolve o jid real via onWhatsApp, tratando o 9º dígito do Brasil.
+// Retorna o jid existente ou null se o número não estiver no WhatsApp.
+async function resolverJid(sock, number) {
+  if (String(number).includes('@')) return number;
+  const base = String(number).replace(/\D/g, '');
+  const candidatos = new Set([base]);
+  const m = base.match(/^55(\d{2})(\d{8,9})$/);
+  if (m) {
+    const [, ddd, resto] = m;
+    if (resto.length === 9 && resto[0] === '9') candidatos.add(`55${ddd}${resto.slice(1)}`);
+    else if (resto.length === 8) candidatos.add(`55${ddd}9${resto}`);
+  }
+  for (const cand of candidatos) {
+    try {
+      const res = await sock.onWhatsApp(cand);
+      if (res?.[0]?.exists && res[0].jid) return res[0].jid;
+    } catch (_) {}
+  }
+  return null;
+}
+
 const server = http.createServer(async (req, res) => {
   try {
     const url = new URL(req.url, 'http://localhost');
@@ -645,7 +666,11 @@ const server = http.createServer(async (req, res) => {
         return sendJson(res, 503, { error: 'WhatsApp não conectado para este tenant' });
       }
 
-      const jid = number.includes('@') ? number : `${number.replace(/\D/g, '')}@s.whatsapp.net`;
+      const jid = await resolverJid(tenant.sock, number);
+      if (!jid) {
+        tag(`Número não está no WhatsApp: ${number} — notificação não enviada`, tenant.imobiliariaId);
+        return sendJson(res, 422, { ok: false, error: 'numero_nao_whatsapp' });
+      }
       console.log('[WA:send] Tentando enviar para', jid, 'via', imobiliariaId);
       try {
         await tenant.sock.sendMessage(jid, { text });
