@@ -396,6 +396,12 @@ async function connectTenant(tenant) {
     tenant.reconnectTimer = null;
   }
 
+  // Encerra socket anterior para evitar listeners órfãos
+  if (tenant.sock) {
+    try { tenant.sock.ev.removeAllListeners(); tenant.sock.end(); } catch (_) {}
+    tenant.sock = null;
+  }
+
   try {
     if (!fs.existsSync(tenant.authDir)) {
       fs.mkdirSync(tenant.authDir, { recursive: true });
@@ -421,10 +427,13 @@ async function connectTenant(tenant) {
       keepAliveIntervalMs: 25000,
       retryRequestDelayMs: 2000,
     });
+    const sock = tenant.sock;
 
-    tenant.sock.ev.on('creds.update', saveCreds);
+    sock.ev.on('creds.update', saveCreds);
 
-    tenant.sock.ev.on('connection.update', async ({ connection, lastDisconnect, qr }) => {
+    sock.ev.on('connection.update', async ({ connection, lastDisconnect, qr }) => {
+      if (tenant.sock !== sock) return;
+
       if (qr) {
         tenant.qrCode = qr;
         tenant.status = 'aguardando_qr';
@@ -439,6 +448,12 @@ async function connectTenant(tenant) {
 
         const reason = new Boom(lastDisconnect?.error)?.output?.statusCode;
         tag(`Desconectado. Motivo: ${reason}`, tenant.imobiliariaId);
+
+        if (reason === DisconnectReason.connectionReplaced) {
+          // 440: outra sessão substituiu esta — reconectar geraria loop imediato
+          tag('Sessão substituída (440) — aguardando ação do gestor', tenant.imobiliariaId);
+          return;
+        }
 
         if (reason === DisconnectReason.loggedOut) {
           if (hadSession) {
@@ -470,7 +485,7 @@ async function connectTenant(tenant) {
       }
     });
 
-    tenant.sock.ev.on('messages.upsert', async ({ messages, type }) => {
+    sock.ev.on('messages.upsert', async ({ messages, type }) => {
       if (tenant.imobiliariaId === process.env.NOTIF_INSTANCE_ID) return;
       if (type !== 'notify') return;
       for (const msg of messages) {
