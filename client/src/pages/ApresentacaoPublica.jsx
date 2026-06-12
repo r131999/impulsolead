@@ -178,8 +178,6 @@ export default function ApresentacaoPublica() {
             <video
               src={ap.videoUrl}
               controls
-              autoPlay
-              muted
               playsInline
               preload="none"
               poster={fotos[0]?.url}
@@ -233,7 +231,13 @@ export default function ApresentacaoPublica() {
                   onClick={() => setLightbox({ fotos: fotosDoAmb, idx })}
                   style={{ aspectRatio: '4/3', background: '#111' }}
                 >
-                  <img src={thumbUrl(foto.url)} alt={foto.ambiente} loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                  <img
+                    src={thumbUrl(foto.url)}
+                    alt={foto.ambiente}
+                    loading="lazy"
+                    onError={(e) => { if (!e.currentTarget.dataset.fb) { e.currentTarget.dataset.fb = '1'; e.currentTarget.src = foto.url; } }}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                  />
                 </div>
               ))}
             </div>
