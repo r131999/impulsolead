@@ -184,7 +184,7 @@ const fotoStorage = multer.diskStorage({
   },
   filename: (_req, file, cb) => {
     const unique = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    cb(null, `${unique}${path.extname(file.originalname)}`);
+    cb(null, `${unique}_raw${path.extname(file.originalname)}`);
   },
 });
 
@@ -219,21 +219,6 @@ async function uploadFoto(req, res) {
         return res.status(400).json({ error: 'Ambiente é obrigatório' });
       }
 
-      // Conversão HEIC → JPEG
-      const isHeic = ['.heic', '.heif'].includes(path.extname(req.file.originalname).toLowerCase())
-        || req.file.mimetype === 'image/heic'
-        || req.file.mimetype === 'image/heif';
-
-      if (isHeic) {
-        const novoNome = req.file.filename.replace(/\.(heic|heif)$/i, '.jpg');
-        const novoCaminho = path.join(path.dirname(req.file.path), novoNome);
-        await sharp(req.file.path).jpeg({ quality: 85 }).toFile(novoCaminho);
-        fs.unlinkSync(req.file.path);
-        req.file.path = novoCaminho;
-        req.file.filename = novoNome;
-        req.file.mimetype = 'image/jpeg';
-      }
-
       const { id } = req.params;
       const ap = await prisma.apresentacao.findFirst({ where: whereAutorizado(req, id) });
       if (!ap) {
@@ -241,12 +226,35 @@ async function uploadFoto(req, res) {
         return res.status(404).json({ error: 'Apresentação não encontrada' });
       }
 
+      const rawPath = req.file.path;
+      const baseName = req.file.filename.replace(/_raw\.[^.]+$/, '');
+      const dir = path.dirname(rawPath);
+      const webPath = path.join(dir, `${baseName}.jpg`);
+      const thumbPath = path.join(dir, `${baseName}_thumb.jpg`);
+
+      // Versão web: EXIF rotate + strip metadata + resize 1920 + JPEG q80
+      await sharp(rawPath)
+        .rotate()
+        .resize(1920, 1920, { fit: 'inside', withoutEnlargement: true })
+        .jpeg({ quality: 80 })
+        .toFile(webPath);
+
+      // Thumbnail: mesmo pipeline, 600x600 q70
+      await sharp(rawPath)
+        .rotate()
+        .resize(600, 600, { fit: 'inside', withoutEnlargement: true })
+        .jpeg({ quality: 70 })
+        .toFile(thumbPath);
+
+      fs.unlink(rawPath, () => {});
+
       const agg = await prisma.fotoApresentacao.aggregate({ where: { apresentacaoId: id }, _max: { ordem: true } });
       const ordem = (agg._max.ordem ?? -1) + 1;
 
-      const url = `/uploads/apresentacoes/${id}/${req.file.filename}`;
+      const { size: tamanho } = fs.statSync(webPath);
+      const url = `/uploads/apresentacoes/${id}/${baseName}.jpg`;
       const foto = await prisma.fotoApresentacao.create({
-        data: { apresentacaoId: id, url, tamanho: req.file.size, ambiente: ambiente.trim(), ordem },
+        data: { apresentacaoId: id, url, tamanho, ambiente: ambiente.trim(), ordem },
       });
       res.status(201).json({ foto });
     } catch (err) {
@@ -267,7 +275,9 @@ async function excluirFoto(req, res) {
     if (!foto) return res.status(404).json({ error: 'Foto não encontrada' });
 
     await prisma.fotoApresentacao.delete({ where: { id: fotoId } });
-    fs.unlink(path.join(UPLOAD_DIR, id, path.basename(foto.url)), () => {});
+    const base = path.basename(foto.url);
+    fs.unlink(path.join(UPLOAD_DIR, id, base), () => {});
+    fs.unlink(path.join(UPLOAD_DIR, id, base.replace(/\.[^.]+$/, '_thumb.jpg')), () => {});
 
     res.json({ message: 'Foto removida' });
   } catch (err) {

@@ -57,7 +57,7 @@ const UPLOAD_DIR_TOURS = process.env.UPLOAD_DIR_TOURS || '/opt/uploads/tours';
 app.use('/uploads/tours', express.static(UPLOAD_DIR_TOURS));
 
 const UPLOAD_DIR_APRESENTACOES = process.env.UPLOAD_DIR_APRESENTACOES || '/opt/uploads/apresentacoes';
-app.use('/uploads/apresentacoes', express.static(UPLOAD_DIR_APRESENTACOES));
+app.use('/uploads/apresentacoes', express.static(UPLOAD_DIR_APRESENTACOES, { maxAge: '30d', immutable: true }));
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,

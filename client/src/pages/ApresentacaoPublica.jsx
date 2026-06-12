@@ -37,6 +37,10 @@ function IcWhatsApp() {
   return <svg width="20" height="20" fill="white" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12c0 1.85.5 3.58 1.37 5.07L2 22l5.07-1.36A9.94 9.94 0 0012 22c5.52 0 10-4.48 10-10S17.52 2 12 2zm0 18c-1.66 0-3.2-.45-4.54-1.23l-.32-.19-3.01.79.8-2.95-.21-.33A7.94 7.94 0 014 12c0-4.41 3.59-8 8-8s8 3.59 8 8-3.59 8-8 8zm4.39-5.97c-.24-.12-1.41-.7-1.63-.78-.22-.08-.38-.12-.54.12s-.62.78-.76.94c-.14.16-.28.18-.52.06a6.53 6.53 0 01-1.91-1.18 7.17 7.17 0 01-1.32-1.64c-.14-.24-.01-.37.1-.49.1-.11.24-.28.36-.42.12-.14.16-.24.24-.4.08-.16.04-.3-.02-.42-.06-.12-.54-1.29-.74-1.76-.19-.46-.39-.4-.54-.4h-.46c-.16 0-.42.06-.64.3s-.84.82-.84 2 .86 2.32.98 2.48c.12.16 1.68 2.56 4.06 3.59.57.24 1.01.39 1.36.5.57.18 1.09.15 1.5.09.46-.07 1.41-.58 1.61-1.14.2-.56.2-1.04.14-1.14-.06-.1-.22-.16-.46-.28z"/></svg>
 }
 
+function thumbUrl(url) {
+  return url ? url.replace(/\.[^./?#]+$/, '_thumb.jpg') : url;
+}
+
 export default function ApresentacaoPublica() {
   const { slug } = useParams()
   const [dados, setDados] = useState(null)
@@ -125,7 +129,7 @@ export default function ApresentacaoPublica() {
       {/* ── HERO ──────────────────────────────────────────────────────────── */}
       <section style={{ position: 'relative', minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', background: '#080808' }}>
         {heroFoto && (
-          <img src={heroFoto} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: 0.55 }} />
+          <img src={heroFoto} alt="" fetchpriority="high" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: 0.55 }} />
         )}
         <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0.6) 50%, rgba(0,0,0,0.85) 100%)' }} />
 
@@ -177,6 +181,8 @@ export default function ApresentacaoPublica() {
               autoPlay
               muted
               playsInline
+              preload="none"
+              poster={fotos[0]?.url}
               style={{ width: '100%', borderRadius: 12, boxShadow: '0 8px 32px rgba(0,0,0,0.5)', display: 'block' }}
             />
           </div>
@@ -227,7 +233,7 @@ export default function ApresentacaoPublica() {
                   onClick={() => setLightbox({ fotos: fotosDoAmb, idx })}
                   style={{ aspectRatio: '4/3', background: '#111' }}
                 >
-                  <img src={foto.url} alt={foto.ambiente} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                  <img src={thumbUrl(foto.url)} alt={foto.ambiente} loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
                 </div>
               ))}
             </div>
