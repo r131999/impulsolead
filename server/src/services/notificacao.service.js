@@ -68,7 +68,8 @@ async function notificarViaWebhook(corretor, lead, imobiliaria) {
 // Não bloqueia o fluxo principal: falhas são logadas, não propagadas.
 async function notificarCorretor(corretor, lead, imobiliaria) {
   try {
-    const resultado = await notificarViaEvolution(corretor, lead, imobiliaria.id);
+    const instanciaId = process.env.NOTIF_INSTANCE_ID || imobiliaria.id;
+    const resultado = await notificarViaEvolution(corretor, lead, instanciaId);
     if (resultado.enviado) return resultado;
 
     // Se Baileys falhou, tenta o webhook genérico

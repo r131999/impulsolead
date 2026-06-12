@@ -471,6 +471,7 @@ async function connectTenant(tenant) {
     });
 
     tenant.sock.ev.on('messages.upsert', async ({ messages, type }) => {
+      if (tenant.imobiliariaId === process.env.NOTIF_INSTANCE_ID) return;
       if (type !== 'notify') return;
       for (const msg of messages) {
         await handleMessage(tenant, msg);
