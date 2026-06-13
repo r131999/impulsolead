@@ -7,7 +7,6 @@ import { Avatar } from '../components/Avatar'
 import ChatLead from './ChatLead'
 
 const COLUNAS = [
-  { id: 'revisao',     label: 'Revisão',     dot: '#F97316' },
   { id: 'lead',        label: 'Lead',        dot: '#3B82F6' },
   { id: 'atendimento', label: 'Atendimento', dot: '#6366f1' },
   { id: 'em_espera',   label: 'Em Espera',   dot: '#64748B' },

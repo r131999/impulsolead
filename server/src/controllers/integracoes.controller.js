@@ -72,38 +72,52 @@ async function receberLeadMeta(req, res) {
         const normStr = (s) =>
           String(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 
-        const getField = (...names) => {
-          const normNames = names.map(normStr);
-          for (const f of fieldData) {
-            if (normNames.includes(normStr(f.name)) && f?.values?.[0]) return f.values[0];
-          }
-          return null;
-        };
+        // Nome: 1º canônico full_name, 2º campo cujo nome contenha 'nome'/'name'
+        const nome =
+          fieldData.find((f) => f.name === 'full_name')?.values?.[0] ??
+          (() => {
+            for (const f of fieldData) {
+              const n = normStr(f.name);
+              if ((n.includes('nome') || n.includes('name')) && f?.values?.[0]) return f.values[0];
+            }
+            return null;
+          })();
 
-        const nome = getField('full_name', 'nome', 'nome_completo', 'name', 'nome completo', 'full name');
+        // Telefone — 3 prioridades:
+        // 1º canônico phone_number (campo padrão do Meta, independe do idioma)
+        // 2º campo cujo nome normalizado contenha keyword de telefone
+        // 3º fallback regex: prefere +55 (score 3) > começa com 55 (score 2) > 10-13 dígitos (score 1)
+        const phoneKeywords = ['telefone', 'telefono', 'telemovel', 'celular', 'whatsapp', 'whats', 'contato', 'fone', 'phone', 'numero'];
+        const telefone =
+          fieldData.find((f) => f.name === 'phone_number')?.values?.[0] ??
+          (() => {
+            for (const f of fieldData) {
+              if (phoneKeywords.some((kw) => normStr(f.name).includes(kw)) && f?.values?.[0]) return f.values[0];
+            }
+            return null;
+          })() ??
+          (() => {
+            let best = null;
+            let bestScore = 0;
+            for (const f of fieldData) {
+              const val = f?.values?.[0];
+              if (!val) continue;
+              const str = String(val);
+              const digits = str.replace(/\D/g, '');
+              const score = str.includes('+55') ? 3
+                : digits.startsWith('55') ? 2
+                : (digits.length >= 10 && digits.length <= 13) ? 1
+                : 0;
+              if (score > bestScore) { bestScore = score; best = val; }
+              if (bestScore === 3) break;
+            }
+            return best;
+          })();
 
-        const telefoneNomeado = getField(
-          'phone_number', 'telefone', 'numero_do_whatsapp', 'número_do_whatsapp',
-          'whatsapp', 'celular', 'mobile', 'mobile_phone', 'phone', 'fone', 'tel',
-          'contato', 'numero', 'número', 'whatsapp_number', 'numero_whatsapp',
-          'número_whatsapp', 'zap', 'whats', 'numero de telefone', 'número de telefone',
-          'numero de celular', 'número de celular',
-        );
-
-        const telefone = telefoneNomeado ?? (() => {
-          for (const f of fieldData) {
-            const val = f?.values?.[0];
-            if (!val) continue;
-            const d = String(val).replace(/\D/g, '');
-            if (d.length >= 10 && d.length <= 15) return val;
-          }
-          return null;
-        })();
-
-        const email = getField('email');
-        const campanha = sanitizarTexto(leadData.campaign_name || getField('campaign_name') || value.campaign_name || null);
-        const conjuntoName = sanitizarTexto(leadData.adset_name || getField('adset_name') || value.adset_name || null);
-        const anuncioName = sanitizarTexto(leadData.ad_name || getField('ad_name') || value.ad_name || null);
+        const email = fieldData.find((f) => f.name === 'email')?.values?.[0] ?? null;
+        const campanha = sanitizarTexto(leadData.campaign_name || fieldData.find((f) => f.name === 'campaign_name')?.values?.[0] || value.campaign_name || null);
+        const conjuntoName = sanitizarTexto(leadData.adset_name || fieldData.find((f) => f.name === 'adset_name')?.values?.[0] || value.adset_name || null);
+        const anuncioName = sanitizarTexto(leadData.ad_name || fieldData.find((f) => f.name === 'ad_name')?.values?.[0] || value.ad_name || null);
 
         const fieldNames = fieldData.map((f) => f.name).join(', ');
         console.log(`[meta-webhook] Dados do lead buscados: nome="${nome}" telefone="${telefone}" | campos: ${fieldNames}`);
@@ -116,31 +130,7 @@ async function receberLeadMeta(req, res) {
         const nomeSanitizado = sanitizarTexto(nome);
 
         if (!telefone) {
-          console.warn(`[meta-webhook] Lead ${leadgenId} sem telefone — criando card para revisão | campos: ${fieldNames}`);
-          const leadRevisao = await prisma.lead.create({
-            data: {
-              nome: nomeSanitizado,
-              telefone: '',
-              whatsappJid: '',
-              status: 'revisao',
-              origem: 'Meta Ads',
-              campanha: campanha || null,
-              conjuntoName: conjuntoName || null,
-              anuncioName: anuncioName || null,
-              adId: leadData.ad_id || null,
-              adsetId: leadData.adset_id || null,
-              campaignId: leadData.campaign_id || null,
-              imobiliariaId,
-            },
-          });
-          await prisma.historicoLead.create({
-            data: {
-              leadId: leadRevisao.id,
-              acao: 'Lead recebido via Meta Lead Ads — telefone não localizado, aguarda revisão',
-              detalhes: `Campos recebidos: ${fieldNames}`,
-            },
-          });
-          console.log(`[meta-webhook] Card de revisão criado: ${leadRevisao.id}`);
+          console.error('[meta-webhook] telefone nao identificado', { leadgen_id: leadgenId, field_data: fieldData });
           continue;
         }
 
