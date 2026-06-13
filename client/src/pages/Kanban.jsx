@@ -7,6 +7,7 @@ import { Avatar } from '../components/Avatar'
 import ChatLead from './ChatLead'
 
 const COLUNAS = [
+  { id: 'revisao',     label: 'Revisão',     dot: '#F97316' },
   { id: 'lead',        label: 'Lead',        dot: '#3B82F6' },
   { id: 'atendimento', label: 'Atendimento', dot: '#6366f1' },
   { id: 'em_espera',   label: 'Em Espera',   dot: '#64748B' },
@@ -94,7 +95,7 @@ function agrupar(leads) {
 }
 
 function temPendenciaLocal(lead) {
-  if (lead.status === 'venda' || lead.status === 'perdido') return false
+  if (lead.status === 'venda' || lead.status === 'perdido' || lead.status === 'revisao') return false
   if (!lead.atualizadoEm) return false
   const diffMs = Date.now() - new Date(lead.atualizadoEm).getTime()
   return diffMs > 24 * 60 * 60 * 1000 && !lead.observacoes
@@ -252,6 +253,14 @@ export default function Kanban() {
               <div className="flex items-center gap-2 mb-2 px-1">
                 <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: col.dot }} />
                 <span className="text-sm font-semibold" style={{ color: '#F1F5F9' }}>{col.label}</span>
+                {col.id === 'revisao' && (
+                  <span
+                    className="text-xs px-1.5 py-0.5 rounded font-medium"
+                    style={{ backgroundColor: 'rgba(249,115,22,0.15)', color: '#F97316', fontSize: 10, lineHeight: '16px' }}
+                  >
+                    sem telefone
+                  </span>
+                )}
                 <span
                   className="ml-auto text-xs rounded-full px-2 py-0.5"
                   style={{ color: '#64748B', backgroundColor: '#1E293B' }}
@@ -262,7 +271,11 @@ export default function Kanban() {
 
               <div
                 className="flex-1 rounded-xl p-2 space-y-2 overflow-y-auto"
-                style={{ minHeight: 80, backgroundColor: '#0B1120' }}
+                style={{
+                  minHeight: 80,
+                  backgroundColor: '#0B1120',
+                  border: col.id === 'revisao' ? '1px solid rgba(249,115,22,0.18)' : 'none',
+                }}
               >
                 {grupos[col.id].map((lead) => (
                   <LeadCard
@@ -399,7 +412,16 @@ function LeadCard({ lead, atualizando, followUp, podeGerenciar, bloqueado, chatH
           </button>
         </div>
       </div>
-      <p className="text-xs mt-0.5" style={{ color: '#64748B' }}>{lead.telefone}</p>
+      {lead.telefone ? (
+        <p className="text-xs mt-0.5" style={{ color: '#64748B' }}>{lead.telefone}</p>
+      ) : (
+        <span
+          className="inline-block text-xs font-medium px-1.5 py-0.5 rounded mt-0.5"
+          style={{ backgroundColor: 'rgba(249,115,22,0.15)', color: '#F97316', fontSize: 10, lineHeight: '16px' }}
+        >
+          📵 sem telefone
+        </span>
+      )}
       {(lead.conjuntoName || lead.campanha) && (
         <span
           className="inline-block text-xs font-medium px-1.5 py-0.5 rounded mt-1"
@@ -667,6 +689,7 @@ const QUALIFICACAO_LABELS = {
 }
 
 const STATUS_COR_MODAL = {
+  revisao: '#F97316',
   lead: '#3B82F6', atendimento: '#6366f1', em_espera: '#64748B', agendamento: '#8B5CF6',
   visita: '#F59E0B', proposta: '#f97316', venda: '#10B981', perdido: '#EF4444',
 }
