@@ -69,25 +69,78 @@ async function receberLeadMeta(req, res) {
 
         const fieldData = leadData.field_data || [];
 
+        const normStr = (s) =>
+          String(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+
         const getField = (...names) => {
-          for (const n of names) {
-            const f = fieldData.find((x) => x.name === n);
-            if (f?.values?.[0]) return f.values[0];
+          const normNames = names.map(normStr);
+          for (const f of fieldData) {
+            if (normNames.includes(normStr(f.name)) && f?.values?.[0]) return f.values[0];
           }
           return null;
         };
 
-        const nome = getField('full_name', 'nome', 'nome_completo', 'name');
-        const telefone = getField('phone_number', 'telefone', 'número_do_whatsapp', 'numero_do_whatsapp', 'whatsapp', 'celular');
+        const nome = getField('full_name', 'nome', 'nome_completo', 'name', 'nome completo', 'full name');
+
+        const telefoneNomeado = getField(
+          'phone_number', 'telefone', 'numero_do_whatsapp', 'número_do_whatsapp',
+          'whatsapp', 'celular', 'mobile', 'mobile_phone', 'phone', 'fone', 'tel',
+          'contato', 'numero', 'número', 'whatsapp_number', 'numero_whatsapp',
+          'número_whatsapp', 'zap', 'whats', 'numero de telefone', 'número de telefone',
+          'numero de celular', 'número de celular',
+        );
+
+        const telefone = telefoneNomeado ?? (() => {
+          for (const f of fieldData) {
+            const val = f?.values?.[0];
+            if (!val) continue;
+            const d = String(val).replace(/\D/g, '');
+            if (d.length >= 10 && d.length <= 15) return val;
+          }
+          return null;
+        })();
+
         const email = getField('email');
         const campanha = sanitizarTexto(leadData.campaign_name || getField('campaign_name') || value.campaign_name || null);
         const conjuntoName = sanitizarTexto(leadData.adset_name || getField('adset_name') || value.adset_name || null);
         const anuncioName = sanitizarTexto(leadData.ad_name || getField('ad_name') || value.ad_name || null);
 
-        console.log(`[meta-webhook] Dados do lead buscados: ${nome} ${telefone}`);
+        const fieldNames = fieldData.map((f) => f.name).join(', ');
+        console.log(`[meta-webhook] Dados do lead buscados: nome="${nome}" telefone="${telefone}" | campos: ${fieldNames}`);
 
-        if (!nome || !telefone) {
-          console.warn(`[meta-webhook] Lead ${leadgenId} descartado: nome="${nome}" telefone="${telefone}" (campo não encontrado no field_data)`);
+        if (!nome) {
+          console.warn(`[meta-webhook] Lead ${leadgenId} descartado: nome não encontrado | campos: ${fieldNames}`);
+          continue;
+        }
+
+        const nomeSanitizado = sanitizarTexto(nome);
+
+        if (!telefone) {
+          console.warn(`[meta-webhook] Lead ${leadgenId} sem telefone — criando card para revisão | campos: ${fieldNames}`);
+          const leadRevisao = await prisma.lead.create({
+            data: {
+              nome: nomeSanitizado,
+              telefone: '',
+              whatsappJid: '',
+              status: 'revisao',
+              origem: 'Meta Ads',
+              campanha: campanha || null,
+              conjuntoName: conjuntoName || null,
+              anuncioName: anuncioName || null,
+              adId: leadData.ad_id || null,
+              adsetId: leadData.adset_id || null,
+              campaignId: leadData.campaign_id || null,
+              imobiliariaId,
+            },
+          });
+          await prisma.historicoLead.create({
+            data: {
+              leadId: leadRevisao.id,
+              acao: 'Lead recebido via Meta Lead Ads — telefone não localizado, aguarda revisão',
+              detalhes: `Campos recebidos: ${fieldNames}`,
+            },
+          });
+          console.log(`[meta-webhook] Card de revisão criado: ${leadRevisao.id}`);
           continue;
         }
 
@@ -96,8 +149,6 @@ async function receberLeadMeta(req, res) {
           console.warn(`[meta-webhook] Lead ${leadgenId} descartado: telefone "${telefone}" tem ${digitos.length} dígitos (fora do range 10–15)`);
           continue;
         }
-
-        const nomeSanitizado = sanitizarTexto(nome);
 
         const configAgente = await prisma.configAgente.findUnique({
           where: { imobiliariaId },
