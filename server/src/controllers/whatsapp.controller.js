@@ -38,8 +38,8 @@ async function conectar(req, res) {
     // Garante registro no BD
     await prisma.whatsappInstancia.upsert({
       where: { imobiliariaId: req.imobiliariaId },
-      update: { ativo: true },
-      create: { imobiliariaId: req.imobiliariaId, ativo: true },
+      update: { ativo: true, status: 'conectado' },
+      create: { imobiliariaId: req.imobiliariaId, ativo: true, status: 'conectado' },
     });
 
     await axios.post(
@@ -102,8 +102,8 @@ async function adminConectar(req, res) {
 
     await prisma.whatsappInstancia.upsert({
       where: { imobiliariaId: id },
-      update: { ativo: true },
-      create: { imobiliariaId: id, ativo: true },
+      update: { ativo: true, status: 'conectado' },
+      create: { imobiliariaId: id, ativo: true, status: 'conectado' },
     });
 
     await axios.post(
