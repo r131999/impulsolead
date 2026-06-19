@@ -1,6 +1,7 @@
-﻿const bcrypt = require('bcryptjs');
-const crypto = require('crypto');
+'use strict';
 
+const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
 const prisma = require('../lib/prisma');
 
 const PERGUNTAS_PADRAO = [
@@ -14,24 +15,42 @@ const PERGUNTAS_PADRAO = [
   'Qual faixa de valor você tem em mente para o imóvel?',
 ];
 
+// Todas as permissões ligadas — padrão para trial e migration de clientes existentes
+const PERMISSOES_PADRAO = {
+  importacaoListas:          true,
+  gestaoImoveis:             true,
+  arquivosImovel:            true,
+  apresentacaoPersonalizada: true,
+  tourVirtual:               true,
+  painelCampanhas:           true,
+  relatorios:                true,
+  followUpAutomatico:        true,
+  agenteIA:                  true,
+  chatLead:                  true,
+  multiplosWhatsapp:         true,
+};
+
+const VALID_PLANOS = ['trial', 'construcao', 'desenvolvimento', 'sucesso', 'legado', 'cancelado'];
+
 function gerarApiKey() {
   return crypto.randomBytes(32).toString('hex');
 }
 
 function calcStatusPlano(plano, trialExpiraEm) {
-  if (plano === 'ativo') return 'ativo';
   if (plano === 'cancelado') return 'cancelado';
+  if (plano === 'legado') return 'legado';
   if (plano === 'trial') {
     return trialExpiraEm && new Date() <= new Date(trialExpiraEm)
       ? 'trial_ativo'
       : 'trial_expirado';
   }
-  return plano;
+  return plano; // construcao | desenvolvimento | sucesso
 }
+
+// ── listarClientes ────────────────────────────────────────────────────────────
 
 async function listarClientes(req, res) {
   const { busca } = req.query;
-
   const where = busca ? { nome: { contains: busca, mode: 'insensitive' } } : {};
 
   const imobiliarias = await prisma.imobiliaria.findMany({
@@ -42,6 +61,10 @@ async function listarClientes(req, res) {
       email: true,
       plano: true,
       trialExpiraEm: true,
+      planoExpiraEm: true,
+      planoBloqueadoEm: true,
+      limiteAcessos: true,
+      permissoes: true,
       criadoEm: true,
       _count: {
         select: {
@@ -55,11 +78,13 @@ async function listarClientes(req, res) {
   });
 
   const agora = new Date();
-  const resultado = imobiliarias.map(imob => {
-    const diasRestantes =
-      imob.trialExpiraEm
-        ? Math.max(0, Math.ceil((new Date(imob.trialExpiraEm) - agora) / (1000 * 60 * 60 * 24)))
-        : null;
+  const resultado = imobiliarias.map((imob) => {
+    let diasRestantes = null;
+    if (imob.trialExpiraEm) {
+      diasRestantes = Math.max(0, Math.ceil((new Date(imob.trialExpiraEm) - agora) / (1000 * 60 * 60 * 24)));
+    } else if (imob.planoExpiraEm) {
+      diasRestantes = Math.max(0, Math.ceil((new Date(imob.planoExpiraEm) - agora) / (1000 * 60 * 60 * 24)));
+    }
 
     return {
       id: imob.id,
@@ -67,6 +92,10 @@ async function listarClientes(req, res) {
       email: imob.email,
       plano: imob.plano,
       trialExpiraEm: imob.trialExpiraEm,
+      planoExpiraEm: imob.planoExpiraEm,
+      planoBloqueadoEm: imob.planoBloqueadoEm,
+      limiteAcessos: imob.limiteAcessos,
+      permissoes: imob.permissoes,
       criadoEm: imob.criadoEm,
       totalLeads: imob._count.leads,
       totalCorretores: imob._count.corretores,
@@ -79,13 +108,14 @@ async function listarClientes(req, res) {
   res.json(resultado);
 }
 
+// ── atualizarPlano ────────────────────────────────────────────────────────────
+
 async function atualizarPlano(req, res) {
   const { id } = req.params;
   const { plano, planoExpiraEm, diasExtender } = req.body;
 
-  const validPlanos = ['trial', 'gratuito', 'starter', 'pro', 'legado', 'cancelado'];
-  if (!validPlanos.includes(plano)) {
-    return res.status(400).json({ error: `Plano inválido. Use: ${validPlanos.join(', ')}` });
+  if (!VALID_PLANOS.includes(plano)) {
+    return res.status(400).json({ error: `Plano inválido. Use: ${VALID_PLANOS.join(', ')}` });
   }
 
   const imobiliaria = await prisma.imobiliaria.findUnique({ where: { id } });
@@ -93,20 +123,23 @@ async function atualizarPlano(req, res) {
     return res.status(404).json({ error: 'Imobiliária não encontrada' });
   }
 
-  // Ao atualizar plano pelo admin, sempre limpa o bloqueio
+  // Ao trocar plano, limpa bloqueio e notificação (exceto cancelado, que bloqueia)
   const data = { plano, planoBloqueadoEm: null, notificacaoVencimento: false };
 
   if (plano === 'trial') {
-    const dias = diasExtender && Number.isInteger(diasExtender) && diasExtender > 0
-      ? diasExtender : 7;
+    const dias = Number.isInteger(diasExtender) && diasExtender > 0 ? diasExtender : 7;
     data.trialExpiraEm = new Date(Date.now() + dias * 24 * 60 * 60 * 1000);
     data.planoExpiraEm = null;
-  } else if (['gratuito', 'starter', 'pro'].includes(plano)) {
+  } else if (['construcao', 'desenvolvimento', 'sucesso'].includes(plano)) {
     data.planoExpiraEm = planoExpiraEm
       ? new Date(planoExpiraEm)
       : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
     data.trialExpiraEm = null;
   } else if (plano === 'legado') {
+    data.planoExpiraEm = null;
+    data.trialExpiraEm = null;
+  } else if (plano === 'cancelado') {
+    data.planoBloqueadoEm = new Date(); // bloqueia imediatamente
     data.planoExpiraEm = null;
     data.trialExpiraEm = null;
   }
@@ -122,6 +155,48 @@ async function atualizarPlano(req, res) {
   });
 }
 
+// ── atualizarPermissoes ───────────────────────────────────────────────────────
+
+async function atualizarPermissoes(req, res) {
+  const { id } = req.params;
+  const { permissoes } = req.body;
+
+  if (!permissoes || typeof permissoes !== 'object' || Array.isArray(permissoes)) {
+    return res.status(400).json({ error: 'Campo permissoes deve ser um objeto' });
+  }
+
+  const imobiliaria = await prisma.imobiliaria.findUnique({ where: { id } });
+  if (!imobiliaria) return res.status(404).json({ error: 'Imobiliária não encontrada' });
+
+  const atualizado = await prisma.imobiliaria.update({
+    where: { id },
+    data: { permissoes },
+  });
+  res.json({ id: atualizado.id, permissoes: atualizado.permissoes });
+}
+
+// ── atualizarLimiteAcessos ────────────────────────────────────────────────────
+
+async function atualizarLimiteAcessos(req, res) {
+  const { id } = req.params;
+  const { limiteAcessos } = req.body;
+
+  if (!Number.isInteger(limiteAcessos) || limiteAcessos < 1) {
+    return res.status(400).json({ error: 'limiteAcessos deve ser um inteiro >= 1' });
+  }
+
+  const imobiliaria = await prisma.imobiliaria.findUnique({ where: { id } });
+  if (!imobiliaria) return res.status(404).json({ error: 'Imobiliária não encontrada' });
+
+  const atualizado = await prisma.imobiliaria.update({
+    where: { id },
+    data: { limiteAcessos },
+  });
+  res.json({ id: atualizado.id, limiteAcessos: atualizado.limiteAcessos });
+}
+
+// ── getPlanoCliente ───────────────────────────────────────────────────────────
+
 async function getPlanoCliente(req, res) {
   const { id } = req.params;
   const imobiliaria = await prisma.imobiliaria.findUnique({
@@ -130,6 +205,7 @@ async function getPlanoCliente(req, res) {
       id: true, nome: true, plano: true, trialExpiraEm: true,
       planoExpiraEm: true, planoBloqueadoEm: true,
       notificacaoVencimento: true, criadoEm: true,
+      permissoes: true, limiteAcessos: true,
     },
   });
   if (!imobiliaria) return res.status(404).json({ error: 'Imobiliária não encontrada' });
@@ -137,6 +213,7 @@ async function getPlanoCliente(req, res) {
   const agora = new Date();
   let expiraEm = null;
   let diasRestantes = null;
+
   if (imobiliaria.plano === 'trial') {
     expiraEm = imobiliaria.trialExpiraEm
       ? new Date(imobiliaria.trialExpiraEm)
@@ -155,11 +232,15 @@ async function getPlanoCliente(req, res) {
     planoExpiraEm: imobiliaria.planoExpiraEm,
     planoBloqueadoEm: imobiliaria.planoBloqueadoEm,
     notificacaoVencimento: imobiliaria.notificacaoVencimento,
+    permissoes: imobiliaria.permissoes,
+    limiteAcessos: imobiliaria.limiteAcessos,
     expiraEm: expiraEm ? expiraEm.toISOString() : null,
     diasRestantes,
     bloqueado: !!imobiliaria.planoBloqueadoEm,
   });
 }
+
+// ── criarCliente ──────────────────────────────────────────────────────────────
 
 async function criarCliente(req, res) {
   const { nomeImobiliaria, nomeGestor, emailGestor, senhaInicial } = req.body;
@@ -169,11 +250,9 @@ async function criarCliente(req, res) {
       error: 'Campos obrigatórios: nomeImobiliaria, nomeGestor, emailGestor, senhaInicial',
     });
   }
-
   if (senhaInicial.length < 6) {
     return res.status(400).json({ error: 'A senha deve ter no mínimo 6 caracteres' });
   }
-
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   if (!emailRegex.test(emailGestor)) {
     return res.status(400).json({ error: 'Email inválido' });
@@ -195,6 +274,8 @@ async function criarCliente(req, res) {
         plano: 'trial',
         trialExpiraEm,
         apiKey: gerarApiKey(),
+        permissoes: PERMISSOES_PADRAO,
+        limiteAcessos: 25,
       },
     });
 
@@ -209,10 +290,7 @@ async function criarCliente(req, res) {
     });
 
     await tx.configAgente.create({
-      data: {
-        imobiliariaId: imobiliaria.id,
-        perguntas: PERGUNTAS_PADRAO,
-      },
+      data: { imobiliariaId: imobiliaria.id, perguntas: PERGUNTAS_PADRAO },
     });
 
     await tx.modeloMensagem.createMany({
@@ -257,18 +335,19 @@ async function criarCliente(req, res) {
   });
 }
 
+// ── getStats ──────────────────────────────────────────────────────────────────
+
 async function getStats(req, res) {
   const agora = new Date();
   const em7Dias = new Date(agora.getTime() + 7 * 24 * 60 * 60 * 1000);
 
   const [totalClientes, clientesAtivos, trialsExpirando, totalLeads] = await prisma.$transaction([
     prisma.imobiliaria.count(),
-    prisma.imobiliaria.count({ where: { plano: 'ativo' } }),
     prisma.imobiliaria.count({
-      where: {
-        plano: 'trial',
-        trialExpiraEm: { gte: agora, lte: em7Dias },
-      },
+      where: { plano: { in: ['construcao', 'desenvolvimento', 'sucesso'] } },
+    }),
+    prisma.imobiliaria.count({
+      where: { plano: 'trial', trialExpiraEm: { gte: agora, lte: em7Dias } },
     }),
     prisma.lead.count(),
   ]);
@@ -281,4 +360,12 @@ async function getStats(req, res) {
   });
 }
 
-module.exports = { listarClientes, atualizarPlano, getPlanoCliente, criarCliente, getStats };
+module.exports = {
+  listarClientes,
+  atualizarPlano,
+  atualizarPermissoes,
+  atualizarLimiteAcessos,
+  getPlanoCliente,
+  criarCliente,
+  getStats,
+};

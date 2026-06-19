@@ -3,41 +3,63 @@ import { useAuth } from '../context/AuthContext'
 
 const PLANOS = [
   {
-    id: 'starter',
-    nome: 'Starter',
-    preco: 'R$ 197',
+    id: 'construcao',
+    nome: 'Construção',
+    preco: 'R$ 147',
     periodo: '/mês',
-    descricao: 'Ideal para imobiliárias que querem organizar seus leads e distribuir para a equipe.',
+    acessos: 5,
+    descricao: 'Para imobiliárias em crescimento que querem organizar e distribuir seus leads com eficiência.',
     recursos: [
-      'Kanban de leads ilimitado',
-      'Gestão de corretores',
+      'Kanban de leads',
       'Distribuição automática de leads',
-      'Notificações WhatsApp',
-      'Relatórios de desempenho',
-      'Arquivos de imóveis',
-      'Histórico de distribuição',
+      'Gestão de corretores',
+      'Notificações via WhatsApp',
+      '5 acessos inclusos',
+      'Acesso adicional: R$25/mês',
     ],
     cor: '#6366F1',
     corFundo: 'rgba(99,102,241,0.08)',
     corBorda: 'rgba(99,102,241,0.25)',
   },
   {
-    id: 'pro',
-    nome: 'Pro',
-    preco: 'R$ 297',
+    id: 'desenvolvimento',
+    nome: 'Desenvolvimento',
+    preco: 'R$ 347',
     periodo: '/mês',
-    descricao: 'Tudo do Starter mais chat com leads e assistente IA para maximizar as conversões.',
+    acessos: 12,
+    descricao: 'Para equipes maiores que precisam de gestão completa de imóveis, relatórios e apresentações.',
     recursos: [
-      'Tudo do Starter',
-      'Chat direto com lead via WhatsApp',
-      'Assistente IA integrado',
-      'Análise inteligente de conversas',
-      'Prioridade no suporte',
+      'Tudo do Construção',
+      'Gestão e arquivos de imóveis',
+      'Apresentações personalizadas',
+      'Relatórios de desempenho',
+      'Follow-up automático',
+      '12 acessos inclusos',
+      'Acesso adicional: R$25/mês',
     ],
     cor: '#10B981',
     corFundo: 'rgba(16,185,129,0.08)',
     corBorda: 'rgba(16,185,129,0.25)',
     destaque: true,
+  },
+  {
+    id: 'sucesso',
+    nome: 'Sucesso',
+    preco: 'R$ 597',
+    periodo: '/mês',
+    acessos: 25,
+    descricao: 'Para operações completas com tour virtual, análise de campanhas e importação de listas.',
+    recursos: [
+      'Tudo do Desenvolvimento',
+      'Tour virtual',
+      'Painel de campanhas (ROI)',
+      'Importação de listas de contatos',
+      '25 acessos inclusos',
+      'Acesso adicional: R$25/mês',
+    ],
+    cor: '#F59E0B',
+    corFundo: 'rgba(245,158,11,0.08)',
+    corBorda: 'rgba(245,158,11,0.25)',
   },
 ]
 
@@ -48,17 +70,17 @@ export default function Planos() {
   const planoAtual = planoInfo?.plano
 
   return (
-    <div className="p-4 sm:p-6 max-w-3xl mx-auto">
+    <div className="p-4 sm:p-6 max-w-4xl mx-auto">
       <div className="mb-8 text-center">
         <h1 className="text-2xl font-bold mb-2" style={{ color: '#F1F5F9' }}>Escolha seu plano</h1>
         <p style={{ color: '#94A3B8' }}>
           {planoAtual === 'trial'
-            ? `Você está no período de teste. Escolha um plano para continuar após o trial.`
+            ? 'Você está no período de teste. Escolha um plano para continuar após o trial.'
             : 'Selecione o plano que melhor atende sua imobiliária.'}
         </p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
         {PLANOS.map((p) => {
           const atual = planoAtual === p.id
           return (
@@ -196,7 +218,7 @@ function ModalPix({ plano, onClose }) {
           className="flex items-center justify-center gap-2 w-full py-3 rounded-lg font-semibold text-sm"
           style={{ backgroundColor: '#25D366', color: '#fff' }}
         >
-          📲 Enviar comprovante — (98) 98144-4954
+          Enviar comprovante — (98) 98144-4954
         </a>
       </div>
     </div>

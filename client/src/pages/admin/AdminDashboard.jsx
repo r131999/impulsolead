@@ -1,7 +1,10 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAdminAuth } from '../../context/AdminAuthContext'
-import { getStats, getClientes, criarCliente, atualizarPlano } from '../../api/admin'
+import {
+  getStats, getClientes, criarCliente,
+  atualizarPlano, atualizarPermissoes, atualizarLimiteAcessos,
+} from '../../api/admin'
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -11,38 +14,72 @@ function fmtData(iso) {
 }
 
 function calcStatus(plano, trialExpiraEm) {
-  if (plano === 'ativo') return 'ativo'
   if (plano === 'cancelado') return 'cancelado'
+  if (plano === 'legado') return 'legado'
   if (plano === 'trial') {
     return trialExpiraEm && new Date() <= new Date(trialExpiraEm)
       ? 'trial_ativo'
       : 'trial_expirado'
   }
-  return plano
+  return plano // construcao | desenvolvimento | sucesso
 }
 
 const STATUS_LABEL = {
-  trial_ativo:    'Trial ativo',
-  trial_expirado: 'Trial expirado',
-  ativo:          'Ativo',
-  cancelado:      'Cancelado',
+  trial_ativo:     'Trial ativo',
+  trial_expirado:  'Trial expirado',
+  construcao:      'Construção',
+  desenvolvimento: 'Desenvolvimento',
+  sucesso:         'Sucesso',
+  legado:          'Legado',
+  cancelado:       'Cancelado',
 }
 
 const STATUS_COLOR = {
-  trial_ativo:    { bg: 'rgba(234,179,8,0.15)',   text: '#facc15' },
-  trial_expirado: { bg: 'rgba(239,68,68,0.15)',   text: '#f87171' },
-  ativo:          { bg: 'rgba(16,185,129,0.15)',  text: '#34d399' },
-  cancelado:      { bg: 'rgba(100,116,139,0.15)', text: '#94a3b8' },
+  trial_ativo:     { bg: 'rgba(234,179,8,0.15)',   text: '#facc15' },
+  trial_expirado:  { bg: 'rgba(239,68,68,0.15)',   text: '#f87171' },
+  construcao:      { bg: 'rgba(99,102,241,0.15)',  text: '#818cf8' },
+  desenvolvimento: { bg: 'rgba(16,185,129,0.15)',  text: '#34d399' },
+  sucesso:         { bg: 'rgba(245,158,11,0.15)',  text: '#fbbf24' },
+  legado:          { bg: 'rgba(139,92,246,0.15)',  text: '#a78bfa' },
+  cancelado:       { bg: 'rgba(100,116,139,0.15)', text: '#94a3b8' },
 }
 
-function diasColor(dias, status) {
-  if (status !== 'trial_ativo') return '#94A3B8'
+function diasColor(dias) {
+  if (dias === null || dias === undefined) return '#94A3B8'
   if (dias < 7) return '#f87171'
   if (dias < 15) return '#fbbf24'
   return '#34d399'
 }
 
-// ─── componentes auxiliares ─────────────────────────────────────────────────
+// ─── dados de planos ─────────────────────────────────────────────────────────
+
+const PLANOS_OPCOES = [
+  { value: 'construcao',    label: 'Construção — R$147/mês' },
+  { value: 'desenvolvimento', label: 'Desenvolvimento — R$347/mês' },
+  { value: 'sucesso',       label: 'Sucesso — R$597/mês' },
+  { value: 'trial',         label: 'Trial' },
+  { value: 'legado',        label: 'Legado' },
+  { value: 'cancelado',     label: 'Cancelado' },
+]
+
+const PERMISSOES_ATUAIS = [
+  { key: 'importacaoListas',          label: 'Importação de listas' },
+  { key: 'gestaoImoveis',             label: 'Gestão de imóveis' },
+  { key: 'arquivosImovel',            label: 'Arquivos de imóveis' },
+  { key: 'apresentacaoPersonalizada', label: 'Apresentação personalizada' },
+  { key: 'tourVirtual',               label: 'Tour virtual' },
+  { key: 'painelCampanhas',           label: 'Painel de campanhas (ROI)' },
+  { key: 'relatorios',                label: 'Relatórios' },
+  { key: 'followUpAutomatico',        label: 'Follow-up automático' },
+]
+
+const PERMISSOES_FUTURAS = [
+  { key: 'agenteIA',          label: 'Agente IA (Lia)' },
+  { key: 'chatLead',          label: 'Chat com lead' },
+  { key: 'multiplosWhatsapp', label: 'Múltiplos WhatsApp' },
+]
+
+// ─── componentes base ────────────────────────────────────────────────────────
 
 function StatCard({ label, value, sub, accent }) {
   return (
@@ -77,11 +114,11 @@ function Modal({ title, onClose, children }) {
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
       <div
-        className="w-full max-w-lg rounded-2xl shadow-2xl"
-        style={{ backgroundColor: '#0f1929', border: '1px solid #1e2d3d' }}
+        className="w-full max-w-lg rounded-2xl shadow-2xl flex flex-col"
+        style={{ backgroundColor: '#0f1929', border: '1px solid #1e2d3d', maxHeight: '90vh' }}
       >
         <div
-          className="flex items-center justify-between px-6 py-4"
+          className="flex items-center justify-between px-6 py-4 flex-shrink-0"
           style={{ borderBottom: '1px solid #1e2d3d' }}
         >
           <h2 className="text-white font-semibold">{title}</h2>
@@ -92,7 +129,7 @@ function Modal({ title, onClose, children }) {
             ✕
           </button>
         </div>
-        <div className="px-6 py-5">{children}</div>
+        <div className="px-6 py-5 overflow-y-auto">{children}</div>
       </div>
     </div>
   )
@@ -102,96 +139,273 @@ function InfoRow({ label, value }) {
   return (
     <div className="flex justify-between items-center py-2" style={{ borderBottom: '1px solid #1e2d3d' }}>
       <span className="text-xs" style={{ color: '#64748B' }}>{label}</span>
-      <span className="text-sm font-medium" style={{ color: '#F1F5F9' }}>{value || '—'}</span>
+      <span className="text-sm font-medium" style={{ color: '#F1F5F9' }}>{value ?? '—'}</span>
     </div>
+  )
+}
+
+function Section({ title, children }) {
+  return (
+    <div className="rounded-xl p-4 space-y-3" style={{ backgroundColor: '#0B1120', border: '1px solid #1e2d3d' }}>
+      <p className="text-xs font-semibold tracking-wider" style={{ color: '#64748B' }}>{title}</p>
+      {children}
+    </div>
+  )
+}
+
+function Toggle({ label, value, onChange }) {
+  return (
+    <div className="flex items-center justify-between gap-3 py-0.5">
+      <span className="text-sm" style={{ color: value ? '#CBD5E1' : '#64748B' }}>{label}</span>
+      <button
+        onClick={() => onChange(!value)}
+        className="relative flex-shrink-0 w-9 h-5 rounded-full transition-colors"
+        style={{ backgroundColor: value ? '#6366f1' : '#1e2d3d' }}
+      >
+        <span
+          className="absolute top-0.5 w-4 h-4 rounded-full transition-transform"
+          style={{
+            backgroundColor: '#fff',
+            transform: value ? 'translateX(17px)' : 'translateX(2px)',
+          }}
+        />
+      </button>
+    </div>
+  )
+}
+
+function SaveButton({ onClick, loading, children }) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={loading}
+      className="w-full py-2 rounded-lg text-sm font-medium text-white transition-opacity disabled:opacity-50"
+      style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}
+    >
+      {loading ? 'Salvando...' : children}
+    </button>
   )
 }
 
 // ─── modal gerenciar ────────────────────────────────────────────────────────
 
 function ModalGerenciar({ cliente, onClose, onAtualizado }) {
-  const [diasExtender, setDiasExtender] = useState(30)
-  const [salvando, setSalvando] = useState(false)
-  const [erro, setErro] = useState('')
-  const status = calcStatus(cliente.plano, cliente.trialExpiraEm)
+  // ── plano ──
+  const [planoSel, setPlanoSel] = useState(cliente.plano)
+  const [expiraEm, setExpiraEm] = useState(
+    cliente.planoExpiraEm
+      ? new Date(cliente.planoExpiraEm).toISOString().split('T')[0]
+      : ''
+  )
+  const [diasTrial, setDiasTrial] = useState(30)
+  const [salvandoPlano, setSalvandoPlano] = useState(false)
 
-  const acao = async (plano, extras = {}) => {
-    setSalvando(true)
-    setErro('')
+  // ── permissões ──
+  const [perms, setPerms] = useState(
+    typeof cliente.permissoes === 'object' && cliente.permissoes !== null
+      ? { ...cliente.permissoes }
+      : {}
+  )
+  const [salvandoPerms, setSalvandoPerms] = useState(false)
+
+  // ── limite ──
+  const [limite, setLimite] = useState(cliente.limiteAcessos ?? 5)
+  const [salvandoLimite, setSalvandoLimite] = useState(false)
+
+  // ── feedback ──
+  const [msg, setMsg] = useState({ texto: '', erro: false })
+
+  const feedback = (texto, erro = false) => {
+    setMsg({ texto, erro })
+    setTimeout(() => setMsg({ texto: '', erro: false }), 3000)
+  }
+
+  const salvarPlano = async () => {
+    setSalvandoPlano(true)
     try {
-      await atualizarPlano(cliente.id, { plano, ...extras })
+      const payload = { plano: planoSel }
+      if (planoSel === 'trial') {
+        payload.diasExtender = Number(diasTrial)
+      } else if (['construcao', 'desenvolvimento', 'sucesso'].includes(planoSel) && expiraEm) {
+        payload.planoExpiraEm = expiraEm
+      }
+      await atualizarPlano(cliente.id, payload)
       onAtualizado()
       onClose()
     } catch (err) {
-      setErro(err.response?.data?.error || 'Erro ao atualizar')
+      feedback(err.response?.data?.error || 'Erro ao atualizar plano', true)
     } finally {
-      setSalvando(false)
+      setSalvandoPlano(false)
     }
+  }
+
+  const salvarPermissoes = async () => {
+    setSalvandoPerms(true)
+    try {
+      await atualizarPermissoes(cliente.id, { permissoes: perms })
+      onAtualizado()
+      feedback('Permissões salvas')
+    } catch (err) {
+      feedback(err.response?.data?.error || 'Erro ao salvar permissões', true)
+    } finally {
+      setSalvandoPerms(false)
+    }
+  }
+
+  const salvarLimite = async () => {
+    setSalvandoLimite(true)
+    try {
+      await atualizarLimiteAcessos(cliente.id, { limiteAcessos: Number(limite) })
+      onAtualizado()
+      feedback('Limite atualizado')
+    } catch (err) {
+      feedback(err.response?.data?.error || 'Erro ao atualizar limite', true)
+    } finally {
+      setSalvandoLimite(false)
+    }
+  }
+
+  const togglePerm = (key) => (val) => setPerms((p) => ({ ...p, [key]: val }))
+
+  const isPago = ['construcao', 'desenvolvimento', 'sucesso'].includes(planoSel)
+  const acessosEmUso = cliente.totalCorretores ?? 0
+  const status = calcStatus(cliente.plano, cliente.trialExpiraEm)
+
+  const inputStyle = {
+    backgroundColor: '#111827', border: '1px solid #1e2d3d', color: '#F1F5F9',
   }
 
   return (
     <Modal title="Gerenciar cliente" onClose={onClose}>
+      {/* Info */}
       <div className="space-y-1 mb-5">
         <InfoRow label="Nome" value={cliente.nome} />
         <InfoRow label="Email" value={cliente.email} />
         <InfoRow label="Plano atual" value={<PlanoBadge status={status} />} />
-        <InfoRow label="Trial expira em" value={fmtData(cliente.trialExpiraEm)} />
+        <InfoRow label="Expira em" value={fmtData(cliente.planoExpiraEm || cliente.trialExpiraEm)} />
         <InfoRow label="Cadastrado em" value={fmtData(cliente.criadoEm)} />
         <InfoRow label="Total de leads" value={cliente.totalLeads} />
-        <InfoRow label="Corretores ativos" value={cliente.totalCorretores} />
-        <InfoRow label="Usuários" value={cliente.totalUsuarios} />
       </div>
 
-      {erro && <p className="text-xs text-red-400 mb-4">{erro}</p>}
-
-      <div className="space-y-3">
-        {/* Estender trial */}
-        <div
-          className="rounded-xl p-4 space-y-3"
-          style={{ backgroundColor: '#0B1120', border: '1px solid #1e2d3d' }}
+      {msg.texto && (
+        <p
+          className="text-xs mb-3 px-3 py-2 rounded-lg"
+          style={{
+            backgroundColor: msg.erro ? 'rgba(239,68,68,0.1)' : 'rgba(16,185,129,0.1)',
+            color: msg.erro ? '#f87171' : '#34d399',
+          }}
         >
-          <p className="text-xs font-medium" style={{ color: '#94A3B8' }}>Estender / reativar trial</p>
-          <div className="flex gap-2">
+          {msg.texto}
+        </p>
+      )}
+
+      <div className="space-y-4">
+        {/* ── Seção Plano ── */}
+        <Section title="PLANO">
+          <select
+            value={planoSel}
+            onChange={(e) => setPlanoSel(e.target.value)}
+            className="w-full rounded-lg px-3 py-2.5 text-sm outline-none"
+            style={inputStyle}
+          >
+            {PLANOS_OPCOES.map((p) => (
+              <option key={p.value} value={p.value}>{p.label}</option>
+            ))}
+          </select>
+
+          {planoSel === 'trial' && (
+            <div className="flex items-center gap-3">
+              <input
+                type="number"
+                min="1"
+                max="365"
+                value={diasTrial}
+                onChange={(e) => setDiasTrial(e.target.value)}
+                className="w-24 rounded-lg px-3 py-2 text-sm outline-none"
+                style={inputStyle}
+              />
+              <span className="text-sm" style={{ color: '#64748B' }}>dias a partir de hoje</span>
+            </div>
+          )}
+
+          {isPago && (
+            <div>
+              <label className="block text-xs mb-1.5" style={{ color: '#64748B' }}>Expiração do plano</label>
+              <input
+                type="date"
+                value={expiraEm}
+                onChange={(e) => setExpiraEm(e.target.value)}
+                className="w-full rounded-lg px-3 py-2.5 text-sm outline-none"
+                style={inputStyle}
+              />
+            </div>
+          )}
+
+          {planoSel === 'cancelado' && (
+            <p className="text-xs px-3 py-2 rounded-lg" style={{ backgroundColor: 'rgba(239,68,68,0.08)', color: '#f87171' }}>
+              O cliente será bloqueado imediatamente ao salvar.
+            </p>
+          )}
+
+          <SaveButton onClick={salvarPlano} loading={salvandoPlano}>
+            Salvar plano
+          </SaveButton>
+        </Section>
+
+        {/* ── Seção Acessos ── */}
+        <Section title="ACESSOS">
+          {/* Contador */}
+          <div className="flex items-center justify-between px-1">
+            <span className="text-sm" style={{ color: '#94A3B8' }}>Em uso agora</span>
+            <span
+              className="text-sm font-bold px-3 py-1 rounded-lg"
+              style={{
+                backgroundColor: acessosEmUso >= limite ? 'rgba(239,68,68,0.15)' : 'rgba(16,185,129,0.1)',
+                color: acessosEmUso >= limite ? '#f87171' : '#34d399',
+              }}
+            >
+              {acessosEmUso} / {limite}
+            </span>
+          </div>
+
+          <div>
+            <label className="block text-xs mb-1.5" style={{ color: '#64748B' }}>Limite de acessos</label>
             <input
               type="number"
               min="1"
-              max="365"
-              value={diasExtender}
-              onChange={(e) => setDiasExtender(Number(e.target.value))}
-              className="w-24 rounded-lg px-3 py-2 text-sm outline-none"
-              style={{ backgroundColor: '#111827', border: '1px solid #1e2d3d', color: '#F1F5F9' }}
+              value={limite}
+              onChange={(e) => setLimite(e.target.value)}
+              className="w-full rounded-lg px-3 py-2.5 text-sm outline-none"
+              style={inputStyle}
             />
-            <span className="flex items-center text-sm" style={{ color: '#64748B' }}>dias a partir de hoje</span>
           </div>
-          <button
-            onClick={() => acao('trial', { diasExtender })}
-            disabled={salvando}
-            className="w-full py-2 rounded-lg text-sm font-medium text-white transition-opacity disabled:opacity-60"
-            style={{ backgroundColor: '#854d0e' }}
-          >
-            Estender trial ({diasExtender}d)
-          </button>
-        </div>
 
-        {/* Ativar plano */}
-        <button
-          onClick={() => acao('ativo')}
-          disabled={salvando || status === 'ativo'}
-          className="w-full py-2.5 rounded-lg text-sm font-medium text-white transition-opacity disabled:opacity-40"
-          style={{ backgroundColor: '#065f46' }}
-        >
-          {status === 'ativo' ? 'Plano já ativo' : 'Ativar plano (sem expiração)'}
-        </button>
+          <SaveButton onClick={salvarLimite} loading={salvandoLimite}>
+            Salvar limite
+          </SaveButton>
+        </Section>
 
-        {/* Cancelar plano */}
-        <button
-          onClick={() => acao('cancelado')}
-          disabled={salvando || status === 'cancelado'}
-          className="w-full py-2.5 rounded-lg text-sm font-medium transition-opacity disabled:opacity-40"
-          style={{ backgroundColor: 'rgba(239,68,68,0.15)', color: '#f87171', border: '1px solid rgba(239,68,68,0.3)' }}
-        >
-          {status === 'cancelado' ? 'Plano já cancelado' : 'Cancelar plano'}
-        </button>
+        {/* ── Seção Permissões ── */}
+        <Section title="PERMISSÕES">
+          <div className="space-y-2">
+            {PERMISSOES_ATUAIS.map(({ key, label }) => (
+              <Toggle key={key} label={label} value={!!perms[key]} onChange={togglePerm(key)} />
+            ))}
+          </div>
+
+          <div className="my-2" style={{ borderTop: '1px solid #1e2d3d' }} />
+
+          <p className="text-xs mb-2" style={{ color: '#475569' }}>Futuras</p>
+          <div className="space-y-2">
+            {PERMISSOES_FUTURAS.map(({ key, label }) => (
+              <Toggle key={key} label={label} value={!!perms[key]} onChange={togglePerm(key)} />
+            ))}
+          </div>
+
+          <SaveButton onClick={salvarPermissoes} loading={salvandoPerms}>
+            Salvar permissões
+          </SaveButton>
+        </Section>
       </div>
     </Modal>
   )
@@ -227,11 +441,7 @@ function ModalNovoCliente({ onClose, onCriado }) {
     }
   }
 
-  const inputStyle = {
-    backgroundColor: '#0B1120',
-    border: '1px solid #1e2d3d',
-    color: '#F1F5F9',
-  }
+  const inputStyle = { backgroundColor: '#0B1120', border: '1px solid #1e2d3d', color: '#F1F5F9' }
 
   return (
     <Modal title="Novo cliente" onClose={onClose}>
@@ -303,7 +513,7 @@ function ModalNovoCliente({ onClose, onCriado }) {
         </Field>
 
         <p className="text-xs" style={{ color: '#64748B' }}>
-          Será criado com 7 dias de trial automaticamente.
+          Criado com 7 dias de trial e todas as permissões ativas.
         </p>
 
         {erro && <p className="text-xs text-red-400">{erro}</p>}
@@ -366,16 +576,12 @@ export default function AdminDashboard() {
     }
   }, [busca])
 
-  useEffect(() => {
-    carregar()
-  }, [carregar])
+  useEffect(() => { carregar() }, [carregar])
 
   const handleLogout = () => {
     logout()
     navigate('/admin/login')
   }
-
-  const clientesFiltrados = clientes
 
   return (
     <div className="min-h-screen" style={{ background: '#0B1120' }}>
@@ -398,9 +604,7 @@ export default function AdminDashboard() {
         </div>
 
         <div className="flex items-center gap-4">
-          <span className="text-xs" style={{ color: '#64748B' }}>
-            {supremo?.nome}
-          </span>
+          <span className="text-xs" style={{ color: '#64748B' }}>{supremo?.nome}</span>
           <button
             onClick={handleLogout}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors hover:bg-red-500/10"
@@ -415,10 +619,7 @@ export default function AdminDashboard() {
       <main className="max-w-7xl mx-auto px-6 py-8 space-y-8">
         {/* Stats */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <StatCard
-            label="Total de clientes"
-            value={stats?.totalClientes}
-          />
+          <StatCard label="Total de clientes" value={stats?.totalClientes} />
           <StatCard
             label="Planos ativos"
             value={stats?.clientesAtivos}
@@ -430,11 +631,7 @@ export default function AdminDashboard() {
             accent={stats?.trialsExpirando7dias > 0 ? '#f87171' : undefined}
             sub={stats?.trialsExpirando7dias > 0 ? 'Atenção necessária' : 'Tudo em ordem'}
           />
-          <StatCard
-            label="Total de leads"
-            value={stats?.totalLeads}
-            accent="#818cf8"
-          />
+          <StatCard label="Total de leads" value={stats?.totalLeads} accent="#818cf8" />
         </div>
 
         {/* Barra de ações */}
@@ -463,15 +660,12 @@ export default function AdminDashboard() {
         </div>
 
         {/* Tabela */}
-        <div
-          className="rounded-xl overflow-hidden"
-          style={{ border: '1px solid #1e2d3d' }}
-        >
+        <div className="rounded-xl overflow-hidden" style={{ border: '1px solid #1e2d3d' }}>
           {loading ? (
             <div className="flex items-center justify-center py-16">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-500" />
             </div>
-          ) : clientesFiltrados.length === 0 ? (
+          ) : clientes.length === 0 ? (
             <div className="text-center py-16" style={{ color: '#475569' }}>
               <p className="text-sm">Nenhum cliente encontrado</p>
             </div>
@@ -480,7 +674,7 @@ export default function AdminDashboard() {
               <table className="w-full text-sm">
                 <thead>
                   <tr style={{ backgroundColor: '#0f1929', borderBottom: '1px solid #1e2d3d' }}>
-                    {['Imobiliária', 'Plano', 'Dias restantes', 'Leads', 'Corretores', 'Usuários', 'Cadastro', ''].map((h) => (
+                    {['Imobiliária', 'Plano', 'Dias restantes', 'Acessos', 'Leads', 'Cadastro', ''].map((h) => (
                       <th
                         key={h}
                         className="text-left px-4 py-3 text-xs font-medium whitespace-nowrap"
@@ -492,9 +686,8 @@ export default function AdminDashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {clientesFiltrados.map((c, i) => {
+                  {clientes.map((c, i) => {
                     const status = calcStatus(c.plano, c.trialExpiraEm)
-                    const dc = diasColor(c.diasRestantes, status)
                     return (
                       <tr
                         key={c.id}
@@ -515,21 +708,28 @@ export default function AdminDashboard() {
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap">
                           {c.diasRestantes !== null ? (
-                            <span className="font-medium" style={{ color: dc }}>
+                            <span className="font-medium" style={{ color: diasColor(c.diasRestantes) }}>
                               {c.diasRestantes}d
                             </span>
                           ) : (
                             <span style={{ color: '#475569' }}>—</span>
                           )}
                         </td>
+                        <td className="px-4 py-3 whitespace-nowrap text-center">
+                          <span
+                            className="text-xs font-medium px-2 py-0.5 rounded"
+                            style={{
+                              backgroundColor: c.totalCorretores >= c.limiteAcessos
+                                ? 'rgba(239,68,68,0.12)'
+                                : 'rgba(100,116,139,0.12)',
+                              color: c.totalCorretores >= c.limiteAcessos ? '#f87171' : '#94A3B8',
+                            }}
+                          >
+                            {c.totalCorretores}/{c.limiteAcessos}
+                          </span>
+                        </td>
                         <td className="px-4 py-3 text-center" style={{ color: '#94A3B8' }}>
                           {c.totalLeads}
-                        </td>
-                        <td className="px-4 py-3 text-center" style={{ color: '#94A3B8' }}>
-                          {c.totalCorretores}
-                        </td>
-                        <td className="px-4 py-3 text-center" style={{ color: '#94A3B8' }}>
-                          {c.totalUsuarios}
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap" style={{ color: '#64748B' }}>
                           {fmtData(c.criadoEm)}
@@ -553,12 +753,11 @@ export default function AdminDashboard() {
         </div>
 
         <p className="text-xs text-center" style={{ color: '#334155' }}>
-          {clientesFiltrados.length} cliente{clientesFiltrados.length !== 1 ? 's' : ''}
+          {clientes.length} cliente{clientes.length !== 1 ? 's' : ''}
           {busca ? ` para "${busca}"` : ''}
         </p>
       </main>
 
-      {/* Modais */}
       {clienteGerenciar && (
         <ModalGerenciar
           cliente={clienteGerenciar}

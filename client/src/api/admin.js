@@ -33,3 +33,9 @@ export const criarCliente = (data) => adminApi.post('/admin/clientes', data)
 
 export const atualizarPlano = (id, data) =>
   adminApi.put(`/admin/clientes/${id}/plano`, data)
+
+export const atualizarPermissoes = (id, data) =>
+  adminApi.patch(`/admin/clientes/${id}/permissoes`, data)
+
+export const atualizarLimiteAcessos = (id, data) =>
+  adminApi.patch(`/admin/clientes/${id}/limite-acessos`, data)
