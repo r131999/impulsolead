@@ -3,6 +3,7 @@ import { getDashboard, getFunil } from '../api/dashboard'
 import { pendentes as followUpsPendentes, atualizar as atualizarFollowUp } from '../api/followups'
 import { useNavigate } from 'react-router-dom'
 import DesempenhoAnuncios from '../components/DesempenhoAnuncios'
+import { usePermissao } from '../hooks/usePermissao'
 
 const STATUS_BADGE = {
   lead:        'text-[#60A5FA]',
@@ -25,6 +26,7 @@ const STATUS_BADGE_BG = {
 }
 
 export default function Dashboard() {
+  const podePainelCampanhas = usePermissao('painelCampanhas')
   const [dados, setDados] = useState(null)
   const [funil, setFunil] = useState(null)
   const [followUps, setFollowUps] = useState([])
@@ -90,7 +92,25 @@ export default function Dashboard() {
 
   return (
     <div className="p-4 md:p-6 max-w-7xl mx-auto">
-      <DesempenhoAnuncios />
+      {podePainelCampanhas ? (
+        <DesempenhoAnuncios />
+      ) : (
+        <div
+          className="rounded-xl mb-4 p-4 flex items-center justify-between"
+          style={{ backgroundColor: '#111827', border: '1px solid #1E293B' }}
+        >
+          <p className="text-sm" style={{ color: '#475569' }}>🔒 Painel de Campanhas disponível em um plano superior.</p>
+          <a
+            href="https://wa.me/5598981444954"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs font-medium px-3 py-1.5 rounded-lg flex-shrink-0 ml-4"
+            style={{ backgroundColor: 'rgba(37,211,102,0.15)', color: '#25D366' }}
+          >
+            Falar com suporte
+          </a>
+        </div>
+      )}
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
         <div>

@@ -3,6 +3,7 @@ import * as leadsApi from '../api/leads'
 import * as followupsApi from '../api/followups'
 import * as corretoresApi from '../api/corretores'
 import { useAuth } from '../context/AuthContext'
+import { usePermissao } from '../hooks/usePermissao'
 import { Avatar } from '../components/Avatar'
 import ChatLead from './ChatLead'
 
@@ -108,8 +109,9 @@ function extrairTimestamp(texto) {
 }
 
 export default function Kanban() {
-  const { isCorretor, isGerente, isBloqueado, planoInfo } = useAuth()
-  const chatHabilitado = !['gratuito', 'starter'].includes(planoInfo?.plano)
+  const { isCorretor, isGerente, isBloqueado } = useAuth()
+  const chatHabilitado = usePermissao('chatLead')
+  const followUpHabilitado = usePermissao('followUpAutomatico')
   const [grupos, setGrupos] = useState(() => agrupar([]))
   const [loading, setLoading] = useState(true)
   const [modal, setModal] = useState(null)
@@ -285,6 +287,7 @@ export default function Kanban() {
                     podeGerenciar={!isCorretor}
                     bloqueado={isBloqueado}
                     chatHabilitado={chatHabilitado}
+                    followUpHabilitado={followUpHabilitado}
                     onDetalhes={() => !isBloqueado && setModalDetalhes(lead)}
                     onAvancar={() => avancar(lead)}
                     onVoltar={() => voltar(lead)}
@@ -357,7 +360,7 @@ export default function Kanban() {
   )
 }
 
-function LeadCard({ lead, atualizando, followUp, podeGerenciar, bloqueado, chatHabilitado, onDetalhes, onAvancar, onVoltar, onPerdido, onFollowUp, onChat, onDistribuir }) {
+function LeadCard({ lead, atualizando, followUp, podeGerenciar, bloqueado, chatHabilitado, followUpHabilitado, onDetalhes, onAvancar, onVoltar, onPerdido, onFollowUp, onChat, onDistribuir }) {
   const proximo = proximoStatus(lead.status)
   const podeAvancar = !!proximo
   const podePerdido = lead.status !== 'venda' && lead.status !== 'perdido'
@@ -405,7 +408,7 @@ function LeadCard({ lead, atualizando, followUp, podeGerenciar, bloqueado, chatH
             style={{ color: chatHabilitado ? '#64748B' : '#374151', minWidth: 36, minHeight: 36, cursor: chatHabilitado ? 'pointer' : 'not-allowed' }}
             onMouseEnter={(e) => { if (chatHabilitado) { e.currentTarget.style.color = '#94A3B8'; e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.06)' } }}
             onMouseLeave={(e) => { e.currentTarget.style.color = chatHabilitado ? '#64748B' : '#374151'; e.currentTarget.style.backgroundColor = 'transparent' }}
-            title={chatHabilitado ? 'Abrir chat com lead' : 'Disponível no plano Pro'}
+            title={chatHabilitado ? 'Abrir chat com lead' : 'Em breve'}
           >
             💬
           </button>
@@ -544,16 +547,22 @@ function LeadCard({ lead, atualizando, followUp, podeGerenciar, bloqueado, chatH
             </button>
           )}
           <button
-            onClick={onFollowUp}
-            className="flex-1 flex items-center justify-center text-sm rounded-md transition-colors"
+            onClick={followUpHabilitado ? onFollowUp : undefined}
+            disabled={!followUpHabilitado}
+            className="flex-1 flex items-center justify-center text-sm rounded-md transition-colors disabled:opacity-40"
             style={{
-              backgroundColor: followUp ? 'rgba(99,102,241,0.2)' : 'rgba(99,102,241,0.08)',
-              color: followUp ? '#818cf8' : '#64748B',
+              backgroundColor: followUpHabilitado
+                ? (followUp ? 'rgba(99,102,241,0.2)' : 'rgba(99,102,241,0.08)')
+                : 'rgba(100,116,139,0.08)',
+              color: followUpHabilitado ? (followUp ? '#818cf8' : '#64748B') : '#374151',
               minHeight: 36,
+              cursor: followUpHabilitado ? 'pointer' : 'not-allowed',
             }}
-            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(99,102,241,0.25)'}
-            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = followUp ? 'rgba(99,102,241,0.2)' : 'rgba(99,102,241,0.08)'}
-            title={followUp ? 'Ver follow-up agendado' : 'Agendar follow-up'}
+            onMouseEnter={(e) => { if (followUpHabilitado) e.currentTarget.style.backgroundColor = 'rgba(99,102,241,0.25)' }}
+            onMouseLeave={(e) => { if (followUpHabilitado) e.currentTarget.style.backgroundColor = followUp ? 'rgba(99,102,241,0.2)' : 'rgba(99,102,241,0.08)' }}
+            title={followUpHabilitado
+              ? (followUp ? 'Ver follow-up agendado' : 'Agendar follow-up')
+              : 'Disponível em um plano superior'}
           >
             📅
           </button>

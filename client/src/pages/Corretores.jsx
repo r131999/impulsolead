@@ -11,6 +11,7 @@ export default function Corretores() {
   const [corretores, setCorretores] = useState([])
   const [fila, setFila] = useState([])
   const [equipes, setEquipes] = useState([])
+  const [limiteAcessos, setLimiteAcessos] = useState(null)
   const [loading, setLoading] = useState(true)
   const [modal, setModal] = useState(null)
   const [editando, setEditando] = useState(null)
@@ -22,6 +23,8 @@ export default function Corretores() {
   const [erro, setErro] = useState('')
   const [aba, setAba] = useState('lista')
   const [atualizandoEquipe, setAtualizandoEquipe] = useState(null)
+  const [limiteInfo, setLimiteInfo] = useState(null) // null | { tipo: 'aviso', ... } | { tipo: 'bloqueado', ... }
+  const [cienteCobranca, setCienteCobranca] = useState(false)
   const fotoInputRef = useRef(null)
 
   const carregar = useCallback(() => {
@@ -32,6 +35,7 @@ export default function Corretores() {
     ])
       .then(([r1, r2, r3]) => {
         setCorretores(r1.data.corretores)
+        setLimiteAcessos(r1.data.limiteAcessos ?? null)
         setFila(r2.data.fila)
         setEquipes(r3.data.equipes)
       })
@@ -44,7 +48,14 @@ export default function Corretores() {
   const setAcesso = (k) => (e) => setFormAcesso((f) => ({ ...f, [k]: e.target.value }))
   const setReset = (k) => (e) => setFormReset((f) => ({ ...f, [k]: e.target.value }))
 
-  const abrirCriar = () => { setEditando(null); setForm(FORM_VAZIO); setErro(''); setModal('form') }
+  const abrirCriar = () => {
+    setEditando(null)
+    setForm(FORM_VAZIO)
+    setErro('')
+    setLimiteInfo(null)
+    setCienteCobranca(false)
+    setModal('form')
+  }
   const abrirEditar = (c) => {
     setEditando(c)
     setForm({ nome: c.nome, telefone: c.telefone, whatsapp: c.whatsapp, email: c.email || '' })
@@ -72,12 +83,23 @@ export default function Corretores() {
       if (editando) {
         await corretoresApi.atualizar(editando.id, form)
       } else {
-        await corretoresApi.criar(form)
+        const payload = { ...form }
+        if (limiteInfo?.tipo === 'aviso' && cienteCobranca) payload.ciente = true
+        await corretoresApi.criar(payload)
+        setLimiteInfo(null)
+        setCienteCobranca(false)
       }
       setModal(null)
       carregar()
     } catch (err) {
-      setErro(err.response?.data?.error || 'Erro ao salvar')
+      const data = err.response?.data
+      if (data?.faixaCobranca) {
+        setLimiteInfo({ tipo: 'aviso', totalAtivos: data.totalAtivos, limiteAcessos: data.limiteAcessos, mensagem: data.mensagem })
+      } else if (data?.bloqueado) {
+        setLimiteInfo({ tipo: 'bloqueado', error: data.error })
+      } else {
+        setErro(data?.error || 'Erro ao salvar')
+      }
     } finally {
       setSalvando(false)
     }
@@ -157,15 +179,33 @@ export default function Corretores() {
     )
   }
 
+  const totalAtivos = corretores.filter((c) => c.ativo).length
+  const totalDisponiveis = corretores.filter((c) => c.ativo && c.disponivel).length
+
   return (
     <div className="p-4 md:p-6 max-w-5xl mx-auto">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
         <div>
           <h1 className="text-xl md:text-2xl font-bold" style={{ color: '#F1F5F9' }}>Corretores</h1>
-          <p className="text-xs md:text-sm mt-0.5" style={{ color: '#94A3B8' }}>
-            {corretores.filter((c) => c.ativo).length} ativos ·{' '}
-            {corretores.filter((c) => c.ativo && c.disponivel).length} disponíveis
-          </p>
+          <div className="flex items-center gap-3 mt-0.5 flex-wrap">
+            <p className="text-xs md:text-sm" style={{ color: '#94A3B8' }}>
+              {totalAtivos} ativos · {totalDisponiveis} disponíveis
+            </p>
+            {limiteAcessos != null && (
+              <span
+                className="text-xs font-medium px-2 py-0.5 rounded-full"
+                style={
+                  totalAtivos > limiteAcessos
+                    ? { backgroundColor: 'rgba(239,68,68,0.15)', color: '#EF4444' }
+                    : totalAtivos === limiteAcessos
+                    ? { backgroundColor: 'rgba(245,158,11,0.15)', color: '#F59E0B' }
+                    : { backgroundColor: 'rgba(99,102,241,0.12)', color: '#818cf8' }
+                }
+              >
+                {totalAtivos}/{limiteAcessos} acessos em uso
+              </span>
+            )}
+          </div>
         </div>
         <button onClick={abrirCriar} className="btn-primary self-start sm:self-auto">+ Novo corretor</button>
       </div>
@@ -410,11 +450,60 @@ export default function Corretores() {
                 <label className="label">E-mail</label>
                 <input type="email" className="input" value={form.email} onChange={set('email')} />
               </div>
+              {/* Aviso de cobrança extra (N+1 ou N+2 acima do limite) */}
+              {!editando && limiteInfo?.tipo === 'aviso' && (
+                <div className="rounded-lg p-3" style={{ backgroundColor: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.3)' }}>
+                  <p className="text-sm font-semibold mb-1" style={{ color: '#F59E0B' }}>Acesso adicional — cobrança extra</p>
+                  <p className="text-xs mb-3" style={{ color: '#94A3B8' }}>{limiteInfo.mensagem}</p>
+                  <label className="flex items-start gap-2 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={cienteCobranca}
+                      onChange={(e) => setCienteCobranca(e.target.checked)}
+                      className="mt-0.5"
+                      style={{ accentColor: '#F59E0B' }}
+                    />
+                    <span className="text-xs" style={{ color: '#F1F5F9' }}>Estou ciente da cobrança adicional e quero continuar</span>
+                  </label>
+                </div>
+              )}
+
+              {/* Bloqueio: mais de 2 acima do limite */}
+              {!editando && limiteInfo?.tipo === 'bloqueado' && (
+                <div className="rounded-lg p-3" style={{ backgroundColor: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.3)' }}>
+                  <p className="text-sm font-semibold mb-1" style={{ color: '#EF4444' }}>Limite máximo de acessos atingido</p>
+                  <p className="text-xs mb-3" style={{ color: '#94A3B8' }}>{limiteInfo.error}</p>
+                  <a
+                    href="https://wa.me/5598981444954"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs font-medium px-3 py-1.5 rounded-lg inline-block"
+                    style={{ backgroundColor: 'rgba(37,211,102,0.15)', color: '#25D366' }}
+                  >
+                    Falar com suporte
+                  </a>
+                </div>
+              )}
+
               {erro && <p className="text-sm" style={{ color: '#EF4444' }}>{erro}</p>}
               <div className="flex gap-2 pt-2">
                 <button type="button" onClick={() => setModal(null)} className="btn-secondary flex-1">Cancelar</button>
-                <button type="submit" className="btn-primary flex-1" disabled={salvando}>
-                  {salvando ? 'Salvando...' : editando ? 'Salvar' : 'Criar'}
+                <button
+                  type="submit"
+                  className="btn-primary flex-1"
+                  disabled={
+                    salvando ||
+                    (!editando && limiteInfo?.tipo === 'aviso' && !cienteCobranca) ||
+                    (!editando && limiteInfo?.tipo === 'bloqueado')
+                  }
+                >
+                  {salvando
+                    ? 'Salvando...'
+                    : editando
+                    ? 'Salvar'
+                    : limiteInfo?.tipo === 'aviso'
+                    ? 'Confirmar criação'
+                    : 'Criar'}
                 </button>
               </div>
             </form>

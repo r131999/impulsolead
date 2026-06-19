@@ -7,19 +7,19 @@ import { getLogoUrl } from '../api/config'
 import { usePushNotification } from '../hooks/usePushNotification'
 
 const NAV_GESTOR = [
-  { to: '/dashboard',        label: 'Dashboard',         icon: ChartIcon },
-  { to: '/kanban',           label: 'Kanban',             icon: KanbanIcon },
-  { to: '/leads',            label: 'Leads',              icon: UsersIcon },
-  { to: '/corretores',       label: 'Corretores',         icon: HomeIcon },
-  { to: '/equipes',          label: 'Equipes',            icon: EquipeIcon },
-  { to: '/relatorios',       label: 'Relatórios',         icon: BarChartIcon },
-  { to: '/imoveis',          label: 'Imóveis',            icon: BuildingIcon },
-  { to: '/arquivos-imoveis',  label: 'Arquivos de Imóveis', icon: FolderIcon },
-  { to: '/apresentacoes',    label: 'Apresentações',       icon: ApresentacaoIcon },
-  { to: '/config',           label: 'Agente IA',           icon: BotIcon },
-  { to: '/whatsapp',         label: 'WhatsApp',           icon: WhatsAppNavIcon },
-  { to: '/integracoes',      label: 'Integrações',         icon: IntegracaoIcon },
-  { to: '/chat',             label: 'Assistente IA',      icon: ChatIAIcon },
+  { to: '/dashboard',        label: 'Dashboard',           icon: ChartIcon },
+  { to: '/kanban',           label: 'Kanban',               icon: KanbanIcon },
+  { to: '/leads',            label: 'Leads',                icon: UsersIcon },
+  { to: '/corretores',       label: 'Corretores',           icon: HomeIcon },
+  { to: '/equipes',          label: 'Equipes',              icon: EquipeIcon },
+  { to: '/relatorios',       label: 'Relatórios',           icon: BarChartIcon,     permissao: 'relatorios' },
+  { to: '/imoveis',          label: 'Imóveis',              icon: BuildingIcon,     permissao: 'gestaoImoveis' },
+  { to: '/arquivos-imoveis', label: 'Arquivos de Imóveis',  icon: FolderIcon,       permissao: 'arquivosImovel' },
+  { to: '/apresentacoes',    label: 'Apresentações',        icon: ApresentacaoIcon, permissao: 'apresentacaoPersonalizada' },
+  { to: '/config',           label: 'Agente IA',            icon: BotIcon },
+  { to: '/whatsapp',         label: 'WhatsApp',             icon: WhatsAppNavIcon },
+  { to: '/integracoes',      label: 'Integrações',          icon: IntegracaoIcon },
+  { to: '/chat',             label: 'Assistente IA',        icon: ChatIAIcon,       permissao: 'agenteIA' },
 ]
 
 const NAV_CORRETOR = [
@@ -54,10 +54,16 @@ function calcBanner(planoInfo, isCorretor) {
   return null
 }
 
+function navItemBloqueado(permissao, permissoes) {
+  if (!permissao || !permissoes) return false
+  return permissoes[permissao] === false
+}
+
 export default function Layout() {
   const { usuario, logout, isCorretor, isGerente, atualizarFotoPerfil, planoInfo } = useAuth()
   const navigate = useNavigate()
   const banner = calcBanner(planoInfo, isCorretor)
+  const permissoes = planoInfo?.permissoes || null
   const [aberta, setAberta] = useState(false)
   const [salvandoFoto, setSalvandoFoto] = useState(false)
   const [logoUrl, setLogoUrl] = useState(null)
@@ -241,23 +247,27 @@ export default function Layout() {
           </div>
 
           <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
-            {navItems.map(({ to, label, icon: Icon }) => (
-              <NavLink
-                key={to}
-                to={to}
-                onClick={fechar}
-                className={({ isActive }) =>
-                  `flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                    isActive
-                      ? 'bg-indigo-700 text-white'
-                      : 'text-indigo-200 hover:bg-indigo-800 hover:text-white'
-                  }`
-                }
-              >
-                <Icon className="w-4 h-4 flex-shrink-0" />
-                {label}
-              </NavLink>
-            ))}
+            {navItems.map(({ to, label, icon: Icon, permissao }) => {
+              const bloqueado = navItemBloqueado(permissao, permissoes)
+              return (
+                <NavLink
+                  key={to}
+                  to={to}
+                  onClick={fechar}
+                  className={({ isActive }) =>
+                    `flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                      isActive
+                        ? 'bg-indigo-700 text-white'
+                        : 'text-indigo-200 hover:bg-indigo-800 hover:text-white'
+                    }`
+                  }
+                >
+                  <Icon className="w-4 h-4 flex-shrink-0" />
+                  <span className="flex-1">{label}</span>
+                  {bloqueado && <span style={{ fontSize: 11, opacity: 0.55 }}>🔒</span>}
+                </NavLink>
+              )
+            })}
           </nav>
 
           <div className="p-3 border-t border-indigo-800">

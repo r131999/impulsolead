@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import * as apApi from '../api/apresentacao'
+import { usePermissao } from '../hooks/usePermissao'
 
 function formatarData(iso) {
   if (!iso) return ''
@@ -144,6 +145,7 @@ function ModalApresentacao({ ap, onSalvo, onClose }) {
 }
 
 export default function Apresentacoes() {
+  const podeApresentacoes = usePermissao('apresentacaoPersonalizada')
   const navigate = useNavigate()
   const [apresentacoes, setApresentacoes] = useState([])
   const [loading, setLoading] = useState(true)
@@ -173,6 +175,32 @@ export default function Apresentacoes() {
       setCopiado(ap.id)
       setTimeout(() => setCopiado(null), 2000)
     })
+  }
+
+  if (!podeApresentacoes) {
+    return (
+      <div className="p-4 md:p-6 max-w-3xl mx-auto">
+        <h1 className="text-xl font-bold mb-6" style={{ color: '#F1F5F9' }}>Apresentações</h1>
+        <div style={{ position: 'relative', minHeight: 320, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ position: 'absolute', inset: 0, backdropFilter: 'blur(4px)', backgroundColor: 'rgba(0,0,0,0.4)', borderRadius: 12, zIndex: 10 }} />
+          <div style={{ position: 'relative', zIndex: 20, textAlign: 'center', padding: '2rem' }}>
+            <div style={{ fontSize: 40, marginBottom: 12 }}>🔒</div>
+            <h3 style={{ color: '#F1F5F9', fontSize: 18, fontWeight: 700, marginBottom: 8 }}>
+              Apresentações Personalizadas disponível em um plano superior
+            </h3>
+            <p style={{ color: '#94A3B8', marginBottom: 20, fontSize: 14 }}>Entre em contato com o suporte para fazer upgrade.</p>
+            <a
+              href="https://wa.me/5598981444954"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ display: 'inline-block', backgroundColor: '#25D366', color: '#fff', fontWeight: 700, padding: '10px 24px', borderRadius: 8, textDecoration: 'none', fontSize: 14 }}
+            >
+              Falar com suporte
+            </a>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (

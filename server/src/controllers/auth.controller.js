@@ -34,6 +34,7 @@ function calcPlanoInfo(imob) {
     diasParaVencer,
     avisoVencimento,
     bloqueado,
+    permissoes: imob.permissoes || {},
   };
 }
 
@@ -189,7 +190,7 @@ async function login(req, res) {
     where: { email },
     include: {
       imobiliaria: {
-        select: { id: true, nome: true, plano: true, trialExpiraEm: true, planoExpiraEm: true, planoBloqueadoEm: true, criadoEm: true },
+        select: { id: true, nome: true, plano: true, trialExpiraEm: true, planoExpiraEm: true, planoBloqueadoEm: true, criadoEm: true, permissoes: true },
       },
     },
   });
@@ -308,7 +309,7 @@ async function me(req, res) {
       where: { id: req.corretorId },
       include: {
         imobiliaria: {
-          select: { id: true, nome: true, plano: true, trialExpiraEm: true, planoExpiraEm: true, planoBloqueadoEm: true, criadoEm: true },
+          select: { id: true, nome: true, plano: true, trialExpiraEm: true, planoExpiraEm: true, planoBloqueadoEm: true, criadoEm: true, permissoes: true },
         },
       },
     });
@@ -332,7 +333,7 @@ async function me(req, res) {
     where: { id: req.usuario.id },
     include: {
       imobiliaria: {
-        select: { id: true, nome: true, email: true, telefone: true, logoUrl: true, plano: true, trialExpiraEm: true, planoExpiraEm: true, planoBloqueadoEm: true, criadoEm: true, apiKey: true },
+        select: { id: true, nome: true, email: true, telefone: true, logoUrl: true, plano: true, trialExpiraEm: true, planoExpiraEm: true, planoBloqueadoEm: true, criadoEm: true, apiKey: true, permissoes: true },
       },
     },
   });
@@ -393,7 +394,7 @@ async function loginCorretor(req, res) {
     where: { email, ativo: true, usuarioAtivo: true },
     include: {
       imobiliaria: {
-        select: { id: true, nome: true, plano: true, trialExpiraEm: true, planoExpiraEm: true, planoBloqueadoEm: true, criadoEm: true },
+        select: { id: true, nome: true, plano: true, trialExpiraEm: true, planoExpiraEm: true, planoBloqueadoEm: true, criadoEm: true, permissoes: true },
       },
     },
   });

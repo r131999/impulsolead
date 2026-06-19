@@ -11,19 +11,25 @@ async function listar(req, res) {
   if (ativo !== undefined) where.ativo = ativo === 'true';
   if (disponivel !== undefined) where.disponivel = disponivel === 'true';
 
-  const corretores = await prisma.corretor.findMany({
-    where,
-    orderBy: { posicaoFila: 'asc' },
-    select: {
-      id: true, nome: true, email: true, telefone: true, whatsapp: true,
-      ativo: true, disponivel: true, posicaoFila: true, leadsRecebidos: true,
-      usuarioAtivo: true, equipeId: true, fotoPerfil: true, criadoEm: true,
-      equipe: { select: { id: true, nome: true } },
-      _count: { select: { leads: true } },
-    },
-  });
+  const [corretores, imobiliaria] = await Promise.all([
+    prisma.corretor.findMany({
+      where,
+      orderBy: { posicaoFila: 'asc' },
+      select: {
+        id: true, nome: true, email: true, telefone: true, whatsapp: true,
+        ativo: true, disponivel: true, posicaoFila: true, leadsRecebidos: true,
+        usuarioAtivo: true, equipeId: true, fotoPerfil: true, criadoEm: true,
+        equipe: { select: { id: true, nome: true } },
+        _count: { select: { leads: true } },
+      },
+    }),
+    prisma.imobiliaria.findUnique({
+      where: { id: req.imobiliariaId },
+      select: { limiteAcessos: true },
+    }),
+  ]);
 
-  res.json({ corretores });
+  res.json({ corretores, limiteAcessos: imobiliaria?.limiteAcessos ?? 999 });
 }
 
 async function buscarFila(req, res) {
@@ -45,15 +51,39 @@ async function buscarFila(req, res) {
 }
 
 async function criar(req, res) {
-  const { nome, email, telefone, whatsapp } = req.body;
+  const { nome, email, telefone, whatsapp, ciente } = req.body;
 
   if (!nome || !telefone || !whatsapp) {
     return res.status(400).json({ error: 'Campos obrigatórios: nome, telefone, whatsapp' });
   }
 
-  const totalAtivos = await prisma.corretor.count({
-    where: { imobiliariaId: req.imobiliariaId, ativo: true },
-  });
+  const [totalAtivos, imobiliaria] = await Promise.all([
+    prisma.corretor.count({ where: { imobiliariaId: req.imobiliariaId, ativo: true } }),
+    prisma.imobiliaria.findUnique({ where: { id: req.imobiliariaId }, select: { limiteAcessos: true } }),
+  ]);
+
+  const limite = imobiliaria?.limiteAcessos ?? 999;
+  const novoTotal = totalAtivos + 1;
+
+  // Bloqueia: N+1 > limiteAcessos+2 (mais de 2 acima do contrato)
+  if (novoTotal > limite + 2) {
+    return res.status(422).json({
+      bloqueado: true,
+      error: `Limite máximo atingido. Seu plano permite até ${limite + 2} acessos no total. Entre em contato com o suporte para ampliar.`,
+      totalAtivos,
+      limiteAcessos: limite,
+    });
+  }
+
+  // Aviso: limiteAcessos < N+1 <= limiteAcessos+2 e gestor não confirmou
+  if (novoTotal > limite && !ciente) {
+    return res.status(402).json({
+      faixaCobranca: true,
+      mensagem: `Seu plano inclui ${limite} acessos. Este corretor será o ${novoTotal}º acesso, gerando R$25/mês adicionais.`,
+      totalAtivos,
+      limiteAcessos: limite,
+    });
+  }
 
   const corretor = await prisma.corretor.create({
     data: {
