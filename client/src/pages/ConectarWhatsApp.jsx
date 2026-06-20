@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import QRCode from 'react-qr-code'
 import { getStatusWhatsapp, conectarWhatsapp, deletarSessaoWhats } from '../api/whatsapp'
-import { getConfig, atualizarConfig } from '../api/config'
+import { getConfig, atualizarConfig, getAlertaLead, atualizarAlertaLead } from '../api/config'
+import { useAuth } from '../context/AuthContext'
 
 const STATUS_LABEL = {
   conectado:     { txt: 'Conectado',        cor: '#10B981' },
@@ -10,7 +11,15 @@ const STATUS_LABEL = {
   desconectado:  { txt: 'Desconectado',     cor: '#EF4444' },
 }
 
+const ALERTA_PADRAO = {
+  avisoLeadAtivo: false,
+  avisoLeadCorretorHoras: 4,
+  avisoLeadGestorHoras: 6,
+  telefoneNotificacoes: '',
+}
+
 export default function ConectarWhatsApp() {
+  const { isGestor } = useAuth()
   const [status, setStatus]         = useState(null)
   const [qrCode, setQrCode]         = useState(null)
   const [carregando, setCarregando]  = useState(true)
@@ -21,6 +30,13 @@ export default function ConectarWhatsApp() {
   const [salvoOk, setSalvoOk]       = useState(false)
   const pollingRef                  = useRef(null)
 
+  // ── Alertas de lead sem atendimento ───────────────────────────────────────
+  const [alerta, setAlerta]               = useState(ALERTA_PADRAO)
+  const [alertaCarregado, setAlertaCarregado] = useState(false)
+  const [salvandoAlerta, setSalvandoAlerta]   = useState(false)
+  const [alertaSalvoOk, setAlertaSalvoOk]     = useState(false)
+  const [alertaErro, setAlertaErro]           = useState(null)
+
   // ── Carregar status inicial e mensagem de boas-vindas ────────────────────
   useEffect(() => {
     carregarStatus()
@@ -29,6 +45,21 @@ export default function ConectarWhatsApp() {
     }).catch(() => {})
     return () => pararPolling()
   }, [])
+
+  useEffect(() => {
+    if (!isGestor) return
+    getAlertaLead().then(({ data }) => {
+      const c = data.config
+      if (c) {
+        setAlerta({
+          avisoLeadAtivo: !!c.avisoLeadAtivo,
+          avisoLeadCorretorHoras: c.avisoLeadCorretorHoras,
+          avisoLeadGestorHoras: c.avisoLeadGestorHoras,
+          telefoneNotificacoes: c.telefoneNotificacoes || '',
+        })
+      }
+    }).catch(() => {}).finally(() => setAlertaCarregado(true))
+  }, [isGestor])
 
   async function carregarStatus() {
     try {
@@ -95,6 +126,49 @@ export default function ConectarWhatsApp() {
       // silencia — o erro visual não é crítico aqui
     } finally {
       setSalvando(false)
+    }
+  }
+
+  // ── Alertas de lead sem atendimento ───────────────────────────────────────
+  function validarAlerta() {
+    const corretorH = Number(alerta.avisoLeadCorretorHoras)
+    const gestorH   = Number(alerta.avisoLeadGestorHoras)
+
+    if (!Number.isInteger(corretorH) || corretorH < 1) {
+      return 'O tempo para avisar o corretor deve ser um número inteiro de pelo menos 1 hora.'
+    }
+    if (!Number.isInteger(gestorH) || gestorH < 1) {
+      return 'O tempo para escalar para o gestor deve ser um número inteiro de pelo menos 1 hora.'
+    }
+    if (gestorH < corretorH) {
+      return 'O tempo de escalonamento para o gestor deve ser maior ou igual ao tempo do corretor.'
+    }
+    return null
+  }
+
+  async function handleSalvarAlerta() {
+    const erroValidacao = validarAlerta()
+    if (erroValidacao) {
+      setAlertaErro(erroValidacao)
+      return
+    }
+
+    setAlertaErro(null)
+    setSalvandoAlerta(true)
+    setAlertaSalvoOk(false)
+    try {
+      await atualizarAlertaLead({
+        avisoLeadAtivo: alerta.avisoLeadAtivo,
+        avisoLeadCorretorHoras: Number(alerta.avisoLeadCorretorHoras),
+        avisoLeadGestorHoras: Number(alerta.avisoLeadGestorHoras),
+        telefoneNotificacoes: alerta.telefoneNotificacoes?.trim() || null,
+      })
+      setAlertaSalvoOk(true)
+      setTimeout(() => setAlertaSalvoOk(false), 3000)
+    } catch (e) {
+      setAlertaErro(e.response?.data?.error || 'Erro ao salvar configuração de alertas.')
+    } finally {
+      setSalvandoAlerta(false)
     }
   }
 
@@ -259,6 +333,121 @@ export default function ConectarWhatsApp() {
           </button>
         </div>
       </div>
+
+      {/* Card: alertas de lead sem atendimento (só gestor) */}
+      {isGestor && alertaCarregado && (
+        <div className="card mb-4">
+          <div className="flex items-center justify-between gap-4 mb-1">
+            <div className="min-w-0">
+              <h2 className="font-semibold" style={{ color: '#F1F5F9' }}>Alertas de lead sem atendimento</h2>
+            </div>
+            <button
+              type="button"
+              onClick={() => setAlerta((a) => ({ ...a, avisoLeadAtivo: !a.avisoLeadAtivo }))}
+              className="relative flex-shrink-0 rounded-full transition-colors"
+              style={{ width: 44, height: 24, backgroundColor: alerta.avisoLeadAtivo ? '#10B981' : 'rgba(255,255,255,0.15)' }}
+              title={alerta.avisoLeadAtivo ? 'Desligar alertas' : 'Ligar alertas'}
+            >
+              <span
+                className="absolute top-1 rounded-full bg-white shadow transition-transform"
+                style={{
+                  width: 16, height: 16, left: 4,
+                  transform: alerta.avisoLeadAtivo ? 'translateX(20px)' : 'translateX(0)',
+                }}
+              />
+            </button>
+          </div>
+
+          <p className="text-xs mb-4" style={{ color: '#94A3B8' }}>
+            Quando um lead novo passa as horas configuradas abaixo sem o corretor registrar
+            tratativa (preencher a observação ou avançar o card), o corretor é avisado. Se
+            continuar parado até o tempo de escalonamento, o gestor é avisado. Vale só para
+            leads recentes (últimas 48h) e os avisos respeitam o horário comercial.
+          </p>
+
+          <fieldset disabled={!alerta.avisoLeadAtivo} style={{ opacity: alerta.avisoLeadAtivo ? 1 : 0.5 }}>
+            <div className="grid grid-cols-2 gap-3 mb-3">
+              <div>
+                <label className="block text-xs font-medium mb-2" style={{ color: '#64748B' }}>
+                  AVISAR O CORRETOR APÓS (HORAS)
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  step={1}
+                  value={alerta.avisoLeadCorretorHoras}
+                  onChange={(e) => setAlerta((a) => ({ ...a, avisoLeadCorretorHoras: e.target.value }))}
+                  className="w-full rounded-lg px-3 py-2 text-sm"
+                  style={{
+                    backgroundColor: 'rgba(255,255,255,0.05)',
+                    color: '#F1F5F9',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    outline: 'none',
+                  }}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium mb-2" style={{ color: '#64748B' }}>
+                  ESCALAR PARA O GESTOR APÓS (HORAS)
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  step={1}
+                  value={alerta.avisoLeadGestorHoras}
+                  onChange={(e) => setAlerta((a) => ({ ...a, avisoLeadGestorHoras: e.target.value }))}
+                  className="w-full rounded-lg px-3 py-2 text-sm"
+                  style={{
+                    backgroundColor: 'rgba(255,255,255,0.05)',
+                    color: '#F1F5F9',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    outline: 'none',
+                  }}
+                />
+              </div>
+            </div>
+
+            <label className="block text-xs font-medium mb-2" style={{ color: '#64748B' }}>
+              WHATSAPP PARA RECEBER OS ALERTAS
+            </label>
+            <input
+              type="text"
+              value={alerta.telefoneNotificacoes}
+              onChange={(e) => setAlerta((a) => ({ ...a, telefoneNotificacoes: e.target.value }))}
+              placeholder="Opcional — se vazio, usa o telefone do gestor cadastrado"
+              className="w-full rounded-lg px-3 py-2 text-sm"
+              style={{
+                backgroundColor: 'rgba(255,255,255,0.05)',
+                color: '#F1F5F9',
+                border: '1px solid rgba(255,255,255,0.1)',
+                outline: 'none',
+              }}
+            />
+          </fieldset>
+
+          {alertaErro && (
+            <div
+              className="mt-3 rounded-lg px-3 py-2 text-xs"
+              style={{ backgroundColor: 'rgba(239,68,68,0.1)', color: '#FCA5A5', border: '1px solid rgba(239,68,68,0.2)' }}
+            >
+              {alertaErro}
+            </div>
+          )}
+
+          <div className="flex items-center justify-end gap-3 mt-4">
+            {alertaSalvoOk && (
+              <span className="text-xs" style={{ color: '#10B981' }}>Salvo!</span>
+            )}
+            <button
+              onClick={handleSalvarAlerta}
+              disabled={salvandoAlerta}
+              className="btn-primary text-sm"
+            >
+              {salvandoAlerta ? 'Salvando…' : 'Salvar'}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Card: instruções quando desconectado */}
       {status === 'desconectado' && (

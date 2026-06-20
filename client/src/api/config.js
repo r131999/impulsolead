@@ -7,3 +7,5 @@ export const atualizarLogo = (formData) => api.put('/config/logo', formData, {
   headers: { 'Content-Type': 'multipart/form-data' },
 })
 export const getLogoUrl = () => api.get('/config/logo-url')
+export const getAlertaLead = () => api.get('/config/alerta-lead')
+export const atualizarAlertaLead = (data) => api.put('/config/alerta-lead', data)

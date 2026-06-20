@@ -167,4 +167,80 @@ async function atualizarDistribuicao(req, res) {
   }
 }
 
-module.exports = { getLogoImobiliaria, getConfigAgente, atualizarConfigAgente, atualizarDistribuicao, atualizarLogo };
+async function getAlertaLead(req, res) {
+  try {
+    const imob = await prisma.imobiliaria.findUnique({
+      where: { id: req.imobiliariaId },
+      select: {
+        avisoLeadAtivo: true,
+        avisoLeadCorretorHoras: true,
+        avisoLeadGestorHoras: true,
+        telefoneNotificacoes: true,
+      },
+    });
+
+    res.json({ config: imob });
+  } catch (err) {
+    console.error('[config] getAlertaLead:', err.message);
+    res.status(500).json({ error: 'Erro ao buscar configuração de alertas' });
+  }
+}
+
+async function atualizarAlertaLead(req, res) {
+  try {
+    const { avisoLeadAtivo, avisoLeadCorretorHoras, avisoLeadGestorHoras, telefoneNotificacoes } = req.body;
+
+    if (avisoLeadAtivo !== undefined && typeof avisoLeadAtivo !== 'boolean') {
+      return res.status(400).json({ error: 'avisoLeadAtivo deve ser boolean' });
+    }
+
+    if (avisoLeadCorretorHoras !== undefined && (!Number.isInteger(avisoLeadCorretorHoras) || avisoLeadCorretorHoras < 1)) {
+      return res.status(400).json({ error: 'avisoLeadCorretorHoras deve ser um número inteiro maior ou igual a 1' });
+    }
+
+    if (avisoLeadGestorHoras !== undefined && (!Number.isInteger(avisoLeadGestorHoras) || avisoLeadGestorHoras < 1)) {
+      return res.status(400).json({ error: 'avisoLeadGestorHoras deve ser um número inteiro maior ou igual a 1' });
+    }
+
+    if (telefoneNotificacoes !== undefined && telefoneNotificacoes !== null && typeof telefoneNotificacoes !== 'string') {
+      return res.status(400).json({ error: 'telefoneNotificacoes deve ser uma string ou nulo' });
+    }
+
+    // avisoLeadGestorHoras precisa ser >= avisoLeadCorretorHoras — como o PUT pode enviar
+    // só um dos dois campos, comparamos com o valor já salvo para o que não veio no corpo.
+    const atual = await prisma.imobiliaria.findUnique({
+      where: { id: req.imobiliariaId },
+      select: { avisoLeadCorretorHoras: true, avisoLeadGestorHoras: true },
+    });
+
+    const corretorHorasFinal = avisoLeadCorretorHoras !== undefined ? avisoLeadCorretorHoras : atual.avisoLeadCorretorHoras;
+    const gestorHorasFinal   = avisoLeadGestorHoras   !== undefined ? avisoLeadGestorHoras   : atual.avisoLeadGestorHoras;
+
+    if (gestorHorasFinal < corretorHorasFinal) {
+      return res.status(400).json({ error: 'avisoLeadGestorHoras deve ser maior ou igual a avisoLeadCorretorHoras' });
+    }
+
+    const imob = await prisma.imobiliaria.update({
+      where: { id: req.imobiliariaId },
+      data: {
+        ...(avisoLeadAtivo !== undefined && { avisoLeadAtivo }),
+        ...(avisoLeadCorretorHoras !== undefined && { avisoLeadCorretorHoras }),
+        ...(avisoLeadGestorHoras !== undefined && { avisoLeadGestorHoras }),
+        ...(telefoneNotificacoes !== undefined && { telefoneNotificacoes: telefoneNotificacoes || null }),
+      },
+      select: {
+        avisoLeadAtivo: true,
+        avisoLeadCorretorHoras: true,
+        avisoLeadGestorHoras: true,
+        telefoneNotificacoes: true,
+      },
+    });
+
+    res.json({ config: imob });
+  } catch (err) {
+    console.error('[config] atualizarAlertaLead:', err.message);
+    res.status(500).json({ error: 'Erro ao atualizar configuração de alertas' });
+  }
+}
+
+module.exports = { getLogoImobiliaria, getConfigAgente, atualizarConfigAgente, atualizarDistribuicao, atualizarLogo, getAlertaLead, atualizarAlertaLead };

@@ -1,6 +1,6 @@
 const { Router } = require('express');
 const { authMiddleware, requireRole } = require('../middleware/auth.middleware');
-const { getConfigAgente, atualizarConfigAgente, atualizarDistribuicao, atualizarLogo, getLogoImobiliaria } = require('../controllers/config.controller');
+const { getConfigAgente, atualizarConfigAgente, atualizarDistribuicao, atualizarLogo, getLogoImobiliaria, getAlertaLead, atualizarAlertaLead } = require('../controllers/config.controller');
 
 const router = Router();
 router.use(authMiddleware);
@@ -14,5 +14,7 @@ router.get('/agente', getConfigAgente);
 router.put('/agente', atualizarConfigAgente);
 router.put('/distribuicao', atualizarDistribuicao);
 router.put('/logo', atualizarLogo);
+router.get('/alerta-lead', getAlertaLead);
+router.put('/alerta-lead', atualizarAlertaLead);
 
 module.exports = router;
