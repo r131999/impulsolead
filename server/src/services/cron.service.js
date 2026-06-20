@@ -1,6 +1,7 @@
 ﻿const cron = require('node-cron');
 const { enviarWhatsApp } = require('./notificacao.service');
 const { sincronizarGastoAnuncios } = require('./adSpend.service');
+const { enviarPushCorretor } = require('../controllers/push.controller');
 
 const prisma = require('../lib/prisma');
 
@@ -19,6 +20,18 @@ function fmtDataBrasilia(d) {
   const dd = String(br.getUTCDate()).padStart(2, '0');
   const mm = String(br.getUTCMonth() + 1).padStart(2, '0');
   return `${dd}/${mm}`;
+}
+
+function fmtHoraBrasilia(d) {
+  const br = new Date(d.getTime() - 3 * 60 * 60 * 1000);
+  const hh = String(br.getUTCHours()).padStart(2, '0');
+  const mm = String(br.getUTCMinutes()).padStart(2, '0');
+  return `${hh}:${mm}`;
+}
+
+function dentroDoHorarioComercial(d) {
+  const horaBrasilia = new Date(d.getTime() - 3 * 60 * 60 * 1000).getUTCHours();
+  return horaBrasilia >= 8 && horaBrasilia < 20;
 }
 
 const STATUS_LABEL = {
@@ -271,6 +284,175 @@ async function verificarPlanoVencimento() {
   console.log('[cron] Verificação de planos concluída');
 }
 
+// ── Job 5: alerta escalonado de leads sem tratativa (corretor → gestor) ──────
+
+async function obterTelefoneGestor(imobiliaria) {
+  if (imobiliaria.telefoneNotificacoes) return imobiliaria.telefoneNotificacoes;
+  return imobiliaria.usuarios[0]?.telefone || null;
+}
+
+// Parte A: leads com corretor, sem tratativa — avisa corretor e escala para gestor
+async function processarEscalonamentoCorretorGestor(imobiliaria, agora) {
+  const leads = await prisma.lead.findMany({
+    where: {
+      imobiliariaId: imobiliaria.id,
+      status: 'lead',
+      corretorId: { not: null },
+      OR: [{ observacoes: null }, { observacoes: '' }],
+    },
+    select: {
+      id: true,
+      nome: true,
+      criadoEm: true,
+      avisoCorretorEm: true,
+      avisoGestorEm: true,
+      corretor: { select: { id: true, nome: true, telefone: true, whatsapp: true } },
+    },
+  });
+
+  if (leads.length === 0) return;
+
+  const porCorretor = new Map();
+  const paraGestor = [];
+
+  for (const lead of leads) {
+    const horas = (agora - new Date(lead.criadoEm)) / (1000 * 60 * 60);
+
+    if (horas >= imobiliaria.avisoLeadCorretorHoras && !lead.avisoCorretorEm) {
+      const corretorId = lead.corretor.id;
+      if (!porCorretor.has(corretorId)) {
+        porCorretor.set(corretorId, { corretor: lead.corretor, leads: [] });
+      }
+      porCorretor.get(corretorId).leads.push(lead);
+    }
+
+    if (horas >= imobiliaria.avisoLeadGestorHoras && !lead.avisoGestorEm) {
+      paraGestor.push({ lead, horas });
+    }
+  }
+
+  for (const { corretor, leads: grupo } of porCorretor.values()) {
+    const linhas = grupo
+      .map((l) => `• ${l.nome} — recebido às ${fmtHoraBrasilia(l.criadoEm)}`)
+      .join('\n');
+
+    const texto =
+      `⏰ Você tem lead(s) aguardando há mais de ${imobiliaria.avisoLeadCorretorHoras}h sem nenhuma atualização:\n` +
+      `${linhas}\n` +
+      `Fale com o lead e registre a tratativa na observação do card.`;
+
+    await enviarPushCorretor(corretor.id, '⏰ Leads aguardando atualização', texto);
+    await enviarWhatsApp(corretor.whatsapp || corretor.telefone, texto, imobiliaria.id);
+
+    await prisma.lead.updateMany({
+      where: { id: { in: grupo.map((l) => l.id) } },
+      data: { avisoCorretorEm: agora },
+    });
+
+    console.log(`[cron] Aviso de corretor enviado para ${corretor.nome} (${grupo.length} lead(s))`);
+  }
+
+  if (paraGestor.length > 0) {
+    const telefoneGestor = await obterTelefoneGestor(imobiliaria);
+    if (!telefoneGestor) {
+      console.log(`[cron] ${imobiliaria.nome} sem telefone de gestor — escalonamento pulado.`);
+    } else {
+      const linhas = paraGestor
+        .map(({ lead, horas }) => `• ${lead.nome} — Corretor: ${lead.corretor.nome} — parado há ${Math.floor(horas)}h`)
+        .join('\n');
+
+      const texto =
+        `⚠️ Lead(s) sem tratativa há mais de ${imobiliaria.avisoLeadGestorHoras}h, o corretor já foi avisado e não atualizou:\n` +
+        `${linhas}\n` +
+        `Entre no CRM para falar com o corretor ou transferir o lead.`;
+
+      await enviarWhatsApp(telefoneGestor, texto, imobiliaria.id);
+
+      console.log(`[cron] Escalonamento ao gestor enviado para ${imobiliaria.nome} (${paraGestor.length} lead(s))`);
+    }
+
+    await prisma.lead.updateMany({
+      where: { id: { in: paraGestor.map(({ lead }) => lead.id) } },
+      data: { avisoGestorEm: agora },
+    });
+  }
+}
+
+// Parte B: leads sem corretor parados há mais de 24h — alerta diário ao gestor
+async function processarLeadsSemCorretor(imobiliaria, agora) {
+  const limite24h = new Date(agora.getTime() - 24 * 60 * 60 * 1000);
+  const inicioDia = inicioDiaBrasilia(agora);
+
+  const jaAvisadoHoje =
+    imobiliaria.ultimoAlertaSemCorretorEm && new Date(imobiliaria.ultimoAlertaSemCorretorEm) >= inicioDia;
+  if (jaAvisadoHoje) return;
+
+  const existeLeadParado = await prisma.lead.findFirst({
+    where: {
+      imobiliariaId: imobiliaria.id,
+      status: 'lead',
+      corretorId: null,
+      criadoEm: { lt: limite24h },
+    },
+    select: { id: true },
+  });
+
+  if (!existeLeadParado) return;
+
+  const telefoneGestor = await obterTelefoneGestor(imobiliaria);
+  if (!telefoneGestor) {
+    console.log(`[cron] ${imobiliaria.nome} sem telefone de gestor — alerta sem-corretor pulado.`);
+    return;
+  }
+
+  const texto = '📋 Existem leads parados há mais de 24h aguardando distribuição no CRM. Entre e distribua para algum corretor.';
+  await enviarWhatsApp(telefoneGestor, texto, imobiliaria.id);
+
+  await prisma.imobiliaria.update({
+    where: { id: imobiliaria.id },
+    data: { ultimoAlertaSemCorretorEm: agora },
+  });
+
+  console.log(`[cron] Alerta de leads sem corretor enviado para ${imobiliaria.nome}`);
+}
+
+async function verificarLeadsSemTratativa() {
+  console.log('[cron] Verificando leads sem tratativa...');
+
+  const agora = new Date();
+  if (!dentroDoHorarioComercial(agora)) {
+    console.log('[cron] Fora do horário comercial (8h–20h Brasília) — aguardando próximo ciclo.');
+    return;
+  }
+
+  const imobiliarias = await prisma.imobiliaria.findMany({
+    where: { avisoLeadAtivo: true },
+    select: {
+      id: true,
+      nome: true,
+      avisoLeadCorretorHoras: true,
+      avisoLeadGestorHoras: true,
+      telefoneNotificacoes: true,
+      ultimoAlertaSemCorretorEm: true,
+      usuarios: {
+        where: { role: 'gestor', telefone: { not: null } },
+        select: { telefone: true },
+        orderBy: { criadoEm: 'asc' },
+        take: 1,
+      },
+    },
+  });
+
+  for (const imobiliaria of imobiliarias) {
+    try {
+      await processarEscalonamentoCorretorGestor(imobiliaria, agora);
+      await processarLeadsSemCorretor(imobiliaria, agora);
+    } catch (err) {
+      console.error(`[cron] Erro ao verificar leads sem tratativa de ${imobiliaria.nome}:`, err.message);
+    }
+  }
+}
+
 // ── Inicialização ─────────────────────────────────────────────────────────────
 
 function iniciarCrons() {
@@ -308,7 +490,16 @@ function iniciarCrons() {
     }
   });
 
-  console.log('[cron] Jobs iniciados: leads-parados (6h) | relatorio-semanal (dom 8h) | plano-vencimento (diário 9h) | ad-spend (20min)');
+  // Job 5: alerta escalonado de leads sem tratativa — a cada 15 minutos
+  cron.schedule('*/15 * * * *', async () => {
+    try {
+      await verificarLeadsSemTratativa();
+    } catch (err) {
+      console.error('[cron] Erro no job leads-sem-tratativa:', err.message);
+    }
+  });
+
+  console.log('[cron] Jobs iniciados: leads-parados (6h) | relatorio-semanal (dom 8h) | plano-vencimento (diário 9h) | ad-spend (20min) | leads-sem-tratativa (15min)');
 }
 
 module.exports = { iniciarCrons };

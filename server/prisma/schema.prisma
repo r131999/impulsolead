@@ -24,6 +24,12 @@ model Imobiliaria {
   criadoEm              DateTime  @default(now())
   atualizadoEm          DateTime  @updatedAt
 
+  avisoLeadAtivo             Boolean   @default(true)
+  avisoLeadCorretorHoras     Int       @default(4)
+  avisoLeadGestorHoras       Int       @default(6)
+  telefoneNotificacoes       String?
+  ultimoAlertaSemCorretorEm  DateTime?
+
   usuarios               Usuario[]
   corretores             Corretor[]
   leads                  Lead[]
@@ -134,6 +140,8 @@ model Lead {
 
   ultimaNotificacaoGestor DateTime?
   etapaEntradaEm          DateTime?
+  avisoCorretorEm         DateTime?
+  avisoGestorEm           DateTime?
 
   criadoEm     DateTime @default(now())
   atualizadoEm DateTime @updatedAt
