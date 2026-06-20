@@ -1,5 +1,6 @@
 const { Router } = require('express');
 const { authMiddleware, requireRole } = require('../middleware/auth.middleware');
+const { requirePermissao } = require('../middleware/permissao.middleware');
 const ctrl = require('../controllers/apresentacao.controller');
 
 const router = Router();
@@ -10,6 +11,7 @@ router.get('/og/ap/:slug', ctrl.ogApresentacao);
 
 // Rotas autenticadas
 router.use(authMiddleware);
+router.use(requirePermissao('apresentacaoPersonalizada'));
 
 const roles = ['gestor', 'admin', 'gerente', 'corretor'];
 

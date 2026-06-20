@@ -1,9 +1,11 @@
 const { Router } = require('express');
 const { authMiddleware, requireRole } = require('../middleware/auth.middleware');
+const { requirePermissao } = require('../middleware/permissao.middleware');
 const { enviar, listar, remover, download, receberChunk, finalizarChunk } = require('../controllers/arquivos-imovel.controller');
 
 const router = Router();
 router.use(authMiddleware);
+router.use(requirePermissao('arquivosImovel'));
 
 router.post('/chunk', requireRole('gestor', 'admin', 'gerente'), receberChunk);
 router.post('/chunk/finalizar', requireRole('gestor', 'admin', 'gerente'), finalizarChunk);

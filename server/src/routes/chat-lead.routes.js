@@ -1,5 +1,6 @@
 const { Router } = require('express');
 const { authMiddleware } = require('../middleware/auth.middleware');
+const { requirePermissao } = require('../middleware/permissao.middleware');
 const { webhookAuthMiddleware } = require('../middleware/webhook.middleware');
 const {
   listarMensagens,
@@ -17,6 +18,7 @@ router.post('/:leadId/mensagem-recebida', webhookAuthMiddleware, receberMensagem
 
 // Rotas autenticadas por JWT
 router.use(authMiddleware);
+router.use(requirePermissao('chatLead'));
 
 router.get('/:leadId/mensagens', listarMensagens);
 router.post('/:leadId/mensagem', enviarMensagem);
