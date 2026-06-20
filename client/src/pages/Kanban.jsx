@@ -294,7 +294,7 @@ export default function Kanban() {
                     onPerdido={() => abrirPerda(lead)}
                     onFollowUp={() => setModalFU({ lead, followUp: followUpsMap[lead.id] || null })}
                     onChat={() => setModalChat(lead)}
-                    onDistribuir={!isCorretor && !lead.corretor ? () => setModalDistribuir(lead) : null}
+                    onDistribuir={!isCorretor ? () => setModalDistribuir(lead) : null}
                   />
                 ))}
                 {grupos[col.id].length === 0 && (
@@ -449,9 +449,22 @@ function LeadCard({ lead, atualizando, followUp, podeGerenciar, bloqueado, chatH
         <p className="text-xs mt-1 font-medium" style={{ color: fuInfo.cor }}>{fuInfo.texto}</p>
       )}
       {lead.corretor ? (
-        <p className="text-xs mt-1 truncate" style={{ color: '#60A5FA' }}>
-          👤 {lead.corretor.nome}
-        </p>
+        <div className="flex items-center justify-between mt-1 gap-2">
+          <p className="text-xs truncate" style={{ color: '#60A5FA' }}>
+            👤 {lead.corretor.nome}
+          </p>
+          {onDistribuir && (
+            <button
+              onClick={onDistribuir}
+              className="text-xs font-medium px-2 py-0.5 rounded transition-colors flex-shrink-0"
+              style={{ backgroundColor: 'rgba(99,102,241,0.15)', color: '#818cf8' }}
+              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(99,102,241,0.28)' }}
+              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'rgba(99,102,241,0.15)' }}
+            >
+              Transferir
+            </button>
+          )}
+        </div>
       ) : (
         <div className="flex items-center justify-between mt-1 gap-2">
           <span
@@ -1012,8 +1025,8 @@ function ModalDistribuir({ lead, corretores, onConfirmar, onClose }) {
       >
         <div className="flex items-center justify-between px-5 py-4 flex-shrink-0" style={{ borderBottom: '1px solid #1E293B' }}>
           <div>
-            <h2 className="font-bold" style={{ color: '#F1F5F9' }}>Distribuir lead</h2>
-            <p className="text-xs mt-0.5" style={{ color: '#94A3B8' }}>{lead.nome}</p>
+            <h2 className="font-bold" style={{ color: '#F1F5F9' }}>{lead.corretor ? 'Transferir lead' : 'Distribuir lead'}</h2>
+            <p className="text-xs mt-0.5" style={{ color: '#94A3B8' }}>{lead.nome}{lead.corretor ? ' \u00b7 atualmente com ' + lead.corretor.nome : ''}</p>
           </div>
           <button onClick={onClose} className="text-xl leading-none hover:opacity-80" style={{ color: '#64748B' }}>×</button>
         </div>

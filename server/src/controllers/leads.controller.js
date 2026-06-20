@@ -480,9 +480,11 @@ async function distribuir(req, res) {
 
   const lead = await prisma.lead.findFirst({
     where: { id, imobiliariaId: req.imobiliariaId },
+    include: { corretor: { select: { nome: true } } },
   });
   if (!lead) return res.status(404).json({ error: 'Lead não encontrado' });
 
+  const corretorAnterior = lead.corretor?.nome || null;
   let corretorEscolhido;
 
   if (corretorId) {
@@ -518,8 +520,10 @@ async function distribuir(req, res) {
     await tx.historicoLead.create({
       data: {
         leadId: id,
-        acao: 'Lead distribuído manualmente',
-        detalhes: `Corretor: ${corretorEscolhido.nome}${!corretorId ? ' (via fila automática)' : ''}`,
+        acao: corretorAnterior ? 'Lead transferido' : 'Lead distribuído manualmente',
+        detalhes: corretorAnterior
+          ? `De ${corretorAnterior} para ${corretorEscolhido.nome}${!corretorId ? ' (via fila automática)' : ''}`
+          : `Corretor: ${corretorEscolhido.nome}${!corretorId ? ' (via fila automática)' : ''}`,
       },
     });
 
