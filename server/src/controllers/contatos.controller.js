@@ -1,4 +1,4 @@
-﻿const { parse } = require('csv-parse/sync');
+const { parse } = require('csv-parse/sync');
 const XLSX = require('xlsx');
 const axios = require('axios');
 const { notificarCorretor } = require('../services/notificacao.service');
@@ -9,25 +9,75 @@ function normalizarTelefone(raw) {
   return raw.toString().replace(/\D/g, '');
 }
 
+// Decodifica o buffer detectando o encoding pelo BOM.
+// Exports do Meta/Facebook vem em UTF-16 (com BOM), o que quebra o parser padrao.
+function decodificarBuffer(buffer) {
+  if (buffer.length >= 2 && buffer[0] === 0xff && buffer[1] === 0xfe) {
+    return buffer.toString('utf16le', 2); // UTF-16 LE
+  }
+  if (buffer.length >= 2 && buffer[0] === 0xfe && buffer[1] === 0xff) {
+    const swapped = Buffer.from(buffer); // UTF-16 BE -> swap para LE
+    for (let i = 2; i + 1 < swapped.length; i += 2) {
+      const tmp = swapped[i];
+      swapped[i] = swapped[i + 1];
+      swapped[i + 1] = tmp;
+    }
+    return swapped.toString('utf16le', 2);
+  }
+  if (buffer.length >= 3 && buffer[0] === 0xef && buffer[1] === 0xbb && buffer[2] === 0xbf) {
+    return buffer.toString('utf8', 3); // UTF-8 com BOM
+  }
+  return buffer.toString('utf8');
+}
+
+// Detecta o separador a partir da primeira linha (Meta usa TAB, planilhas BR as vezes ';').
+function detectarDelimitador(texto) {
+  const primeiraLinha = texto.split(/\r?\n/)[0] || '';
+  const tabs = (primeiraLinha.match(/\t/g) || []).length;
+  const ponto = (primeiraLinha.match(/;/g) || []).length;
+  const virgulas = (primeiraLinha.match(/,/g) || []).length;
+  if (tabs > 0 && tabs >= virgulas && tabs >= ponto) return '\t';
+  if (ponto > virgulas) return ';';
+  return ',';
+}
+
+// Reconhece nome e telefone em varios formatos de coluna, incluindo os do Meta.
+function extrairNomeTelefone(r) {
+  const nome =
+    r.nome || r.Nome || r.NOME || r.full_name || r.nome_completo || r['Nome completo'] || '';
+  const telefone =
+    r.telefone || r.Telefone || r.TELEFONE || r.phone || r.Phone ||
+    r.phone_number || r['phone number'] || r.celular || r.Celular || '';
+  return { nome: (nome || '').toString().trim(), telefone: (telefone || '').toString() };
+}
+
 function parsearArquivo(buffer, mimetype, originalname) {
   const ext = originalname.split('.').pop().toLowerCase();
   const linhas = [];
 
-  if (ext === 'csv' || mimetype === 'text/csv') {
-    const registros = parse(buffer, { columns: true, skip_empty_lines: true, trim: true });
-    for (const r of registros) {
-      const nome = r.nome || r.Nome || r.NOME || '';
-      const telefone = r.telefone || r.Telefone || r.TELEFONE || r.phone || r.Phone || '';
-      if (telefone) linhas.push({ nome: nome.trim(), telefone: normalizarTelefone(telefone) });
-    }
-  } else {
+  if (ext === 'xlsx' || ext === 'xls') {
     const wb = XLSX.read(buffer, { type: 'buffer' });
     const ws = wb.Sheets[wb.SheetNames[0]];
     const dados = XLSX.utils.sheet_to_json(ws, { defval: '' });
     for (const r of dados) {
-      const nome = r.nome || r.Nome || r.NOME || '';
-      const telefone = r.telefone || r.Telefone || r.TELEFONE || r.phone || r.Phone || '';
-      if (telefone) linhas.push({ nome: nome.toString().trim(), telefone: normalizarTelefone(telefone.toString()) });
+      const { nome, telefone } = extrairNomeTelefone(r);
+      if (telefone) linhas.push({ nome, telefone: normalizarTelefone(telefone) });
+    }
+  } else {
+    const texto = decodificarBuffer(buffer);
+    const delimiter = detectarDelimitador(texto);
+    const registros = parse(texto, {
+      columns: true,
+      skip_empty_lines: true,
+      trim: true,
+      delimiter,
+      bom: true,
+      relax_quotes: true,
+      relax_column_count: true,
+    });
+    for (const r of registros) {
+      const { nome, telefone } = extrairNomeTelefone(r);
+      if (telefone) linhas.push({ nome, telefone: normalizarTelefone(telefone) });
     }
   }
 
