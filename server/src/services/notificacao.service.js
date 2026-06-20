@@ -136,7 +136,10 @@ function httpPost(url, body, extraHeaders = {}) {
 // Envio genérico — usado pelos cron jobs
 async function enviarWhatsApp(telefone, texto, imobiliariaId) {
   const numero = formatarNumero(telefone);
-  const body   = JSON.stringify({ imobiliariaId, number: numero, text: texto });
+  // Usa a instância global de notificações (conectada), igual a notificarCorretor.
+  // As instâncias por imobiliária não estão conectadas no Baileys.
+  const instanciaId = process.env.NOTIF_INSTANCE_ID || imobiliariaId;
+  const body   = JSON.stringify({ imobiliariaId: instanciaId, number: numero, text: texto });
 
   try {
     await httpPost('http://impulsolead-whatsapp:3010/send', body, {});

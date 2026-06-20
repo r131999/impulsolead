@@ -286,6 +286,11 @@ async function verificarPlanoVencimento() {
 
 // ── Job 5: alerta escalonado de leads sem tratativa (corretor → gestor) ──────
 
+// Teto de idade dos leads considerados "novos esfriando" — evita disparar o
+// alerta contra backlog histórico acumulado (lead antigo parado não é o caso de uso).
+const TETO_IDADE_COM_CORRETOR_H = 48;   // Parte A: só leads criados nas últimas 48h
+const TETO_IDADE_SEM_CORRETOR_H = 168;  // Parte B: só leads criados nos últimos 7 dias (24h x 7)
+
 async function obterTelefoneGestor(imobiliaria) {
   if (imobiliaria.telefoneNotificacoes) return imobiliaria.telefoneNotificacoes;
   return imobiliaria.usuarios[0]?.telefone || null;
@@ -293,11 +298,14 @@ async function obterTelefoneGestor(imobiliaria) {
 
 // Parte A: leads com corretor, sem tratativa — avisa corretor e escala para gestor
 async function processarEscalonamentoCorretorGestor(imobiliaria, agora) {
+  const tetoIdade = new Date(agora.getTime() - TETO_IDADE_COM_CORRETOR_H * 60 * 60 * 1000);
+
   const leads = await prisma.lead.findMany({
     where: {
       imobiliariaId: imobiliaria.id,
       status: 'lead',
       corretorId: { not: null },
+      criadoEm: { gte: tetoIdade },
       OR: [{ observacoes: null }, { observacoes: '' }],
     },
     select: {
@@ -381,6 +389,7 @@ async function processarEscalonamentoCorretorGestor(imobiliaria, agora) {
 // Parte B: leads sem corretor parados há mais de 24h — alerta diário ao gestor
 async function processarLeadsSemCorretor(imobiliaria, agora) {
   const limite24h = new Date(agora.getTime() - 24 * 60 * 60 * 1000);
+  const tetoIdade = new Date(agora.getTime() - TETO_IDADE_SEM_CORRETOR_H * 60 * 60 * 1000);
   const inicioDia = inicioDiaBrasilia(agora);
 
   const jaAvisadoHoje =
@@ -392,7 +401,7 @@ async function processarLeadsSemCorretor(imobiliaria, agora) {
       imobiliariaId: imobiliaria.id,
       status: 'lead',
       corretorId: null,
-      criadoEm: { lt: limite24h },
+      criadoEm: { lt: limite24h, gte: tetoIdade },
     },
     select: { id: true },
   });

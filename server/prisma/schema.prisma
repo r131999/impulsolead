@@ -24,7 +24,7 @@ model Imobiliaria {
   criadoEm              DateTime  @default(now())
   atualizadoEm          DateTime  @updatedAt
 
-  avisoLeadAtivo             Boolean   @default(true)
+  avisoLeadAtivo             Boolean   @default(false)
   avisoLeadCorretorHoras     Int       @default(4)
   avisoLeadGestorHoras       Int       @default(6)
   telefoneNotificacoes       String?
