@@ -477,6 +477,60 @@ async function verificarLeadsSemTratativa() {
   }
 }
 
+// ── Job 6: lembrete de follow-up agendado — dispara no WhatsApp do corretor ──
+
+// Piso de recência — evita disparar lembrete de follow-up muito antigo que
+// ficou parado sem ser notificado (ex.: job fora do ar por um tempo).
+const TETO_IDADE_FOLLOWUP_H = 48;
+
+async function verificarFollowUpsPendentes() {
+  console.log('[cron] Verificando follow-ups pendentes...');
+
+  const agora = new Date();
+  const tetoIdade = new Date(agora.getTime() - TETO_IDADE_FOLLOWUP_H * 60 * 60 * 1000);
+
+  const followUps = await prisma.followUp.findMany({
+    where: {
+      status: 'pendente',
+      notificadoEm: null,
+      dataHora: { lte: agora, gte: tetoIdade },
+    },
+    include: {
+      lead: { select: { id: true, nome: true, imobiliariaId: true } },
+      corretor: { select: { id: true, nome: true, telefone: true, whatsapp: true } },
+    },
+  });
+
+  if (followUps.length === 0) {
+    console.log('[cron] Nenhum follow-up pendente para notificar.');
+    return;
+  }
+
+  for (const followUp of followUps) {
+    try {
+      const numero = followUp.corretor.whatsapp || followUp.corretor.telefone;
+      if (!numero) {
+        console.log(`[cron] ${followUp.corretor.nome} sem WhatsApp/telefone — lembrete de follow-up pulado.`);
+        continue;
+      }
+
+      const texto = `🔔 Lembrete de follow-up\n${followUp.lead.nome}\n${followUp.observacao || ''}`;
+
+      await enviarPushCorretor(followUp.corretor.id, '🔔 Lembrete de follow-up', texto);
+      await enviarWhatsApp(numero, texto, followUp.lead.imobiliariaId);
+
+      await prisma.followUp.update({
+        where: { id: followUp.id },
+        data: { notificadoEm: agora },
+      });
+
+      console.log(`[cron] Lembrete de follow-up enviado para ${followUp.corretor.nome} (lead ${followUp.lead.nome})`);
+    } catch (err) {
+      console.error(`[cron] Erro ao notificar follow-up ${followUp.id}:`, err.message);
+    }
+  }
+}
+
 // ── Inicialização ─────────────────────────────────────────────────────────────
 
 function iniciarCrons() {
@@ -523,7 +577,16 @@ function iniciarCrons() {
     }
   });
 
-  console.log('[cron] Jobs iniciados: leads-parados (6h) | relatorio-semanal (dom 8h) | plano-vencimento (diário 9h) | ad-spend (20min) | leads-sem-tratativa (15min)');
+  // Job 6: lembrete de follow-up agendado — a cada 5 minutos
+  cron.schedule('*/5 * * * *', async () => {
+    try {
+      await verificarFollowUpsPendentes();
+    } catch (err) {
+      console.error('[cron] Erro no job followups-pendentes:', err.message);
+    }
+  });
+
+  console.log('[cron] Jobs iniciados: leads-parados (6h) | relatorio-semanal (dom 8h) | plano-vencimento (diário 9h) | ad-spend (20min) | leads-sem-tratativa (15min) | followups-pendentes (5min)');
 }
 
 module.exports = { iniciarCrons };

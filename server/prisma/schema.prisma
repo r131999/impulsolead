@@ -204,12 +204,13 @@ model ModeloMensagem {
 }
 
 model FollowUp {
-  id           String   @id @default(uuid())
+  id           String    @id @default(uuid())
   dataHora     DateTime
   observacao   String?
-  status       String   @default("pendente")
-  criadoEm     DateTime @default(now())
-  atualizadoEm DateTime @updatedAt
+  status       String    @default("pendente")
+  notificadoEm DateTime?
+  criadoEm     DateTime  @default(now())
+  atualizadoEm DateTime  @updatedAt
 
   leadId String
   lead   Lead   @relation(fields: [leadId], references: [id])
