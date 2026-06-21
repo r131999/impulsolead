@@ -47,6 +47,7 @@ function calcBanner(planoInfo, isCorretor) {
   if (!planoInfo) return null
   if (planoInfo.plano === 'legado') return null
   if (planoInfo.bloqueado) return { tipo: 'bloqueado' }
+  if (planoInfo.modoLeitura) return { tipo: 'modo-leitura', trial: planoInfo.plano === 'trial' }
   const dias = planoInfo.diasParaVencer
   if (dias !== null && dias <= 3) {
     return { tipo: 'aviso', dias, trial: planoInfo.plano === 'trial' }
@@ -68,6 +69,7 @@ export default function Layout() {
   const [salvandoFoto, setSalvandoFoto] = useState(false)
   const [logoUrl, setLogoUrl] = useState(null)
   const [pixCopiado, setPixCopiado] = useState(false)
+  const [avisoModoLeitura, setAvisoModoLeitura] = useState(null)
   const { permissao, solicitarPermissao } = usePushNotification()
 
   const copiarPix = () => {
@@ -81,6 +83,17 @@ export default function Layout() {
     getLogoUrl()
       .then((res) => setLogoUrl(res.data.logoUrl))
       .catch(() => {})
+  }, [])
+
+  // Toast disparado pelo interceptor do axios quando uma ação de escrita é
+  // bloqueada por modo leitura (trial/plano vencido) — não desloga, só avisa.
+  useEffect(() => {
+    function onModoLeituraBloqueio(e) {
+      setAvisoModoLeitura(e.detail?.mensagem || 'Ação indisponível: assine um plano para continuar usando o ImpulsoLead.')
+      setTimeout(() => setAvisoModoLeitura(null), 5000)
+    }
+    window.addEventListener('modo-leitura-bloqueio', onModoLeituraBloqueio)
+    return () => window.removeEventListener('modo-leitura-bloqueio', onModoLeituraBloqueio)
   }, [])
 
   const handleFoto = async (e) => {
@@ -166,6 +179,26 @@ export default function Layout() {
           {banner.trial
             ? <a href="/planos" style={{ color: '#FDE68A', textDecoration: 'underline' }}>Escolha um plano para continuar.</a>
             : <a href="/planos" style={{ color: '#FDE68A', textDecoration: 'underline' }}>Renove para não perder o acesso.</a>}
+        </div>
+      )}
+
+      {/* Banner de modo leitura — trial/plano vencido, mas não bloqueado (cancelado) */}
+      {banner?.tipo === 'modo-leitura' && (
+        <div style={{ backgroundColor: '#7C2D12', color: '#FED7AA', padding: '8px 16px', textAlign: 'center', fontSize: 14, fontWeight: 500 }}>
+          {banner.trial
+            ? '🔒 Seu período de testes acabou. '
+            : '🔒 Seu plano venceu. '}
+          Você está em modo somente leitura — escolha um plano para voltar a usar todos os recursos.{' '}
+          <a href="/planos" style={{ color: '#FED7AA', textDecoration: 'underline', fontWeight: 700 }}>Escolher plano</a>
+          {' · '}
+          <a
+            href="https://wa.me/5598981444954"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: '#FED7AA', textDecoration: 'underline', fontWeight: 700 }}
+          >
+            WhatsApp
+          </a>
         </div>
       )}
 
@@ -303,6 +336,15 @@ export default function Layout() {
         </div>
       </div>
       <ChatInterno />
+
+      {avisoModoLeitura && (
+        <div
+          className="fixed bottom-6 left-1/2 -translate-x-1/2 rounded-lg px-5 py-3 text-sm font-medium z-50 shadow-lg"
+          style={{ backgroundColor: 'rgba(124,45,18,0.95)', border: '1px solid rgba(253,186,116,0.4)', color: '#FED7AA', maxWidth: '90vw' }}
+        >
+          🔒 {avisoModoLeitura}
+        </div>
+      )}
     </>
   )
 }

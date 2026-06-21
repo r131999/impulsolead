@@ -220,20 +220,20 @@ async function enviarRelatorioSemanal() {
 async function verificarPlanoVencimento() {
   console.log('[cron] Verificando planos vencendo/vencidos...');
   const agora = new Date();
-  const em3Dias = new Date(agora.getTime() + 3 * 24 * 60 * 60 * 1000);
+  const em2Dias = new Date(agora.getTime() + 2 * 24 * 60 * 60 * 1000);
   const ha5Dias = new Date(agora.getTime() - 5 * 24 * 60 * 60 * 1000);
 
-  // 1. Marcar notificacaoVencimento para planos pagos vencendo em <= 3 dias
+  // 1. Marcar notificacaoVencimento para planos pagos vencendo em <= 2 dias
   await prisma.imobiliaria.updateMany({
     where: {
       plano: { notIn: ['legado', 'cancelado', 'trial'] },
       planoBloqueadoEm: null,
-      planoExpiraEm: { gte: agora, lte: em3Dias },
+      planoExpiraEm: { gte: agora, lte: em2Dias },
     },
     data: { notificacaoVencimento: true },
   });
 
-  // Trials vencendo em <= 3 dias (precisamos fazer em JS pois a data é calculada)
+  // Trials vencendo em <= 2 dias (precisamos fazer em JS pois a data é calculada)
   const todosTrials = await prisma.imobiliaria.findMany({
     where: { plano: 'trial', planoBloqueadoEm: null },
     select: { id: true, trialExpiraEm: true, criadoEm: true },
@@ -244,7 +244,7 @@ async function verificarPlanoVencimento() {
       ? new Date(imob.trialExpiraEm)
       : new Date(new Date(imob.criadoEm).getTime() + 7 * 24 * 60 * 60 * 1000);
     const dias = (expira - agora) / (1000 * 60 * 60 * 24);
-    return dias >= 0 && dias <= 3;
+    return dias >= 0 && dias <= 2;
   }).map((imob) => imob.id);
 
   if (trialsExpirando.length > 0) {

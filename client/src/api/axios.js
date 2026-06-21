@@ -14,7 +14,15 @@ api.interceptors.response.use(
   (res) => res,
   (err) => {
     const status = err.response?.status
-    const msg = err.response?.data?.error || ''
+    const data = err.response?.data || {}
+    const msg = data.error || ''
+
+    // Modo leitura (trial/plano vencido): só avisa, NÃO desloga e NÃO redireciona —
+    // tratado separado do bloco de bloqueio duro abaixo.
+    if (status === 403 && data.modoLeitura) {
+      window.dispatchEvent(new CustomEvent('modo-leitura-bloqueio', { detail: { mensagem: msg } }))
+      return Promise.reject(err)
+    }
 
     if (status === 403 && MSGS_PLANO.some((m) => msg.includes(m))) {
       localStorage.removeItem('token')

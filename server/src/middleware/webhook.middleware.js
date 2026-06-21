@@ -19,14 +19,8 @@ async function webhookAuthMiddleware(req, res, next) {
     return res.status(401).json({ error: 'API key inválida' });
   }
 
-  if (
-    imobiliaria.plano === 'trial' &&
-    imobiliaria.trialExpiraEm &&
-    new Date() > new Date(imobiliaria.trialExpiraEm)
-  ) {
-    return res.status(403).json({ error: 'Trial expirado' });
-  }
-
+  // Entrada de lead via WhatsApp/N8N nunca para por vencimento de trial/plano —
+  // só a auth por x-api-key é checada aqui.
   req.imobiliariaId = imobiliaria.id;
   req.imobiliaria = imobiliaria;
   next();

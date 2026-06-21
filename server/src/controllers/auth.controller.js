@@ -3,6 +3,7 @@ const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 
 const prisma = require('../lib/prisma');
+const { emModoLeitura } = require('../middleware/auth.middleware');
 
 function gerarApiKey() {
   return crypto.randomBytes(32).toString('hex');
@@ -23,7 +24,10 @@ function calcPlanoInfo(imob) {
       : new Date(new Date(imob.criadoEm).getTime() + 7 * 24 * 60 * 60 * 1000);
     diasParaVencer = Math.max(0, Math.ceil((expiraEm - agora) / (1000 * 60 * 60 * 24)));
   }
-  const bloqueado = !!imob.planoBloqueadoEm;
+  // bloqueado = só o bloqueio duro (cancelado). Trial/plano vencido vira modoLeitura,
+  // não bloqueio total — leads continuam entrando e a visualização fica liberada.
+  const bloqueado = plano === 'cancelado';
+  const modoLeitura = emModoLeitura(imob);
   const avisoVencimento = !bloqueado && diasParaVencer !== null && diasParaVencer <= 3;
   return {
     plano,
@@ -34,6 +38,7 @@ function calcPlanoInfo(imob) {
     diasParaVencer,
     avisoVencimento,
     bloqueado,
+    modoLeitura,
     permissoes: imob.permissoes || {},
   };
 }
