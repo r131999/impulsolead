@@ -67,16 +67,15 @@ const PERMISSOES_ATUAIS = [
   { key: 'gestaoImoveis',             label: 'Gestão de imóveis' },
   { key: 'arquivosImovel',            label: 'Arquivos de imóveis' },
   { key: 'apresentacaoPersonalizada', label: 'Apresentação personalizada' },
-  { key: 'tourVirtual',               label: 'Tour virtual' },
   { key: 'painelCampanhas',           label: 'Painel de campanhas (ROI)' },
   { key: 'relatorios',                label: 'Relatórios' },
   { key: 'followUpAutomatico',        label: 'Follow-up automático' },
 ]
 
 const PERMISSOES_FUTURAS = [
-  { key: 'agenteIA',          label: 'Agente IA (Lia)' },
-  { key: 'chatLead',          label: 'Chat com lead' },
-  { key: 'multiplosWhatsapp', label: 'Múltiplos WhatsApp' },
+  { key: 'agenteIA',          label: 'Agente IA (Lia) — Em breve' },
+  { key: 'chatLead',          label: 'Chat com lead — Em breve' },
+  { key: 'multiplosWhatsapp', label: 'Múltiplos WhatsApp — Em breve' },
 ]
 
 // ─── componentes base ────────────────────────────────────────────────────────
@@ -153,14 +152,15 @@ function Section({ title, children }) {
   )
 }
 
-function Toggle({ label, value, onChange }) {
+function Toggle({ label, value, onChange, disabled }) {
   return (
     <div className="flex items-center justify-between gap-3 py-0.5">
-      <span className="text-sm" style={{ color: value ? '#CBD5E1' : '#64748B' }}>{label}</span>
+      <span className="text-sm" style={{ color: disabled ? '#475569' : value ? '#CBD5E1' : '#64748B' }}>{label}</span>
       <button
-        onClick={() => onChange(!value)}
+        onClick={() => !disabled && onChange(!value)}
+        disabled={disabled}
         className="relative flex-shrink-0 w-9 h-5 rounded-full transition-colors"
-        style={{ backgroundColor: value ? '#6366f1' : '#1e2d3d' }}
+        style={{ backgroundColor: value ? '#6366f1' : '#1e2d3d', opacity: disabled ? 0.5 : 1, cursor: disabled ? 'not-allowed' : 'pointer' }}
       >
         <span
           className="absolute top-0.5 w-4 h-4 rounded-full transition-transform"
@@ -398,7 +398,7 @@ function ModalGerenciar({ cliente, onClose, onAtualizado }) {
           <p className="text-xs mb-2" style={{ color: '#475569' }}>Futuras</p>
           <div className="space-y-2">
             {PERMISSOES_FUTURAS.map(({ key, label }) => (
-              <Toggle key={key} label={label} value={!!perms[key]} onChange={togglePerm(key)} />
+              <Toggle key={key} label={label} value={!!perms[key]} onChange={togglePerm(key)} disabled />
             ))}
           </div>
 

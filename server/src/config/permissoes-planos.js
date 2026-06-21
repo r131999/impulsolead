@@ -1,0 +1,86 @@
+const PERMISSOES_POR_PLANO = {
+  trial: {
+    permissoes: {
+      importacaoListas:          true,
+      gestaoImoveis:             true,
+      arquivosImovel:            true,
+      apresentacaoPersonalizada: true,
+      tourVirtual:               false,
+      painelCampanhas:           true,
+      relatorios:                true,
+      followUpAutomatico:        true,
+      agenteIA:                  false,
+      chatLead:                  false,
+      multiplosWhatsapp:         false,
+    },
+    limiteAcessos: 25,
+  },
+  construcao: {
+    permissoes: {
+      importacaoListas:          true,
+      gestaoImoveis:             false,
+      arquivosImovel:            false,
+      apresentacaoPersonalizada: false,
+      tourVirtual:               false,
+      painelCampanhas:           false,
+      relatorios:                false,
+      followUpAutomatico:        false,
+      agenteIA:                  false,
+      chatLead:                  false,
+      multiplosWhatsapp:         false,
+    },
+    limiteAcessos: 5,
+  },
+  desenvolvimento: {
+    permissoes: {
+      importacaoListas:          true,
+      gestaoImoveis:             true,
+      arquivosImovel:            true,
+      apresentacaoPersonalizada: true,
+      tourVirtual:               false,
+      painelCampanhas:           false,
+      relatorios:                true,
+      followUpAutomatico:        true,
+      agenteIA:                  false,
+      chatLead:                  false,
+      multiplosWhatsapp:         false,
+    },
+    limiteAcessos: 12,
+  },
+  sucesso: {
+    permissoes: {
+      importacaoListas:          true,
+      gestaoImoveis:             true,
+      arquivosImovel:            true,
+      apresentacaoPersonalizada: true,
+      tourVirtual:               false,
+      painelCampanhas:           true,
+      relatorios:                true,
+      followUpAutomatico:        true,
+      agenteIA:                  false,
+      chatLead:                  false,
+      multiplosWhatsapp:         false,
+    },
+    limiteAcessos: 25,
+  },
+  legado: {
+    permissoes: {
+      importacaoListas:          true,
+      gestaoImoveis:             true,
+      arquivosImovel:            true,
+      apresentacaoPersonalizada: true,
+      tourVirtual:               false,
+      painelCampanhas:           true,
+      relatorios:                true,
+      followUpAutomatico:        true,
+      agenteIA:                  false,
+      chatLead:                  false,
+      multiplosWhatsapp:         false,
+    },
+    limiteAcessos: 999,
+  },
+};
+
+const PERMISSOES_FUTURAS = ['agenteIA', 'chatLead', 'multiplosWhatsapp'];
+
+module.exports = { PERMISSOES_POR_PLANO, PERMISSOES_FUTURAS };

@@ -3,6 +3,7 @@
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const prisma = require('../lib/prisma');
+const { PERMISSOES_POR_PLANO } = require('../config/permissoes-planos');
 
 const PERGUNTAS_PADRAO = [
   'É o seu primeiro imóvel?',
@@ -14,21 +15,6 @@ const PERGUNTAS_PADRAO = [
   'Qual região você prefere morar?',
   'Qual faixa de valor você tem em mente para o imóvel?',
 ];
-
-// Todas as permissões ligadas — padrão para trial e migration de clientes existentes
-const PERMISSOES_PADRAO = {
-  importacaoListas:          true,
-  gestaoImoveis:             true,
-  arquivosImovel:            true,
-  apresentacaoPersonalizada: true,
-  tourVirtual:               true,
-  painelCampanhas:           true,
-  relatorios:                true,
-  followUpAutomatico:        true,
-  agenteIA:                  true,
-  chatLead:                  true,
-  multiplosWhatsapp:         true,
-};
 
 const VALID_PLANOS = ['trial', 'construcao', 'desenvolvimento', 'sucesso', 'legado', 'cancelado'];
 
@@ -142,6 +128,12 @@ async function atualizarPlano(req, res) {
     data.planoBloqueadoEm = new Date(); // bloqueia imediatamente
     data.planoExpiraEm = null;
     data.trialExpiraEm = null;
+  }
+
+  // Cancelado mantém as permissões e o limite de acessos como estavam — só bloqueia o acesso.
+  if (plano !== 'cancelado') {
+    data.permissoes = PERMISSOES_POR_PLANO[plano].permissoes;
+    data.limiteAcessos = PERMISSOES_POR_PLANO[plano].limiteAcessos;
   }
 
   const atualizado = await prisma.imobiliaria.update({ where: { id }, data });
@@ -274,8 +266,8 @@ async function criarCliente(req, res) {
         plano: 'trial',
         trialExpiraEm,
         apiKey: gerarApiKey(),
-        permissoes: PERMISSOES_PADRAO,
-        limiteAcessos: 25,
+        permissoes: PERMISSOES_POR_PLANO.trial.permissoes,
+        limiteAcessos: PERMISSOES_POR_PLANO.trial.limiteAcessos,
       },
     });
 

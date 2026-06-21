@@ -4,6 +4,7 @@ const crypto = require('crypto');
 
 const prisma = require('../lib/prisma');
 const { emModoLeitura } = require('../middleware/auth.middleware');
+const { PERMISSOES_POR_PLANO } = require('../config/permissoes-planos');
 
 function gerarApiKey() {
   return crypto.randomBytes(32).toString('hex');
@@ -54,21 +55,6 @@ const PERGUNTAS_PADRAO = [
   'Qual faixa de valor você tem em mente para o imóvel?',
 ];
 
-// Trial = acesso total por 7 dias
-const PERMISSOES_TRIAL = {
-  importacaoListas:          true,
-  gestaoImoveis:             true,
-  arquivosImovel:            true,
-  apresentacaoPersonalizada: true,
-  tourVirtual:               true,
-  painelCampanhas:           true,
-  relatorios:                true,
-  followUpAutomatico:        true,
-  agenteIA:                  true,
-  chatLead:                  true,
-  multiplosWhatsapp:         true,
-};
-
 async function register(req, res) {
   const { nomeImobiliaria, nomeUsuario, email, senha, telefone } = req.body;
 
@@ -104,8 +90,8 @@ async function register(req, res) {
         plano: 'trial',
         trialExpiraEm,
         apiKey: gerarApiKey(),
-        permissoes: PERMISSOES_TRIAL,
-        limiteAcessos: 25,
+        permissoes: PERMISSOES_POR_PLANO.trial.permissoes,
+        limiteAcessos: PERMISSOES_POR_PLANO.trial.limiteAcessos,
       },
     });
 
