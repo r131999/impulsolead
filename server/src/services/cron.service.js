@@ -101,13 +101,28 @@ async function verificarLeadsParados() {
       continue;
     }
 
-    const linhas = grupo
-      .map((l) => `• ${l.nome} — Etapa: ${STATUS_LABEL[l.status] || l.status} — Corretor: ${l.corretor?.nome || 'Sem corretor'}`)
-      .join('\n');
+    const porCorretor = new Map();
+    let semCorretor = 0;
+    for (const l of grupo) {
+      const nomeCorretor = l.corretor?.nome;
+      if (!nomeCorretor) {
+        semCorretor++;
+        continue;
+      }
+      porCorretor.set(nomeCorretor, (porCorretor.get(nomeCorretor) || 0) + 1);
+    }
+
+    const linhas = [...porCorretor.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .map(([nomeCorretor, n]) => `- ${nomeCorretor} — ${n} lead${n === 1 ? '' : 's'}`);
+
+    if (semCorretor > 0) {
+      linhas.push(`- Sem corretor — ${semCorretor} lead${semCorretor === 1 ? '' : 's'}`);
+    }
 
     const texto =
-      `⚠️ Leads parados há mais de 48h na ${imobiliaria.nome}:\n\n` +
-      `${linhas}\n\n` +
+      `⚠️ ${grupo.length} lead${grupo.length === 1 ? '' : 's'} parado${grupo.length === 1 ? '' : 's'} há mais de 48h na ${imobiliaria.nome}:\n\n` +
+      `${linhas.join('\n')}\n\n` +
       `Acesse o CRM para verificar.`;
 
     await enviarWhatsApp(telefoneGestor, texto, imobiliaria.id);
