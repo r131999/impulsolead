@@ -457,9 +457,9 @@ function LeadCard({ lead, atualizando, followUp, podeGerenciar, bloqueado, chatH
             <button
               onClick={onDistribuir}
               className="text-xs font-medium px-2 py-0.5 rounded transition-colors flex-shrink-0"
-              style={{ backgroundColor: 'rgba(99,102,241,0.15)', color: '#818cf8' }}
-              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(99,102,241,0.28)' }}
-              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'rgba(99,102,241,0.15)' }}
+              style={{ backgroundColor: 'rgba(245,158,11,0.18)', color: '#F59E0B' }}
+              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(245,158,11,0.32)' }}
+              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'rgba(245,158,11,0.18)' }}
             >
               Transferir
             </button>
