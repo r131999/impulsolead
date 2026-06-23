@@ -304,7 +304,6 @@ async function verificarPlanoVencimento() {
 // Teto de idade dos leads considerados "novos esfriando" — evita disparar o
 // alerta contra backlog histórico acumulado (lead antigo parado não é o caso de uso).
 const TETO_IDADE_COM_CORRETOR_H = 48;   // Parte A: só leads criados nas últimas 48h
-const TETO_IDADE_SEM_CORRETOR_H = 168;  // Parte B: só leads criados nos últimos 7 dias (24h x 7)
 
 async function obterTelefoneGestor(imobiliaria) {
   if (imobiliaria.telefoneNotificacoes) return imobiliaria.telefoneNotificacoes;
@@ -401,43 +400,47 @@ async function processarEscalonamentoCorretorGestor(imobiliaria, agora) {
   }
 }
 
-// Parte B: leads sem corretor parados há mais de 24h — alerta diário ao gestor
-async function processarLeadsSemCorretor(imobiliaria, agora) {
-  const limite24h = new Date(agora.getTime() - 24 * 60 * 60 * 1000);
-  const tetoIdade = new Date(agora.getTime() - TETO_IDADE_SEM_CORRETOR_H * 60 * 60 * 1000);
-  const inicioDia = inicioDiaBrasilia(agora);
+// Parte B: leads aguardando distribuição — resumo diário ao gestor às 8h Brasília
+async function notificarLeadsAguardandoDistribuicao() {
+  console.log('[cron] Verificando leads aguardando distribuição...');
 
-  const jaAvisadoHoje =
-    imobiliaria.ultimoAlertaSemCorretorEm && new Date(imobiliaria.ultimoAlertaSemCorretorEm) >= inicioDia;
-  if (jaAvisadoHoje) return;
-
-  const existeLeadParado = await prisma.lead.findFirst({
-    where: {
-      imobiliariaId: imobiliaria.id,
-      status: 'lead',
-      corretorId: null,
-      criadoEm: { lt: limite24h, gte: tetoIdade },
+  const imobiliarias = await prisma.imobiliaria.findMany({
+    where: { avisoLeadAtivo: true },
+    select: {
+      id: true,
+      nome: true,
+      telefoneNotificacoes: true,
+      usuarios: {
+        where: { role: 'gestor', telefone: { not: null } },
+        select: { telefone: true },
+        orderBy: { criadoEm: 'asc' },
+        take: 1,
+      },
     },
-    select: { id: true },
   });
 
-  if (!existeLeadParado) return;
+  for (const imobiliaria of imobiliarias) {
+    try {
+      const total = await prisma.lead.count({
+        where: { imobiliariaId: imobiliaria.id, status: 'lead', corretorId: null },
+      });
 
-  const telefoneGestor = await obterTelefoneGestor(imobiliaria);
-  if (!telefoneGestor) {
-    console.log(`[cron] ${imobiliaria.nome} sem telefone de gestor — alerta sem-corretor pulado.`);
-    return;
+      if (total === 0) continue;
+
+      const telefoneGestor = await obterTelefoneGestor(imobiliaria);
+      if (!telefoneGestor) {
+        console.log(`[cron] ${imobiliaria.nome} sem telefone de gestor — alerta de distribuição pulado.`);
+        continue;
+      }
+
+      const texto = `📊 Bom dia! Você tem ${total} lead(s) aguardando distribuição. Acesse o CRM para distribuir.`;
+      await enviarWhatsApp(telefoneGestor, texto, imobiliaria.id);
+
+      console.log(`[cron] Alerta de leads aguardando distribuição enviado para ${imobiliaria.nome} (${total})`);
+    } catch (err) {
+      console.error(`[cron] Erro no alerta de distribuição de ${imobiliaria.nome}:`, err.message);
+    }
   }
-
-  const texto = '📋 Existem leads parados há mais de 24h aguardando distribuição no CRM. Entre e distribua para algum corretor.';
-  await enviarWhatsApp(telefoneGestor, texto, imobiliaria.id);
-
-  await prisma.imobiliaria.update({
-    where: { id: imobiliaria.id },
-    data: { ultimoAlertaSemCorretorEm: agora },
-  });
-
-  console.log(`[cron] Alerta de leads sem corretor enviado para ${imobiliaria.nome}`);
 }
 
 async function verificarLeadsSemTratativa() {
@@ -457,7 +460,6 @@ async function verificarLeadsSemTratativa() {
       avisoLeadCorretorHoras: true,
       avisoLeadGestorHoras: true,
       telefoneNotificacoes: true,
-      ultimoAlertaSemCorretorEm: true,
       usuarios: {
         where: { role: 'gestor', telefone: { not: null } },
         select: { telefone: true },
@@ -470,7 +472,6 @@ async function verificarLeadsSemTratativa() {
   for (const imobiliaria of imobiliarias) {
     try {
       await processarEscalonamentoCorretorGestor(imobiliaria, agora);
-      await processarLeadsSemCorretor(imobiliaria, agora);
     } catch (err) {
       console.error(`[cron] Erro ao verificar leads sem tratativa de ${imobiliaria.nome}:`, err.message);
     }
@@ -534,13 +535,14 @@ async function verificarFollowUpsPendentes() {
 // ── Inicialização ─────────────────────────────────────────────────────────────
 
 function iniciarCrons() {
-  cron.schedule('0 */6 * * *', async () => {
-    try {
-      await verificarLeadsParados();
-    } catch (err) {
-      console.error('[cron] Erro no job leads-parados:', err.message);
-    }
-  });
+  // Job 1: notificação de leads parados há mais de 48h — DESLIGADO (mantido no código, sem agendamento)
+  // cron.schedule('0 */6 * * *', async () => {
+  //   try {
+  //     await verificarLeadsParados();
+  //   } catch (err) {
+  //     console.error('[cron] Erro no job leads-parados:', err.message);
+  //   }
+  // });
 
   cron.schedule('0 8 * * 0', async () => {
     try {
@@ -577,6 +579,15 @@ function iniciarCrons() {
     }
   });
 
+  // Job 5b: leads aguardando distribuição — todo dia às 8h Brasília (11h UTC)
+  cron.schedule('0 11 * * *', async () => {
+    try {
+      await notificarLeadsAguardandoDistribuicao();
+    } catch (err) {
+      console.error('[cron] Erro no job leads-aguardando-distribuicao:', err.message);
+    }
+  });
+
   // Job 6: lembrete de follow-up agendado — a cada 5 minutos
   cron.schedule('*/5 * * * *', async () => {
     try {
@@ -586,7 +597,7 @@ function iniciarCrons() {
     }
   });
 
-  console.log('[cron] Jobs iniciados: leads-parados (6h) | relatorio-semanal (dom 8h) | plano-vencimento (diário 9h) | ad-spend (20min) | leads-sem-tratativa (15min) | followups-pendentes (5min)');
+  console.log('[cron] Jobs iniciados: relatorio-semanal (dom 8h) | plano-vencimento (diário 9h) | ad-spend (20min) | leads-sem-tratativa (15min) | leads-aguardando-distribuicao (diário 8h BRT) | followups-pendentes (5min)');
 }
 
 module.exports = { iniciarCrons };
