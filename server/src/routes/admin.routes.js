@@ -1,7 +1,7 @@
 const { Router } = require('express');
 const {
   listarClientes, atualizarPlano, atualizarPermissoes, atualizarLimiteAcessos,
-  getPlanoCliente, criarCliente, getStats,
+  atualizarAdAccount, getPlanoCliente, criarCliente, getStats,
 } = require('../controllers/admin.controller');
 const { authMiddleware, requireRole } = require('../middleware/auth.middleware');
 const {
@@ -20,6 +20,7 @@ router.post('/clientes', criarCliente);
 router.put('/clientes/:id/plano', atualizarPlano);
 router.patch('/clientes/:id/permissoes', atualizarPermissoes);
 router.patch('/clientes/:id/limite-acessos', atualizarLimiteAcessos);
+router.patch('/clientes/:id/ad-account', atualizarAdAccount);
 router.get('/clientes/:id/plano', getPlanoCliente);
 router.get('/stats', getStats);
 

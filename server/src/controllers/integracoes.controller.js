@@ -269,8 +269,18 @@ async function conectarMeta(req, res) {
 
   const integracao = await prisma.metaIntegracao.upsert({
     where: { imobiliariaId: req.imobiliariaId },
-    update: { pageId: pageId.trim(), pageToken: pageToken.trim(), ativo: true },
-    create: { imobiliariaId: req.imobiliariaId, pageId: pageId.trim(), pageToken: pageToken.trim() },
+    update: {
+      pageId: pageId.trim(),
+      pageToken: pageToken.trim(),
+      ativo: true,
+      adsToken: process.env.META_SYSTEM_USER_TOKEN,
+    },
+    create: {
+      imobiliariaId: req.imobiliariaId,
+      pageId: pageId.trim(),
+      pageToken: pageToken.trim(),
+      adsToken: process.env.META_SYSTEM_USER_TOKEN,
+    },
   });
 
   res.json({ success: true, pageId: integracao.pageId });
@@ -278,8 +288,12 @@ async function conectarMeta(req, res) {
 
 // DELETE /api/integracoes/meta/desconectar
 async function desconectarMeta(req, res) {
-  await prisma.metaIntegracao.deleteMany({
+  // pageId e pageToken são colunas obrigatórias no schema (não aceitam null), então não são
+  // zerados aqui — apenas ativo:false, que já é o que statusMeta e o webhook usam para tratar
+  // a integração como desconectada. adAccountId e adsToken ficam intactos para a reconexão.
+  await prisma.metaIntegracao.updateMany({
     where: { imobiliariaId: req.imobiliariaId },
+    data: { ativo: false },
   });
   res.json({ success: true });
 }

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAdminAuth } from '../../context/AdminAuthContext'
 import {
   getStats, getClientes, criarCliente,
-  atualizarPlano, atualizarPermissoes, atualizarLimiteAcessos,
+  atualizarPlano, atualizarPermissoes, atualizarLimiteAcessos, atualizarAdAccount,
 } from '../../api/admin'
 
 // ─── helpers ────────────────────────────────────────────────────────────────
@@ -212,6 +212,10 @@ function ModalGerenciar({ cliente, onClose, onAtualizado }) {
   const [limite, setLimite] = useState(cliente.limiteAcessos ?? 5)
   const [salvandoLimite, setSalvandoLimite] = useState(false)
 
+  // ── ad account (Meta) ──
+  const [adAccountId, setAdAccountId] = useState(cliente.adAccountId ?? '')
+  const [salvandoAdAccount, setSalvandoAdAccount] = useState(false)
+
   // ── feedback ──
   const [msg, setMsg] = useState({ texto: '', erro: false })
 
@@ -262,6 +266,20 @@ function ModalGerenciar({ cliente, onClose, onAtualizado }) {
       feedback(err.response?.data?.error || 'Erro ao atualizar limite', true)
     } finally {
       setSalvandoLimite(false)
+    }
+  }
+
+  const salvarAdAccount = async () => {
+    setSalvandoAdAccount(true)
+    try {
+      const res = await atualizarAdAccount(cliente.id, { adAccountId })
+      setAdAccountId(res.data.adAccountId)
+      onAtualizado()
+      feedback('ID da conta de anúncios salvo')
+    } catch (err) {
+      feedback(err.response?.data?.error || 'Erro ao salvar ID da conta de anúncios', true)
+    } finally {
+      setSalvandoAdAccount(false)
     }
   }
 
@@ -382,6 +400,25 @@ function ModalGerenciar({ cliente, onClose, onAtualizado }) {
 
           <SaveButton onClick={salvarLimite} loading={salvandoLimite}>
             Salvar limite
+          </SaveButton>
+        </Section>
+
+        {/* ── Seção Meta Ads ── */}
+        <Section title="META ADS">
+          <div>
+            <label className="block text-xs mb-1.5" style={{ color: '#64748B' }}>ID da Conta de Anúncios (Meta)</label>
+            <input
+              type="text"
+              value={adAccountId}
+              onChange={(e) => setAdAccountId(e.target.value)}
+              placeholder="act_1234567890"
+              className="w-full rounded-lg px-3 py-2.5 text-sm outline-none"
+              style={inputStyle}
+            />
+          </div>
+
+          <SaveButton onClick={salvarAdAccount} loading={salvandoAdAccount}>
+            Salvar ID da conta de anúncios
           </SaveButton>
         </Section>
 

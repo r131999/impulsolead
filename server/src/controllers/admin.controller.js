@@ -52,6 +52,7 @@ async function listarClientes(req, res) {
       limiteAcessos: true,
       permissoes: true,
       criadoEm: true,
+      metaIntegracao: { select: { adAccountId: true } },
       _count: {
         select: {
           leads: true,
@@ -83,6 +84,7 @@ async function listarClientes(req, res) {
       limiteAcessos: imob.limiteAcessos,
       permissoes: imob.permissoes,
       criadoEm: imob.criadoEm,
+      adAccountId: imob.metaIntegracao?.adAccountId ?? null,
       totalLeads: imob._count.leads,
       totalCorretores: imob._count.corretores,
       totalUsuarios: imob._count.usuarios,
@@ -185,6 +187,38 @@ async function atualizarLimiteAcessos(req, res) {
     data: { limiteAcessos },
   });
   res.json({ id: atualizado.id, limiteAcessos: atualizado.limiteAcessos });
+}
+
+// ── atualizarAdAccount ────────────────────────────────────────────────────────
+
+async function atualizarAdAccount(req, res) {
+  const { id } = req.params;
+  const { adAccountId } = req.body;
+
+  if (typeof adAccountId !== 'string' || !adAccountId.trim()) {
+    return res.status(400).json({ error: 'ID de conta de anúncios inválido' });
+  }
+
+  const digitos = adAccountId.trim().replace(/^act_/, '');
+  if (!/^\d+$/.test(digitos)) {
+    return res.status(400).json({ error: 'ID de conta de anúncios inválido' });
+  }
+  const normalizado = `act_${digitos}`;
+
+  const imobiliaria = await prisma.imobiliaria.findUnique({ where: { id } });
+  if (!imobiliaria) return res.status(404).json({ error: 'Imobiliária não encontrada' });
+
+  const integracao = await prisma.metaIntegracao.findUnique({ where: { imobiliariaId: id } });
+  if (!integracao) {
+    return res.status(400).json({ error: 'A integração Meta precisa ser conectada antes de cadastrar o ID da conta de anúncios' });
+  }
+
+  const atualizado = await prisma.metaIntegracao.update({
+    where: { imobiliariaId: id },
+    data: { adAccountId: normalizado },
+  });
+
+  res.json({ id: atualizado.imobiliariaId, adAccountId: atualizado.adAccountId });
 }
 
 // ── getPlanoCliente ───────────────────────────────────────────────────────────
@@ -357,6 +391,7 @@ module.exports = {
   atualizarPlano,
   atualizarPermissoes,
   atualizarLimiteAcessos,
+  atualizarAdAccount,
   getPlanoCliente,
   criarCliente,
   getStats,
