@@ -310,13 +310,15 @@ export default function ApresentacaoPublica() {
       {/* ── SOBRE ─────────────────────────────────────────────────────────── */}
       {ap.descricao && (
         <section style={{ background: '#0d0d0d', padding: '60px 0', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-          <div style={{ maxWidth: 760, margin: '0 auto', padding: '0 20px' }}>
-            <h2 style={{ color: 'rgba(255,255,255,0.9)', fontSize: 'clamp(1.2rem, 3vw, 1.6rem)', fontWeight: 300, marginBottom: 24, letterSpacing: '0.02em' }}>
-              Sobre o imóvel
-            </h2>
-            <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: 16, lineHeight: 1.85, fontWeight: 300, margin: 0, whiteSpace: 'pre-line' }}>
-              {ap.descricao}
-            </p>
+          <div style={{ maxWidth: 1100, margin: '0 auto', padding: '0 20px' }}>
+            <div style={{ maxWidth: 760 }}>
+              <h2 style={{ color: 'rgba(255,255,255,0.9)', fontSize: 'clamp(1.2rem, 3vw, 1.6rem)', fontWeight: 300, marginBottom: 24, letterSpacing: '0.02em' }}>
+                Sobre o imóvel
+              </h2>
+              <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: 16, lineHeight: 1.85, fontWeight: 300, margin: 0, whiteSpace: 'pre-line' }}>
+                {ap.descricao}
+              </p>
+            </div>
           </div>
         </section>
       )}
