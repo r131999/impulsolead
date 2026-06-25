@@ -55,6 +55,7 @@ async function listar(req, res) {
 async function criar(req, res) {
   try {
     const { nomeImóvel, nomeLocal, descricao, valor, quartos, banheiros, vagas, areaM2,
+            estado, cidade, bairro, rua, numero, latitude, longitude,
             nomeLeadPersonalizado, whatsappCorretor, nomeCorretor, publicado } = req.body;
 
     if (!nomeImóvel?.trim()) return res.status(400).json({ error: 'Nome do imóvel é obrigatório' });
@@ -76,6 +77,13 @@ async function criar(req, res) {
         banheiros: banheiros ? Number(banheiros) : null,
         vagas: vagas ? Number(vagas) : null,
         areaM2: areaM2 ? parseFloat(areaM2) : null,
+        estado: estado?.trim() || null,
+        cidade: cidade?.trim() || null,
+        bairro: bairro?.trim() || null,
+        rua: rua?.trim() || null,
+        numero: numero?.trim() || null,
+        latitude: latitude !== undefined && latitude !== null && latitude !== '' ? parseFloat(latitude) : null,
+        longitude: longitude !== undefined && longitude !== null && longitude !== '' ? parseFloat(longitude) : null,
         slug,
         publicado: publicado === true || publicado === 'true',
         nomeLeadPersonalizado: nomeLeadPersonalizado?.trim() || null,
@@ -114,6 +122,7 @@ async function atualizar(req, res) {
     if (!ap) return res.status(404).json({ error: 'Apresentação não encontrada' });
 
     const { nomeImóvel, nomeLocal, descricao, valor, quartos, banheiros, vagas, areaM2,
+            estado, cidade, bairro, rua, numero, latitude, longitude,
             nomeLeadPersonalizado, whatsappCorretor, nomeCorretor, publicado } = req.body;
 
     const atualizado = await prisma.apresentacao.update({
@@ -127,6 +136,13 @@ async function atualizar(req, res) {
         ...(banheiros !== undefined && { banheiros: banheiros ? Number(banheiros) : null }),
         ...(vagas !== undefined && { vagas: vagas ? Number(vagas) : null }),
         ...(areaM2 !== undefined && { areaM2: areaM2 ? parseFloat(areaM2) : null }),
+        ...(estado !== undefined && { estado: estado?.trim() || null }),
+        ...(cidade !== undefined && { cidade: cidade?.trim() || null }),
+        ...(bairro !== undefined && { bairro: bairro?.trim() || null }),
+        ...(rua !== undefined && { rua: rua?.trim() || null }),
+        ...(numero !== undefined && { numero: numero?.trim() || null }),
+        ...(latitude !== undefined && { latitude: latitude !== null && latitude !== '' ? parseFloat(latitude) : null }),
+        ...(longitude !== undefined && { longitude: longitude !== null && longitude !== '' ? parseFloat(longitude) : null }),
         ...(nomeLeadPersonalizado !== undefined && { nomeLeadPersonalizado: nomeLeadPersonalizado?.trim() || null }),
         ...(whatsappCorretor !== undefined && { whatsappCorretor: whatsappCorretor?.trim() || null }),
         ...(nomeCorretor !== undefined && { nomeCorretor: nomeCorretor?.trim() || null }),

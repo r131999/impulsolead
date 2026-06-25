@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
+import { MapContainer, TileLayer, Marker } from 'react-leaflet'
+import 'leaflet/dist/leaflet.css'
+import '../utils/leafletIcon'
 
 const CSS = `
   html { scroll-behavior: smooth; }
@@ -39,6 +42,12 @@ function IcWhatsApp() {
 
 function thumbUrl(url) {
   return url ? url.replace(/\.[^./?#]+$/, '_thumb.jpg') : url;
+}
+
+function montarEndereco(ap) {
+  const linha1 = [[ap.rua, ap.numero].filter(Boolean).join(', '), ap.bairro].filter(Boolean).join(' — ')
+  const linha2 = [ap.cidade, ap.estado].filter(Boolean).join(' - ')
+  return [linha1, linha2].filter(Boolean).join(', ')
 }
 
 export default function ApresentacaoPublica() {
@@ -90,6 +99,8 @@ export default function ApresentacaoPublica() {
     : null
 
   const temCaracteristicas = ap && (ap.quartos || ap.banheiros || ap.vagas || ap.areaM2 || ap.valor)
+  const temLocalizacao = ap && ap.latitude != null && ap.longitude != null
+  const enderecoTexto = ap ? montarEndereco(ap) : ''
 
   const scrollParaGaleria = () => document.getElementById('galeria')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 
@@ -306,6 +317,36 @@ export default function ApresentacaoPublica() {
             <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: 16, lineHeight: 1.85, fontWeight: 300, margin: 0, whiteSpace: 'pre-line' }}>
               {ap.descricao}
             </p>
+          </div>
+        </section>
+      )}
+
+      {/* ── LOCALIZAÇÃO ───────────────────────────────────────────────────── */}
+      {temLocalizacao && (
+        <section style={{ background: '#080808', padding: '60px 0', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+          <div style={{ maxWidth: 1100, margin: '0 auto', padding: '0 20px' }}>
+            <h2 style={{ color: 'rgba(255,255,255,0.9)', fontSize: 'clamp(1.2rem, 3vw, 1.6rem)', fontWeight: 300, marginBottom: 16, letterSpacing: '0.02em' }}>
+              Localização
+            </h2>
+            {enderecoTexto && (
+              <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: 15, marginBottom: 24, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <IcLocal /> {enderecoTexto}
+              </p>
+            )}
+            <div style={{ height: 360, borderRadius: 12, overflow: 'hidden', boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }}>
+              <MapContainer
+                center={[ap.latitude, ap.longitude]}
+                zoom={16}
+                style={{ height: '100%', width: '100%' }}
+                scrollWheelZoom
+              >
+                <TileLayer
+                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                />
+                <Marker position={[ap.latitude, ap.longitude]} />
+              </MapContainer>
+            </div>
           </div>
         </section>
       )}

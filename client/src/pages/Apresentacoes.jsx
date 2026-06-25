@@ -1,7 +1,19 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet'
+import 'leaflet/dist/leaflet.css'
+import '../utils/leafletIcon'
 import * as apApi from '../api/apresentacao'
 import { usePermissao } from '../hooks/usePermissao'
+
+const CENTRO_BRASIL = [-14.235, -51.9253]
+
+function MapClickHandler({ onPick }) {
+  useMapEvents({
+    click(e) { onPick(e.latlng.lat, e.latlng.lng) },
+  })
+  return null
+}
 
 function formatarData(iso) {
   if (!iso) return ''
@@ -20,6 +32,7 @@ const FORM_VAZIO = {
   nomeImóvel: '', nomeLeadPersonalizado: '', descricao: '', valor: '',
   quartos: '', banheiros: '', vagas: '', areaM2: '', nomeLocal: '',
   whatsappCorretor: '', nomeCorretor: '', publicado: false,
+  estado: '', cidade: '', bairro: '', rua: '', numero: '', latitude: null, longitude: null,
 }
 
 function ModalApresentacao({ ap, onSalvo, onClose }) {
@@ -37,11 +50,76 @@ function ModalApresentacao({ ap, onSalvo, onClose }) {
     whatsappCorretor: ap.whatsappCorretor || '',
     nomeCorretor: ap.nomeCorretor || '',
     publicado: ap.publicado || false,
+    estado: ap.estado || '',
+    cidade: ap.cidade || '',
+    bairro: ap.bairro || '',
+    rua: ap.rua || '',
+    numero: ap.numero || '',
+    latitude: ap.latitude ?? null,
+    longitude: ap.longitude ?? null,
   } : FORM_VAZIO)
   const [salvando, setSalvando] = useState(false)
   const [erro, setErro] = useState('')
+  const [estados, setEstados] = useState([])
+  const [municipios, setMunicipios] = useState([])
+  const [loadingMunicipios, setLoadingMunicipios] = useState(false)
+  const [buscandoMapa, setBuscandoMapa] = useState(false)
+  const [erroMapa, setErroMapa] = useState('')
+  const mapRef = useRef(null)
 
   const set = (k, v) => setForm((p) => ({ ...p, [k]: v }))
+
+  useEffect(() => {
+    fetch('https://servicodados.ibge.gov.br/api/v1/localidades/estados?orderBy=nome')
+      .then((r) => r.json())
+      .then((data) => setEstados(Array.isArray(data) ? data : []))
+      .catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    if (!form.estado) { setMunicipios([]); return }
+    setLoadingMunicipios(true)
+    fetch(`https://servicodados.ibge.gov.br/api/v1/localidades/estados/${form.estado}/municipios?orderBy=nome`)
+      .then((r) => r.json())
+      .then((data) => setMunicipios(Array.isArray(data) ? data : []))
+      .catch(() => setMunicipios([]))
+      .finally(() => setLoadingMunicipios(false))
+  }, [form.estado])
+
+  const handlePick = (lat, lng) => {
+    set('latitude', lat)
+    set('longitude', lng)
+  }
+
+  const buscarNoMapa = async () => {
+    const partes = [
+      [form.rua, form.numero].filter(Boolean).join(' '),
+      form.bairro,
+      form.cidade,
+      form.estado,
+      'Brasil',
+    ].filter(Boolean)
+    if (partes.length === 0) return setErroMapa('Informe pelo menos o estado ou a cidade')
+    setErroMapa('')
+    setBuscandoMapa(true)
+    try {
+      const query = encodeURIComponent(partes.join(', '))
+      const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${query}`)
+      const data = await res.json()
+      if (data?.[0]) {
+        const lat = parseFloat(data[0].lat)
+        const lng = parseFloat(data[0].lon)
+        handlePick(lat, lng)
+        mapRef.current?.setView([lat, lng], 16)
+      } else {
+        setErroMapa('Endereço não encontrado. Ajuste o pin manualmente no mapa.')
+      }
+    } catch {
+      setErroMapa('Erro ao buscar endereço no mapa')
+    } finally {
+      setBuscandoMapa(false)
+    }
+  }
 
   const handleWhats = (e) => set('whatsappCorretor', e.target.value.replace(/\D/g, '').slice(0, 13))
 
@@ -110,6 +188,80 @@ function ModalApresentacao({ ap, onSalvo, onClose }) {
               </div>
             ))}
           </div>
+
+          <div className="pt-2" style={{ borderTop: '1px solid #1E293B' }}>
+            <p className="text-xs font-semibold mb-2" style={{ color: '#94A3B8' }}>📍 Localização (opcional)</p>
+            <div className="grid grid-cols-2 gap-3 mb-3">
+              <div>
+                <label className="text-xs font-medium block mb-1" style={{ color: '#94A3B8' }}>Estado</label>
+                <select className="input w-full" value={form.estado} onChange={(e) => { set('estado', e.target.value); set('cidade', '') }}>
+                  <option value="">Selecione...</option>
+                  {estados.map((uf) => <option key={uf.id} value={uf.sigla}>{uf.nome}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-medium block mb-1" style={{ color: '#94A3B8' }}>Município</label>
+                <select className="input w-full" value={form.cidade} disabled={!form.estado || loadingMunicipios} onChange={(e) => set('cidade', e.target.value)}>
+                  <option value="">{form.estado ? 'Selecione...' : 'Escolha o estado primeiro'}</option>
+                  {municipios.map((m) => <option key={m.id} value={m.nome}>{m.nome}</option>)}
+                </select>
+              </div>
+            </div>
+            <div className="mb-3">
+              <label className="text-xs font-medium block mb-1" style={{ color: '#94A3B8' }}>Bairro</label>
+              <input className="input w-full" value={form.bairro} onChange={(e) => set('bairro', e.target.value)} placeholder="Ex: Jardins" />
+            </div>
+            <div className="grid grid-cols-3 gap-3 mb-3">
+              <div className="col-span-2">
+                <label className="text-xs font-medium block mb-1" style={{ color: '#94A3B8' }}>Rua/Avenida</label>
+                <input className="input w-full" value={form.rua} onChange={(e) => set('rua', e.target.value)} placeholder="Ex: Av. Paulista" />
+              </div>
+              <div>
+                <label className="text-xs font-medium block mb-1" style={{ color: '#94A3B8' }}>Número</label>
+                <input className="input w-full" value={form.numero} onChange={(e) => set('numero', e.target.value)} placeholder="—" />
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={buscarNoMapa}
+              disabled={buscandoMapa}
+              className="text-xs px-3 py-2 rounded-lg mb-2 disabled:opacity-50"
+              style={{ backgroundColor: 'rgba(99,102,241,0.15)', color: '#818cf8' }}
+            >
+              {buscandoMapa ? 'Buscando...' : '🔍 Buscar no mapa'}
+            </button>
+            {erroMapa && <p className="text-xs mb-2" style={{ color: '#EF4444' }}>{erroMapa}</p>}
+            <p className="text-xs mb-2" style={{ color: '#64748B' }}>Clique no mapa para marcar o ponto exato do imóvel. Arraste o pin para ajustar.</p>
+
+            <div style={{ height: 240, borderRadius: 8, overflow: 'hidden' }}>
+              <MapContainer
+                ref={mapRef}
+                center={form.latitude != null && form.longitude != null ? [form.latitude, form.longitude] : CENTRO_BRASIL}
+                zoom={form.latitude != null && form.longitude != null ? 16 : 4}
+                style={{ height: '100%', width: '100%' }}
+              >
+                <TileLayer
+                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                />
+                <MapClickHandler onPick={handlePick} />
+                {form.latitude != null && form.longitude != null && (
+                  <Marker
+                    position={[form.latitude, form.longitude]}
+                    draggable
+                    eventHandlers={{
+                      dragend: (e) => {
+                        const { lat, lng } = e.target.getLatLng()
+                        handlePick(lat, lng)
+                      },
+                    }}
+                  />
+                )}
+              </MapContainer>
+            </div>
+          </div>
+
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs font-medium block mb-1" style={{ color: '#94A3B8' }}>Nome do corretor</label>

@@ -448,6 +448,13 @@ model Apresentacao {
   banheiros             Int?
   vagas                 Int?
   areaM2                Float?
+  estado                String?
+  cidade                String?
+  bairro                String?
+  rua                   String?
+  numero                String?
+  latitude              Float?
+  longitude             Float?
   slug                  String             @unique
   publicado             Boolean            @default(false)
   nomeLeadPersonalizado String?
