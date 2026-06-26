@@ -42,6 +42,7 @@ model Imobiliaria {
   sessoesAgente          SessaoAgente[]
   historicosDistribuicao HistoricoDistribuicao[]
   arquivosImovel         ArquivoImovel[]
+  empreendimentos        Empreendimento[]
   mensagensLead          MensagemLead[]
   whatsappInstancia      WhatsappInstancia?
   metaIntegracao         MetaIntegracao?
@@ -327,19 +328,36 @@ model HistoricoDistribuicao {
   imobiliaria   Imobiliaria @relation(fields: [imobiliariaId], references: [id])
 }
 
-model ArquivoImovel {
-  id           String   @id @default(uuid())
-  nome         String
-  tipo         String // "foto", "video", "pdf"
-  filename     String
-  mimetype     String
-  tamanho      Int
-  criadoPorId  String
-  criadoEm     DateTime @default(now())
-  atualizadoEm DateTime @updatedAt
-
+model Empreendimento {
+  id            String          @id @default(uuid())
+  nome          String
+  descricao     String?
   imobiliariaId String
-  imobiliaria   Imobiliaria @relation(fields: [imobiliariaId], references: [id])
+  imobiliaria   Imobiliaria     @relation(fields: [imobiliariaId], references: [id])
+  criadoPorId   String
+  criadoEm      DateTime        @default(now())
+  atualizadoEm  DateTime        @updatedAt
+  arquivos      ArquivoImovel[]
+}
+
+model ArquivoImovel {
+  id                String          @id @default(uuid())
+  nome              String
+  tipo              String          // "foto", "video", "pdf" — mantido para retrocompat
+  filename          String
+  mimetype          String
+  tamanho           Int
+  criadoPorId       String
+  criadoEm          DateTime        @default(now())
+  atualizadoEm      DateTime        @updatedAt
+
+  imobiliariaId     String
+  imobiliaria       Imobiliaria     @relation(fields: [imobiliariaId], references: [id])
+
+  empreendimentoId  String?
+  empreendimento    Empreendimento? @relation(fields: [empreendimentoId], references: [id])
+
+  categoria         String?         // "foto", "video", "book"
 
   mensagens MensagemLead[]
 }

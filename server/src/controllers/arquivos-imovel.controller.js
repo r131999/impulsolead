@@ -23,14 +23,27 @@ const storage = multer.diskStorage({
   },
 });
 
-const ALLOWED_MIMETYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'video/mp4', 'video/quicktime', 'application/pdf'];
-const ALLOWED_EXTS = ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.mp4', '.mov', '.pdf'];
+const ALLOWED_MIMETYPES = [
+  'image/jpeg', 'image/png', 'image/webp', 'image/gif',
+  'video/mp4', 'video/quicktime',
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+];
+const ALLOWED_EXTS = ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.mp4', '.mov', '.pdf', '.doc', '.docx', '.xls', '.xlsx'];
+const BOOK_EXTS   = ['.pdf', '.doc', '.docx', '.xls', '.xlsx'];
 
 const MIMETYPE_MAP = {
   '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png',
   '.webp': 'image/webp', '.gif': 'image/gif',
   '.mp4': 'video/mp4', '.mov': 'video/quicktime',
   '.pdf': 'application/pdf',
+  '.doc':  'application/msword',
+  '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  '.xls':  'application/vnd.ms-excel',
+  '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
 };
 
 const upload = multer({
@@ -38,10 +51,12 @@ const upload = multer({
   limits: { fileSize: 100 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
     const ext = path.extname(file.originalname).toLowerCase();
+    // Para arquivos office/book, o navegador pode enviar mimetype impreciso — confiar na extensão
+    if (BOOK_EXTS.includes(ext)) return cb(null, true);
     if (ALLOWED_MIMETYPES.includes(file.mimetype) && ALLOWED_EXTS.includes(ext)) {
       return cb(null, true);
     }
-    cb(new Error('Tipo de arquivo não permitido. Use: JPG, PNG, WebP, GIF, MP4, MOV, PDF'));
+    cb(new Error('Tipo de arquivo não permitido. Use: JPG, PNG, WebP, GIF, MP4, MOV, PDF, DOC, DOCX, XLS, XLSX'));
   },
 }).single('arquivo');
 
@@ -58,6 +73,14 @@ function handleUpload(req, res, next) {
   });
 }
 
+async function validarEmpreendimento(empreendimentoId, imobiliariaId) {
+  if (!empreendimentoId) return null;
+  const emp = await prisma.empreendimento.findFirst({
+    where: { id: empreendimentoId, imobiliariaId },
+  });
+  return emp || false; // false = não encontrado
+}
+
 async function enviar(req, res) {
   handleUpload(req, res, async () => {
     try {
@@ -65,7 +88,7 @@ async function enviar(req, res) {
         return res.status(400).json({ error: 'Arquivo é obrigatório' });
       }
 
-      const { nome, tipo } = req.body;
+      const { nome, tipo, empreendimentoId, categoria } = req.body;
       if (!nome?.trim()) {
         fs.unlink(req.file.path, () => {});
         return res.status(400).json({ error: 'Campo obrigatório: nome' });
@@ -77,6 +100,14 @@ async function enviar(req, res) {
         return res.status(400).json({ error: 'Tipo inválido. Use: foto, video, pdf' });
       }
 
+      if (empreendimentoId) {
+        const emp = await validarEmpreendimento(empreendimentoId, req.imobiliariaId);
+        if (emp === false) {
+          fs.unlink(req.file.path, () => {});
+          return res.status(400).json({ error: 'Empreendimento não encontrado' });
+        }
+      }
+
       const arquivo = await prisma.arquivoImovel.create({
         data: {
           nome: nome.trim(),
@@ -86,6 +117,8 @@ async function enviar(req, res) {
           tamanho: req.file.size,
           criadoPorId: req.corretorId || req.usuario?.id,
           imobiliariaId: req.imobiliariaId,
+          empreendimentoId: empreendimentoId || null,
+          categoria: categoria || null,
         },
       });
 
@@ -156,7 +189,7 @@ async function receberChunk(req, res) {
 
 async function finalizarChunk(req, res) {
   try {
-    const { uploadId, fileName, nome, tipo, totalChunks } = req.body;
+    const { uploadId, fileName, nome, tipo, totalChunks, empreendimentoId, categoria } = req.body;
 
     if (!uploadId || !fileName || !nome?.trim() || !tipo) {
       return res.status(400).json({ error: 'Campos obrigatórios: uploadId, fileName, nome, tipo' });
@@ -174,6 +207,13 @@ async function finalizarChunk(req, res) {
     const ext = path.extname(fileName).toLowerCase();
     if (!ALLOWED_EXTS.includes(ext)) {
       return res.status(400).json({ error: 'Tipo de arquivo não permitido' });
+    }
+
+    if (empreendimentoId) {
+      const emp = await validarEmpreendimento(empreendimentoId, req.imobiliariaId);
+      if (emp === false) {
+        return res.status(400).json({ error: 'Empreendimento não encontrado' });
+      }
     }
 
     const chunkDir = path.join(TMP_DIR, uploadId);
@@ -217,6 +257,8 @@ async function finalizarChunk(req, res) {
         tamanho: stats.size,
         criadoPorId: req.corretorId || req.usuario?.id,
         imobiliariaId: req.imobiliariaId,
+        empreendimentoId: empreendimentoId || null,
+        categoria: categoria || null,
       },
     });
 
@@ -233,9 +275,11 @@ async function finalizarChunk(req, res) {
 
 async function listar(req, res) {
   try {
-    const { tipo } = req.query;
+    const { tipo, empreendimentoId, categoria } = req.query;
     const where = { imobiliariaId: req.imobiliariaId };
     if (tipo) where.tipo = tipo;
+    if (empreendimentoId) where.empreendimentoId = empreendimentoId;
+    if (categoria) where.categoria = categoria;
 
     const arquivos = await prisma.arquivoImovel.findMany({
       where,
