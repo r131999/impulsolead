@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
 import * as arquivosApi from '../api/arquivos-imovel'
+import * as empreendimentosApi from '../api/empreendimentos'
 
-const FILTROS = [
-  { key: 'todos',  label: 'Todos'  },
-  { key: 'foto',   label: 'Fotos'  },
-  { key: 'video',  label: 'Vídeos' },
-  { key: 'pdf',    label: 'PDFs'   },
+const CATEGORIAS = [
+  { key: 'foto',      label: 'Fotos',     icone: '🖼️', desc: 'JPG, PNG, WebP, GIF' },
+  { key: 'video',     label: 'Vídeos',    icone: '🎬', desc: 'MP4, MOV' },
+  { key: 'book',      label: 'Books',     icone: '📚', desc: 'PDF, Word, Excel' },
+  { key: 'descricao', label: 'Descrição', icone: '📝', desc: 'Texto descritivo' },
 ]
 
 function formatarTamanho(bytes) {
@@ -43,22 +44,82 @@ function IconePDF({ size = 36 }) {
   )
 }
 
-const ICONE_POR_TIPO = { foto: IconeFoto, video: IconeVideo, pdf: IconePDF }
+const ICONE_POR_CATEGORIA = { foto: IconeFoto, video: IconeVideo, book: IconePDF }
+
+function BotaoVoltar({ onClick }) {
+  return (
+    <button
+      onClick={onClick}
+      className="p-1.5 rounded-lg flex-shrink-0 text-sm font-medium"
+      style={{ backgroundColor: '#1E293B', color: '#94A3B8' }}
+      onMouseEnter={(e) => { e.currentTarget.style.color = '#F1F5F9' }}
+      onMouseLeave={(e) => { e.currentTarget.style.color = '#94A3B8' }}
+    >
+      ← Voltar
+    </button>
+  )
+}
 
 export default function MateriaisCorretor() {
+  // Navegação
+  const [nivel, setNivel] = useState('empreendimentos') // 'empreendimentos' | 'categorias' | 'arquivos' | 'descricao'
+  const [empreendimentoAtual, setEmpreendimentoAtual] = useState(null)
+  const [categoriaAtual, setCategoriaAtual] = useState(null)
+
+  // Dados
+  const [empreendimentos, setEmpreendimentos] = useState([])
+  const [loadingEmps, setLoadingEmps] = useState(true)
   const [arquivos, setArquivos] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [filtro, setFiltro] = useState('todos')
+  const [loadingArquivos, setLoadingArquivos] = useState(false)
+
+  // Download
   const [baixando, setBaixando] = useState(null)
   const [progressoBaixando, setProgressoBaixando] = useState(0)
   const [erroDownload, setErroDownload] = useState('')
 
   useEffect(() => {
-    arquivosApi.listar()
-      .then((res) => setArquivos(res.data.arquivos || []))
+    empreendimentosApi.listar()
+      .then((res) => setEmpreendimentos(res.data.empreendimentos || []))
       .catch(() => {})
-      .finally(() => setLoading(false))
+      .finally(() => setLoadingEmps(false))
   }, [])
+
+  // ── Navegação ─────────────────────────────────────────────────────────────────
+
+  const abrirEmpreendimento = (emp) => {
+    setEmpreendimentoAtual(emp)
+    setCategoriaAtual(null)
+    setNivel('categorias')
+  }
+
+  const abrirCategoria = (cat) => {
+    if (cat === 'descricao') {
+      setNivel('descricao')
+    } else {
+      setCategoriaAtual(cat)
+      setNivel('arquivos')
+      setLoadingArquivos(true)
+      arquivosApi.listar({ empreendimentoId: empreendimentoAtual.id, categoria: cat })
+        .then((res) => setArquivos(res.data.arquivos || []))
+        .catch(() => {})
+        .finally(() => setLoadingArquivos(false))
+    }
+  }
+
+  const voltarParaEmpreendimentos = () => {
+    setNivel('empreendimentos')
+    setEmpreendimentoAtual(null)
+    setCategoriaAtual(null)
+  }
+
+  const voltarParaCategorias = () => {
+    setNivel('categorias')
+    setCategoriaAtual(null)
+    setArquivos([])
+    setErroDownload('')
+  }
+
+  // ── Download ──────────────────────────────────────────────────────────────────
 
   const baixarArquivo = async (arquivo) => {
     setBaixando(arquivo.id)
@@ -102,44 +163,165 @@ export default function MateriaisCorretor() {
     }
   }
 
-  const filtrados = filtro === 'todos' ? arquivos : arquivos.filter((a) => a.tipo === filtro)
+  const catLabel = CATEGORIAS.find((c) => c.key === categoriaAtual)?.label
+
+  // ── Nível 1: Empreendimentos ──────────────────────────────────────────────────
+
+  if (nivel === 'empreendimentos') {
+    return (
+      <div className="flex flex-col h-full">
+        <div
+          className="px-4 py-3 md:px-6 md:py-4 flex-shrink-0"
+          style={{ borderBottom: '1px solid #1E293B', backgroundColor: '#111827' }}
+        >
+          <h1 className="text-lg md:text-xl font-bold" style={{ color: '#F1F5F9' }}>
+            📁 Materiais de Vendas
+          </h1>
+          <p className="text-xs md:text-sm mt-0.5" style={{ color: '#94A3B8' }}>
+            Baixe fotos, vídeos e documentos dos empreendimentos
+          </p>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-4">
+          {loadingEmps && (
+            <div className="flex justify-center items-center h-40">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-500" />
+            </div>
+          )}
+
+          {!loadingEmps && empreendimentos.length === 0 && (
+            <div className="flex flex-col items-center justify-center h-40 gap-3">
+              <span style={{ fontSize: 36 }}>📂</span>
+              <p className="text-sm" style={{ color: '#64748B' }}>Nenhum material disponível ainda.</p>
+            </div>
+          )}
+
+          {!loadingEmps && empreendimentos.length > 0 && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {empreendimentos.map((emp) => (
+                <div
+                  key={emp.id}
+                  className="rounded-xl p-4 flex items-center gap-3 cursor-pointer transition-colors"
+                  style={{ backgroundColor: '#111827', border: '1px solid #1E293B' }}
+                  onClick={() => abrirEmpreendimento(emp)}
+                  onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'rgba(99,102,241,0.3)' }}
+                  onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#1E293B' }}
+                >
+                  <span style={{ fontSize: 26, flexShrink: 0 }}>🏢</span>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold truncate" style={{ color: '#F1F5F9' }}>{emp.nome}</p>
+                    <p className="text-xs mt-0.5" style={{ color: '#64748B' }}>
+                      {emp._count?.arquivos ?? 0} arquivo{(emp._count?.arquivos ?? 0) !== 1 ? 's' : ''}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  // ── Nível 2: Categorias ───────────────────────────────────────────────────────
+
+  if (nivel === 'categorias') {
+    return (
+      <div className="flex flex-col h-full">
+        <div
+          className="px-4 py-3 md:px-6 md:py-4 flex items-center gap-3 flex-shrink-0"
+          style={{ borderBottom: '1px solid #1E293B', backgroundColor: '#111827' }}
+        >
+          <BotaoVoltar onClick={voltarParaEmpreendimentos} />
+          <div className="min-w-0">
+            <p className="text-xs" style={{ color: '#64748B' }}>
+              Materiais de Vendas › <span style={{ color: '#94A3B8' }}>{empreendimentoAtual?.nome}</span>
+            </p>
+            <h1 className="text-lg font-bold truncate" style={{ color: '#F1F5F9' }}>
+              {empreendimentoAtual?.nome}
+            </h1>
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-4">
+          <div className="grid grid-cols-2 gap-3">
+            {CATEGORIAS.map((cat) => (
+              <button
+                key={cat.key}
+                onClick={() => abrirCategoria(cat.key)}
+                className="rounded-xl p-5 flex flex-col items-center gap-3 text-center transition-colors"
+                style={{ backgroundColor: '#111827', border: '1px solid #1E293B' }}
+                onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'rgba(99,102,241,0.3)' }}
+                onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#1E293B' }}
+              >
+                <span style={{ fontSize: 32 }}>{cat.icone}</span>
+                <div>
+                  <p className="text-sm font-semibold" style={{ color: '#F1F5F9' }}>{cat.label}</p>
+                  <p className="text-xs mt-0.5" style={{ color: '#64748B' }}>{cat.desc}</p>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // ── Nível 3b: Descrição (somente leitura) ─────────────────────────────────────
+
+  if (nivel === 'descricao') {
+    return (
+      <div className="flex flex-col h-full">
+        <div
+          className="px-4 py-3 md:px-6 md:py-4 flex items-center gap-3 flex-shrink-0"
+          style={{ borderBottom: '1px solid #1E293B', backgroundColor: '#111827' }}
+        >
+          <BotaoVoltar onClick={voltarParaCategorias} />
+          <div className="min-w-0">
+            <p className="text-xs" style={{ color: '#64748B' }}>
+              Materiais de Vendas › {empreendimentoAtual?.nome} › <span style={{ color: '#94A3B8' }}>Descrição</span>
+            </p>
+            <h1 className="text-lg font-bold" style={{ color: '#F1F5F9' }}>Descrição</h1>
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-4">
+          <div
+            className="rounded-xl p-4"
+            style={{ backgroundColor: '#111827', border: '1px solid #1E293B' }}
+          >
+            {empreendimentoAtual?.descricao ? (
+              <p className="text-sm leading-relaxed whitespace-pre-wrap" style={{ color: '#CBD5E1' }}>
+                {empreendimentoAtual.descricao}
+              </p>
+            ) : (
+              <p className="text-sm" style={{ color: '#475569' }}>Sem descrição cadastrada.</p>
+            )}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // ── Nível 3a: Arquivos de uma categoria ───────────────────────────────────────
+
+  const Icone = ICONE_POR_CATEGORIA[categoriaAtual] || IconePDF
 
   return (
     <div className="flex flex-col h-full">
-      {/* Header */}
       <div
-        className="px-4 py-3 md:px-6 md:py-4 flex-shrink-0"
+        className="px-4 py-3 md:px-6 md:py-4 flex items-center gap-3 flex-shrink-0"
         style={{ borderBottom: '1px solid #1E293B', backgroundColor: '#111827' }}
       >
-        <h1 className="text-lg md:text-xl font-bold" style={{ color: '#F1F5F9' }}>
-          📁 Materiais de Vendas
-        </h1>
-        <p className="text-xs md:text-sm mt-0.5" style={{ color: '#94A3B8' }}>
-          Baixe fotos, vídeos e documentos dos empreendimentos
-        </p>
+        <BotaoVoltar onClick={voltarParaCategorias} />
+        <div className="min-w-0">
+          <p className="text-xs" style={{ color: '#64748B' }}>
+            Materiais de Vendas › {empreendimentoAtual?.nome} › <span style={{ color: '#94A3B8' }}>{catLabel}</span>
+          </p>
+          <h1 className="text-lg font-bold" style={{ color: '#F1F5F9' }}>{catLabel}</h1>
+        </div>
       </div>
 
-      {/* Filtros */}
-      <div
-        className="px-4 py-3 flex gap-2 flex-wrap flex-shrink-0"
-        style={{ borderBottom: '1px solid #1E293B', backgroundColor: '#0F172A' }}
-      >
-        {FILTROS.map(({ key, label }) => (
-          <button
-            key={key}
-            onClick={() => setFiltro(key)}
-            className="px-3 py-1 rounded-full text-xs font-medium transition-colors"
-            style={{
-              backgroundColor: filtro === key ? 'rgba(99,102,241,0.25)' : '#1E293B',
-              color: filtro === key ? '#818cf8' : '#64748B',
-            }}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-
-      {/* Erro de download */}
       {erroDownload && (
         <div
           className="mx-4 mt-3 p-3 rounded-lg flex items-center justify-between flex-shrink-0"
@@ -156,80 +338,65 @@ export default function MateriaisCorretor() {
         </div>
       )}
 
-      {/* Conteúdo */}
       <div className="flex-1 overflow-y-auto p-4">
-        {loading && (
+        {loadingArquivos && (
           <div className="flex justify-center items-center h-40">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-500" />
           </div>
         )}
 
-        {!loading && filtrados.length === 0 && (
+        {!loadingArquivos && arquivos.length === 0 && (
           <div className="flex flex-col items-center justify-center h-40 gap-3">
             <span style={{ fontSize: 36 }}>📂</span>
-            <p className="text-sm" style={{ color: '#64748B' }}>
-              {filtro === 'todos'
-                ? 'Nenhum material disponível ainda.'
-                : 'Nenhum arquivo deste tipo.'}
-            </p>
+            <p className="text-sm" style={{ color: '#64748B' }}>Nenhum arquivo nesta categoria.</p>
           </div>
         )}
 
-        {!loading && filtrados.length > 0 && (
+        {!loadingArquivos && arquivos.length > 0 && (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-            {filtrados.map((a) => {
-              const Icone = ICONE_POR_TIPO[a.tipo] || IconePDF
-              return (
+            {arquivos.map((a) => (
+              <div
+                key={a.id}
+                className="rounded-xl p-4 flex flex-col gap-2"
+                style={{ backgroundColor: '#111827', border: '1px solid #1E293B' }}
+              >
                 <div
-                  key={a.id}
-                  className="rounded-xl p-4 flex flex-col gap-2"
-                  style={{ backgroundColor: '#111827', border: '1px solid #1E293B' }}
+                  className="flex items-center justify-center rounded-lg mb-1"
+                  style={{ height: 64, backgroundColor: '#0B1120' }}
                 >
-                  {/* Ícone */}
-                  <div
-                    className="flex items-center justify-center rounded-lg mb-1"
-                    style={{ height: 64, backgroundColor: '#0B1120' }}
-                  >
-                    <Icone size={36} />
-                  </div>
-
-                  {/* Info */}
-                  <div className="min-w-0">
-                    <p
-                      className="text-sm font-semibold truncate leading-tight"
-                      style={{ color: '#F1F5F9' }}
-                      title={a.nome}
-                    >
-                      {a.nome}
-                    </p>
-                    <p className="text-xs mt-0.5" style={{ color: '#64748B' }}>
-                      {formatarTamanho(a.tamanho)}
-                    </p>
-                    <p className="text-xs" style={{ color: '#475569' }}>
-                      {formatarData(a.criadoEm)}
-                    </p>
-                  </div>
-
-                  {/* Botão */}
-                  <button
-                    onClick={() => baixarArquivo(a)}
-                    disabled={baixando === a.id}
-                    className="mt-auto w-full text-xs font-medium py-2 rounded-lg transition-colors disabled:opacity-50"
-                    style={{
-                      backgroundColor: 'rgba(99,102,241,0.15)',
-                      color: '#818cf8',
-                      border: '1px solid rgba(99,102,241,0.25)',
-                    }}
-                    onMouseEnter={(e) => { if (baixando !== a.id) e.currentTarget.style.backgroundColor = 'rgba(99,102,241,0.28)' }}
-                    onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'rgba(99,102,241,0.15)' }}
-                  >
-                    {baixando === a.id
-                      ? `Baixando... ${progressoBaixando > 0 ? progressoBaixando + '%' : ''}`
-                      : '⬇ Baixar'}
-                  </button>
+                  <Icone size={36} />
                 </div>
-              )
-            })}
+
+                <div className="min-w-0">
+                  <p
+                    className="text-sm font-semibold truncate leading-tight"
+                    style={{ color: '#F1F5F9' }}
+                    title={a.nome}
+                  >
+                    {a.nome}
+                  </p>
+                  <p className="text-xs mt-0.5" style={{ color: '#64748B' }}>{formatarTamanho(a.tamanho)}</p>
+                  <p className="text-xs" style={{ color: '#475569' }}>{formatarData(a.criadoEm)}</p>
+                </div>
+
+                <button
+                  onClick={() => baixarArquivo(a)}
+                  disabled={baixando === a.id}
+                  className="mt-auto w-full text-xs font-medium py-2 rounded-lg transition-colors disabled:opacity-50"
+                  style={{
+                    backgroundColor: 'rgba(99,102,241,0.15)',
+                    color: '#818cf8',
+                    border: '1px solid rgba(99,102,241,0.25)',
+                  }}
+                  onMouseEnter={(e) => { if (baixando !== a.id) e.currentTarget.style.backgroundColor = 'rgba(99,102,241,0.28)' }}
+                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'rgba(99,102,241,0.15)' }}
+                >
+                  {baixando === a.id
+                    ? `Baixando... ${progressoBaixando > 0 ? progressoBaixando + '%' : ''}`
+                    : '⬇ Baixar'}
+                </button>
+              </div>
+            ))}
           </div>
         )}
       </div>
