@@ -242,11 +242,12 @@ function FunilVendas({ funil, perdidos, emEspera }) {
 
   const VIEWBOX_W = 400
   const STAGE_H = 48
-  const MIN_W = 70
+  const MIN_W = 40
+  const MAX_W = VIEWBOX_W
   const maxVal = funnelData[0]?.value || 1
 
   const widths = funnelData.map(({ value }) =>
-    Math.max(MIN_W, (value / maxVal) * VIEWBOX_W)
+    MIN_W + (Math.sqrt(value) / Math.sqrt(maxVal)) * (MAX_W - MIN_W)
   )
 
   return (
