@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { FunnelChart, Funnel, Cell, Tooltip, ResponsiveContainer } from 'recharts'
 import { getDashboard, getFunil } from '../api/dashboard'
 import { pendentes as followUpsPendentes, atualizar as atualizarFollowUp } from '../api/followups'
 import { useNavigate } from 'react-router-dom'
@@ -226,74 +227,43 @@ const FUNIL_CONFIG = [
 ]
 
 function FunilVendas({ funil, perdidos }) {
-  const totalGeral = funil.reduce((s, e) => s + e.total, 0) + perdidos
-  const maxVal = Math.max(...funil.map((e) => e.total), 1)
-  const primeiroValor = funil[0]?.total || 0
+  const funnelData = FUNIL_CONFIG.map(({ status, label, cor }, i) => {
+    const value = FUNIL_CONFIG.slice(i).reduce((sum, etapa) => {
+      const found = funil.find((e) => e.status === etapa.status)
+      return sum + (found?.total || 0)
+    }, 0)
+    return { name: label, value, fill: cor }
+  })
 
   return (
     <div className="card mb-6">
       <h2 className="font-semibold mb-5" style={{ color: '#F1F5F9' }}>Funil de Vendas</h2>
-      <div className="space-y-3">
-        {FUNIL_CONFIG.map(({ status, label, cor }) => {
-          const etapa = funil.find((e) => e.status === status)
-          const count = etapa?.total || 0
-          const pctTotal = totalGeral > 0 ? Math.round((count / totalGeral) * 100) : 0
-          const pctConversao = primeiroValor > 0 ? Math.round((count / primeiroValor) * 100) : 0
-          const barWidth = (count / maxVal) * 100
 
-          return (
-            <div key={status} className="flex items-center gap-3">
-              <span
-                className="text-xs font-semibold flex-shrink-0 text-right"
-                style={{ color: cor, width: 80 }}
-              >
-                {label}
-              </span>
-              <div className="flex-1 rounded-full overflow-hidden" style={{ height: 20, backgroundColor: '#1E293B' }}>
-                <div
-                  className="h-full rounded-full transition-all duration-700"
-                  style={{ width: `${barWidth}%`, backgroundColor: cor, opacity: 0.8 }}
-                />
-              </div>
-              <span className="text-sm font-bold flex-shrink-0 w-8 text-right" style={{ color: '#F1F5F9' }}>
-                {count}
-              </span>
-              <span className="text-xs flex-shrink-0 w-10 text-right" style={{ color: '#64748B' }}>
-                {status === 'lead' ? `${pctTotal}%` : `${pctConversao}%`}
-              </span>
-            </div>
-          )
-        })}
-      </div>
+      <ResponsiveContainer width="100%" height={280}>
+        <FunnelChart>
+          <Tooltip formatter={(value, name) => [value, name]} />
+          <Funnel dataKey="value" data={funnelData} isAnimationActive>
+            {funnelData.map((entry) => (
+              <Cell key={entry.name} fill={entry.fill} />
+            ))}
+          </Funnel>
+        </FunnelChart>
+      </ResponsiveContainer>
 
       <div
-        className="mt-5 pt-4 flex items-center gap-3"
+        className="mt-4 pt-4 flex items-center gap-3"
         style={{ borderTop: '1px solid #1E293B' }}
       >
-        <span className="text-xs font-semibold flex-shrink-0 text-right" style={{ color: '#EF4444', width: 80 }}>
+        <span className="text-xs font-semibold w-20 text-right flex-shrink-0" style={{ color: '#EF4444' }}>
           Perdidos
         </span>
-        <div className="flex-1 rounded-full overflow-hidden" style={{ height: 20, backgroundColor: '#1E293B' }}>
-          <div
-            className="h-full rounded-full"
-            style={{
-              width: `${maxVal > 0 ? (perdidos / maxVal) * 100 : 0}%`,
-              backgroundColor: '#EF4444',
-              opacity: 0.6,
-            }}
-          />
-        </div>
-        <span className="text-sm font-bold flex-shrink-0 w-8 text-right" style={{ color: '#EF4444' }}>
+        <span className="text-2xl font-bold" style={{ color: '#EF4444' }}>
           {perdidos}
         </span>
-        <span className="text-xs flex-shrink-0 w-10 text-right" style={{ color: '#64748B' }}>
-          {totalGeral > 0 ? Math.round((perdidos / totalGeral) * 100) : 0}%
+        <span className="text-xs" style={{ color: '#64748B' }}>
+          no período
         </span>
       </div>
-
-      <p className="text-xs mt-3" style={{ color: '#475569' }}>
-        % dos estágios Qualificado→Fechado é em relação ao total de Novos leads
-      </p>
     </div>
   )
 }
