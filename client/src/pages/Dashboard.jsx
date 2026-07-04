@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react'
-import { FunnelChart, Funnel, Cell, Tooltip, ResponsiveContainer } from 'recharts'
 import { getDashboard, getFunil } from '../api/dashboard'
 import { pendentes as followUpsPendentes, atualizar as atualizarFollowUp } from '../api/followups'
 import { useNavigate } from 'react-router-dom'
@@ -150,7 +149,13 @@ export default function Dashboard() {
         </div>
       )}
 
-      {funil && <FunilVendas funil={funil.funil} perdidos={funil.perdidos} />}
+      {funil && (
+        <FunilVendas
+          funil={funil.funil}
+          perdidos={funil.perdidos}
+          emEspera={funil.funil.find((e) => e.status === 'em_espera')?.total || 0}
+        />
+      )}
 
       <FollowUpsHoje followUps={followUps} onRealizar={realizarFollowUp} />
 
@@ -226,43 +231,94 @@ const FUNIL_CONFIG = [
   { status: 'venda',       label: 'Venda',       cor: '#10B981' },
 ]
 
-function FunilVendas({ funil, perdidos }) {
+function FunilVendas({ funil, perdidos, emEspera }) {
   const funnelData = FUNIL_CONFIG.map(({ status, label, cor }, i) => {
     const value = FUNIL_CONFIG.slice(i).reduce((sum, etapa) => {
       const found = funil.find((e) => e.status === etapa.status)
       return sum + (found?.total || 0)
     }, 0)
-    return { name: label, value, fill: cor }
+    return { label, value, cor }
   })
+
+  const VIEWBOX_W = 400
+  const STAGE_H = 48
+  const MIN_W = 70
+  const maxVal = funnelData[0]?.value || 1
+
+  const widths = funnelData.map(({ value }) =>
+    Math.max(MIN_W, (value / maxVal) * VIEWBOX_W)
+  )
 
   return (
     <div className="card mb-6">
       <h2 className="font-semibold mb-5" style={{ color: '#F1F5F9' }}>Funil de Vendas</h2>
 
-      <ResponsiveContainer width="100%" height={280}>
-        <FunnelChart>
-          <Tooltip formatter={(value, name) => [value, name]} />
-          <Funnel dataKey="value" data={funnelData} isAnimationActive>
-            {funnelData.map((entry) => (
-              <Cell key={entry.name} fill={entry.fill} />
-            ))}
-          </Funnel>
-        </FunnelChart>
-      </ResponsiveContainer>
+      <svg
+        width="100%"
+        viewBox={`0 0 ${VIEWBOX_W} ${FUNIL_CONFIG.length * STAGE_H}`}
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        {funnelData.map(({ label, value, cor }, i) => {
+          const topW = widths[i]
+          const botW = i < funnelData.length - 1 ? widths[i + 1] : 0
+          const cx = VIEWBOX_W / 2
+          const y = i * STAGE_H
+          const tl = cx - topW / 2
+          const tr = cx + topW / 2
+          const bl = cx - botW / 2
+          const br = cx + botW / 2
+
+          return (
+            <g key={label}>
+              <path
+                d={`M ${tl},${y} L ${tr},${y} L ${br},${y + STAGE_H} L ${bl},${y + STAGE_H} Z`}
+                fill={cor}
+              />
+              <text
+                x={cx}
+                y={y + STAGE_H / 2 - 5}
+                textAnchor="middle"
+                fill="#000000"
+                fontSize="10"
+                fontWeight="600"
+              >
+                {label}
+              </text>
+              <text
+                x={cx}
+                y={y + STAGE_H / 2 + 10}
+                textAnchor="middle"
+                fill="#000000"
+                fontSize="13"
+                fontWeight="700"
+              >
+                {value}
+              </text>
+            </g>
+          )
+        })}
+      </svg>
 
       <div
-        className="mt-4 pt-4 flex items-center gap-3"
+        className="mt-4 pt-4 grid grid-cols-2 gap-3"
         style={{ borderTop: '1px solid #1E293B' }}
       >
-        <span className="text-xs font-semibold w-20 text-right flex-shrink-0" style={{ color: '#EF4444' }}>
-          Perdidos
-        </span>
-        <span className="text-2xl font-bold" style={{ color: '#EF4444' }}>
-          {perdidos}
-        </span>
-        <span className="text-xs" style={{ color: '#64748B' }}>
-          no período
-        </span>
+        <div
+          className="rounded-lg p-3"
+          style={{ backgroundColor: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}
+        >
+          <p className="text-xs font-semibold" style={{ color: '#EF4444' }}>Perdidos</p>
+          <p className="text-2xl font-bold mt-1" style={{ color: '#EF4444' }}>{perdidos}</p>
+          <p className="text-xs mt-0.5" style={{ color: '#64748B' }}>no período</p>
+        </div>
+        <div
+          className="rounded-lg p-3"
+          style={{ backgroundColor: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)' }}
+        >
+          <p className="text-xs font-semibold" style={{ color: '#F59E0B' }}>Em Espera</p>
+          <p className="text-2xl font-bold mt-1" style={{ color: '#F59E0B' }}>{emEspera}</p>
+          <p className="text-xs mt-0.5" style={{ color: '#64748B' }}>aguardando retomada</p>
+        </div>
       </div>
     </div>
   )
