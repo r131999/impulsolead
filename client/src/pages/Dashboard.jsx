@@ -242,13 +242,12 @@ function FunilVendas({ funil, perdidos, emEspera }) {
 
   const VIEWBOX_W = 400
   const STAGE_H = 48
+  const N = funnelData.length
+  const MAX_W = 400
   const MIN_W = 40
-  const MAX_W = VIEWBOX_W
-  const maxVal = funnelData[0]?.value || 1
+  const step = (MAX_W - MIN_W) / (N - 1)
 
-  const widths = funnelData.map(({ value }) =>
-    MIN_W + (Math.sqrt(value) / Math.sqrt(maxVal)) * (MAX_W - MIN_W)
-  )
+  const widths = funnelData.map((_, i) => MAX_W - i * step)
 
   return (
     <div className="card mb-6">
