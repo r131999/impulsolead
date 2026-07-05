@@ -240,60 +240,51 @@ function FunilVendas({ funil, perdidos, emEspera }) {
     return { label, value, cor }
   })
 
+  const N = FUNIL_CONFIG.length
   const VIEWBOX_W = 400
-  const STAGE_H = 48
-  const N = funnelData.length
-  const MAX_W = 400
-  const MIN_W = 40
-  const step = (MAX_W - MIN_W) / (N - 1)
+  const RAZAO = 0.685
+  const STAGE_H = VIEWBOX_W * 0.92 / N
+  const BULGE = VIEWBOX_W * 16 / 520
+  const cx = VIEWBOX_W / 2
 
-  const widths = funnelData.map((_, i) => MAX_W - i * step)
+  const topWidths = Array.from({ length: N }, (_, i) => VIEWBOX_W * Math.pow(RAZAO, i))
 
   return (
     <div className="card mb-6">
       <h2 className="font-semibold mb-5" style={{ color: '#F1F5F9' }}>Funil de Vendas</h2>
 
-      <svg
-        width="100%"
-        viewBox={`0 0 ${VIEWBOX_W} ${FUNIL_CONFIG.length * STAGE_H}`}
-        xmlns="http://www.w3.org/2000/svg"
-      >
+      <svg width="100%" viewBox={`0 0 ${VIEWBOX_W} ${N * STAGE_H}`} xmlns="http://www.w3.org/2000/svg">
         {funnelData.map(({ label, value, cor }, i) => {
-          const topW = widths[i]
-          const botW = i < funnelData.length - 1 ? widths[i + 1] : 0
-          const cx = VIEWBOX_W / 2
           const y = i * STAGE_H
-          const tl = cx - topW / 2
-          const tr = cx + topW / 2
-          const bl = cx - botW / 2
-          const br = cx + botW / 2
+          const topW = topWidths[i]
+          const tl = cx - topW / 2, tr = cx + topW / 2
+          const isLast = i === N - 1
+
+          let d, labelY, valueY
+          if (isLast) {
+            const yBot = y + STAGE_H
+            const crX = (tr + cx) / 2 + BULGE
+            const clX = (tl + cx) / 2 - BULGE
+            const cyh = y + STAGE_H * 0.85
+            d = `M ${tl},${y} L ${tr},${y} Q ${crX},${cyh} ${cx},${yBot} Q ${clX},${cyh} ${tl},${y} Z`
+            labelY = y + STAGE_H * 0.35
+            valueY = labelY + STAGE_H * 0.3
+          } else {
+            const botW = topWidths[i + 1]
+            const bl = cx - botW / 2, br = cx + botW / 2
+            const clX = (tl + bl) / 2 - BULGE
+            const crX = (tr + br) / 2 + BULGE
+            const cyh = y + STAGE_H * 0.55
+            d = `M ${tl},${y} L ${tr},${y} Q ${crX},${cyh} ${br},${y + STAGE_H} L ${bl},${y + STAGE_H} Q ${clX},${cyh} ${tl},${y} Z`
+            labelY = y + STAGE_H * 0.4
+            valueY = labelY + STAGE_H * 0.3
+          }
 
           return (
             <g key={label}>
-              <path
-                d={`M ${tl},${y} L ${tr},${y} L ${br},${y + STAGE_H} L ${bl},${y + STAGE_H} Z`}
-                fill={cor}
-              />
-              <text
-                x={cx}
-                y={y + STAGE_H / 2 - 5}
-                textAnchor="middle"
-                fill="#000000"
-                fontSize="10"
-                fontWeight="600"
-              >
-                {label}
-              </text>
-              <text
-                x={cx}
-                y={y + STAGE_H / 2 + 10}
-                textAnchor="middle"
-                fill="#000000"
-                fontSize="13"
-                fontWeight="700"
-              >
-                {value}
-              </text>
+              <path d={d} fill={cor} />
+              <text x={cx} y={labelY} textAnchor="middle" fontSize="10" fontWeight="600" fill="#000000">{label}</text>
+              <text x={cx} y={valueY} textAnchor="middle" fontSize="13" fontWeight="700" fill="#000000">{value}</text>
             </g>
           )
         })}
