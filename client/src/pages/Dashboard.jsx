@@ -243,8 +243,7 @@ function FunilVendas({ funil, perdidos, emEspera }) {
   const N = FUNIL_CONFIG.length
   const VIEWBOX_W = 400
   const RAZAO = 0.685
-  const STAGE_H = VIEWBOX_W * 0.92 / N
-  const BULGE = VIEWBOX_W * 16 / 520
+  const STAGE_H = VIEWBOX_W * 0.5 / N
   const cx = VIEWBOX_W / 2
 
   const topWidths = Array.from({ length: N }, (_, i) => VIEWBOX_W * Math.pow(RAZAO, i))
@@ -257,34 +256,18 @@ function FunilVendas({ funil, perdidos, emEspera }) {
         {funnelData.map(({ label, value, cor }, i) => {
           const y = i * STAGE_H
           const topW = topWidths[i]
+          const botW = i < N - 1 ? topWidths[i + 1] : 0
           const tl = cx - topW / 2, tr = cx + topW / 2
-          const isLast = i === N - 1
-
-          let d, labelY, valueY
-          if (isLast) {
-            const yBot = y + STAGE_H
-            const crX = (tr + cx) / 2 + BULGE
-            const clX = (tl + cx) / 2 - BULGE
-            const cyh = y + STAGE_H * 0.85
-            d = `M ${tl},${y} L ${tr},${y} Q ${crX},${cyh} ${cx},${yBot} Q ${clX},${cyh} ${tl},${y} Z`
-            labelY = y + STAGE_H * 0.35
-            valueY = labelY + STAGE_H * 0.3
-          } else {
-            const botW = topWidths[i + 1]
-            const bl = cx - botW / 2, br = cx + botW / 2
-            const clX = (tl + bl) / 2 - BULGE
-            const crX = (tr + br) / 2 + BULGE
-            const cyh = y + STAGE_H * 0.55
-            d = `M ${tl},${y} L ${tr},${y} Q ${crX},${cyh} ${br},${y + STAGE_H} L ${bl},${y + STAGE_H} Q ${clX},${cyh} ${tl},${y} Z`
-            labelY = y + STAGE_H * 0.4
-            valueY = labelY + STAGE_H * 0.3
-          }
+          const bl = cx - botW / 2, br = cx + botW / 2
+          const d = `M ${tl},${y} L ${tr},${y} L ${br},${y + STAGE_H} L ${bl},${y + STAGE_H} Z`
+          const labelY = y + STAGE_H * 0.30
+          const valueY = labelY + 11
 
           return (
             <g key={label}>
               <path d={d} fill={cor} />
-              <text x={cx} y={labelY} textAnchor="middle" fontSize="10" fontWeight="600" fill="#000000">{label}</text>
-              <text x={cx} y={valueY} textAnchor="middle" fontSize="13" fontWeight="700" fill="#000000">{value}</text>
+              <text x={cx} y={labelY} textAnchor="middle" fontSize="9" fontWeight="600" fill="#000000">{label}</text>
+              <text x={cx} y={valueY} textAnchor="middle" fontSize="12" fontWeight="700" fill="#000000">{value}</text>
             </g>
           )
         })}
