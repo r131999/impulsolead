@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react'
-import { getStatusMeta, desconectarMeta, selecionarPagina } from '../api/integracoes'
+import { getStatusMeta, desconectarMeta, selecionarPagina, gerarTokenMake, regenerarTokenMake } from '../api/integracoes'
+import { useAuth } from '../context/AuthContext'
 
 export default function Integracoes() {
+  const { isGestor } = useAuth()
+
   const [ativo, setAtivo]               = useState(false)
   const [pageIdAtual, setPageIdAtual]   = useState(null)
   const [pageNameAtual, setPageNameAtual] = useState(null)
@@ -16,6 +19,12 @@ export default function Integracoes() {
   const [buscandoPaginas, setBuscandoPaginas] = useState(false)
   const [paginasDisponiveis, setPaginasDisponiveis] = useState([])
   const [selectedPageId, setSelectedPageId] = useState('')
+
+  // Make (alternativo)
+  const [urlMake, setUrlMake]             = useState(null)
+  const [gerandoTokenMake, setGerandoTokenMake] = useState(false)
+  const [copiadoMake, setCopiadoMake]     = useState(false)
+  const [erroMake, setErroMake]           = useState(null)
 
   useEffect(() => { carregarStatus() }, [])
 
@@ -112,6 +121,46 @@ export default function Integracoes() {
     } finally {
       setSalvando(false)
     }
+  }
+
+  async function handleGerarTokenMake() {
+    setErroMake(null)
+    setGerandoTokenMake(true)
+    try {
+      const { data } = await gerarTokenMake()
+      setUrlMake(data.url)
+    } catch (e) {
+      setErroMake(e.response?.data?.error || 'Erro ao gerar o link. Tente novamente.')
+    } finally {
+      setGerandoTokenMake(false)
+    }
+  }
+
+  async function handleRegenerarTokenMake() {
+    if (!window.confirm(
+      'Regenerar o link do Make? O link atual deixará de funcionar imediatamente — ' +
+      'qualquer cenário do Make configurado com a URL antiga vai parar de receber leads ' +
+      'até você atualizá-lo com o novo link.'
+    )) return
+
+    setErroMake(null)
+    setGerandoTokenMake(true)
+    try {
+      const { data } = await regenerarTokenMake()
+      setUrlMake(data.url)
+      setCopiadoMake(false)
+    } catch (e) {
+      setErroMake(e.response?.data?.error || 'Erro ao regenerar o link. Tente novamente.')
+    } finally {
+      setGerandoTokenMake(false)
+    }
+  }
+
+  function handleCopiarUrlMake() {
+    navigator.clipboard.writeText(urlMake).then(() => {
+      setCopiadoMake(true)
+      setTimeout(() => setCopiadoMake(false), 2000)
+    })
   }
 
   if (carregando) {
@@ -416,6 +465,79 @@ export default function Integracoes() {
           </div>
         </>
       )}
+
+      {/* Make (alternativo) — só gestor/admin */}
+      {isGestor && (
+        <div className="card mt-6">
+          <div className="flex items-center gap-3 mb-1">
+            <MakeIcon />
+            <div>
+              <p className="font-semibold text-sm" style={{ color: '#F1F5F9' }}>Make (alternativo)</p>
+              <p className="text-xs" style={{ color: '#64748B' }}>Integromat</p>
+            </div>
+          </div>
+          <p className="text-xs mt-2 mb-3" style={{ color: '#94A3B8' }}>
+            Use esta via alternativa quando a conexão direta com o Meta falhar — por exemplo,
+            se o Business Manager for novo e ainda não estiver verificado. Gere um link, configure
+            um cenário no Make para receber os leads e enviá-los para essa URL.
+          </p>
+
+          {erroMake && (
+            <div className="rounded-lg px-4 py-3 text-sm mb-3"
+              style={{ backgroundColor: 'rgba(239,68,68,0.1)', color: '#FCA5A5', border: '1px solid rgba(239,68,68,0.2)' }}>
+              {erroMake}
+            </div>
+          )}
+
+          {!urlMake ? (
+            <button
+              onClick={handleGerarTokenMake}
+              disabled={gerandoTokenMake}
+              style={{
+                padding: '8px 16px', borderRadius: 8,
+                fontSize: 13, fontWeight: 600, border: 'none',
+                backgroundColor: gerandoTokenMake ? 'rgba(99,102,241,0.25)' : '#6366F1',
+                color: '#fff',
+                cursor: gerandoTokenMake ? 'not-allowed' : 'pointer',
+              }}
+            >
+              {gerandoTokenMake ? 'Gerando…' : 'Gerar link do Make'}
+            </button>
+          ) : (
+            <>
+              <div className="flex items-center gap-2 rounded-lg px-3 py-2.5"
+                style={{ backgroundColor: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}>
+                <span className="flex-1 font-mono truncate" style={{ color: '#F1F5F9', fontSize: 12 }}>
+                  {urlMake}
+                </span>
+                <button
+                  onClick={handleCopiarUrlMake}
+                  className="text-xs px-3 py-1.5 rounded-lg flex-shrink-0 font-medium"
+                  style={{
+                    backgroundColor: copiadoMake ? 'rgba(34,197,94,0.15)' : '#1E293B',
+                    color: copiadoMake ? '#22C55E' : '#94A3B8',
+                    border: 'none', cursor: 'pointer',
+                  }}
+                >
+                  {copiadoMake ? '✓ Copiado' : '🔗 Copiar link'}
+                </button>
+              </div>
+              <button
+                onClick={handleRegenerarTokenMake}
+                disabled={gerandoTokenMake}
+                className="text-xs mt-2"
+                style={{
+                  color: '#F87171', background: 'none', border: 'none',
+                  padding: 0, cursor: gerandoTokenMake ? 'not-allowed' : 'pointer',
+                  opacity: gerandoTokenMake ? 0.5 : 1,
+                }}
+              >
+                Regenerar link (invalida o atual)
+              </button>
+            </>
+          )}
+        </div>
+      )}
     </div>
   )
 }
@@ -462,6 +584,20 @@ function MetaIcon() {
     }}>
       <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
         <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15v-4H9l3-6 3 6h-2v4h-2z" />
+      </svg>
+    </div>
+  )
+}
+
+function MakeIcon() {
+  return (
+    <div style={{
+      width: 36, height: 36, borderRadius: 8,
+      background: 'linear-gradient(135deg, #6366F1, #4338CA)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+    }}>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="white">
+        <path d="M12 2L2 8v8l10 6 10-6V8l-10-6zm0 2.311L19.5 8.8v6.4L12 19.69 4.5 15.2V8.8L12 4.311z" />
       </svg>
     </div>
   )

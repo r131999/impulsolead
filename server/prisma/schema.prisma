@@ -46,6 +46,7 @@ model Imobiliaria {
   mensagensLead          MensagemLead[]
   whatsappInstancia      WhatsappInstancia?
   metaIntegracao         MetaIntegracao?
+  makeIntegracao         MakeIntegracao?
   tours                  TourVirtual[]
   apresentacoes          Apresentacao[]
   adSpends               AdSpend[]
@@ -416,6 +417,17 @@ model MetaIntegracao {
   ativo            Boolean     @default(true)
   criadoEm         DateTime    @default(now())
   atualizadoEm     DateTime    @updatedAt
+}
+
+model MakeIntegracao {
+  id            String      @id @default(uuid())
+  imobiliariaId String      @unique
+  imobiliaria   Imobiliaria @relation(fields: [imobiliariaId], references: [id])
+  token         String      @unique
+  ativo         Boolean     @default(true)
+  ultimoUsoEm   DateTime?
+  criadoEm      DateTime    @default(now())
+  atualizadoEm  DateTime    @updatedAt
 }
 
 model TourVirtual {

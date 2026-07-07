@@ -6,6 +6,9 @@ const {
   statusMeta,
   conectarMeta,
   desconectarMeta,
+  receberLeadMake,
+  gerarTokenMake,
+  regenerarTokenMake,
 } = require('../controllers/integracoes.controller');
 
 const router = Router();
@@ -18,5 +21,12 @@ router.post('/meta/webhook', receberLeadMeta);
 router.get('/meta/status', authMiddleware, requireRole('gestor', 'admin'), statusMeta);
 router.post('/meta/conectar', authMiddleware, requireRole('gestor', 'admin'), conectarMeta);
 router.delete('/meta/desconectar', authMiddleware, requireRole('gestor', 'admin'), desconectarMeta);
+
+// Pública — chamada diretamente pelo Make (via alternativa quando a Meta falhar)
+router.post('/make/webhook/:token', receberLeadMake);
+
+// Autenticadas — gerenciamento pelo gestor
+router.post('/make/gerar-token', authMiddleware, requireRole('gestor', 'admin'), gerarTokenMake);
+router.post('/make/regenerar-token', authMiddleware, requireRole('gestor', 'admin'), regenerarTokenMake);
 
 module.exports = router;

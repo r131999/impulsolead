@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const prisma = require('../lib/prisma');
 const { notificarCorretor } = require('../services/notificacao.service');
 const { enviarPushCorretor } = require('./push.controller');
@@ -9,6 +10,119 @@ function sanitizarTexto(valor) {
     .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
     .trim()
     .slice(0, 500);
+}
+
+function normalizarTelefone(telefone) {
+  if (!telefone) return null;
+  const digitos = String(telefone).replace(/\D/g, '');
+  if (digitos.length < 10 || digitos.length > 15) return null;
+  return digitos;
+}
+
+// Cria o lead e distribui para o próximo corretor da fila (ou marca para distribuição
+// manual/sem corretor disponível), independente da origem (Meta Ads, Make, etc).
+async function criarLeadEDistribuir({
+  nome, telefone, origem, campanha, conjuntoName, anuncioName,
+  adId, adsetId, campaignId, imobiliariaId, imobiliaria,
+}) {
+  const configAgente = await prisma.configAgente.findUnique({
+    where: { imobiliariaId },
+    select: { distribuicaoManual: true },
+  });
+  const modoManual = configAgente?.distribuicaoManual ?? false;
+
+  const result = await prisma.$transaction(async (tx) => {
+    const lead = await tx.lead.create({
+      data: {
+        nome,
+        telefone,
+        whatsappJid: `${telefone}@s.whatsapp.net`,
+        status: 'lead',
+        origem,
+        campanha: campanha || null,
+        conjuntoName: conjuntoName || null,
+        anuncioName: anuncioName || null,
+        adId: adId || null,
+        adsetId: adsetId || null,
+        campaignId: campaignId || null,
+        imobiliariaId,
+      },
+    });
+
+    if (modoManual) {
+      await tx.historicoLead.create({
+        data: {
+          leadId: lead.id,
+          acao: `Lead recebido via ${origem} — aguardando distribuição manual`,
+        },
+      });
+      return { lead, corretor: null };
+    }
+
+    const corretores = await tx.corretor.findMany({
+      where: { imobiliariaId, ativo: true, disponivel: true },
+      orderBy: { posicaoFila: 'asc' },
+    });
+
+    let corretor = null;
+
+    if (corretores.length > 0) {
+      const proximo = corretores[0];
+      const maxPosicao = corretores[corretores.length - 1].posicaoFila;
+
+      await tx.corretor.update({
+        where: { id: proximo.id },
+        data: { leadsRecebidos: { increment: 1 }, posicaoFila: maxPosicao + 1 },
+      });
+
+      await tx.lead.update({
+        where: { id: lead.id },
+        data: { corretorId: proximo.id },
+      });
+
+      corretor = proximo;
+
+      await tx.historicoLead.create({
+        data: {
+          leadId: lead.id,
+          acao: `Lead recebido via ${origem} e atribuído automaticamente`,
+          detalhes: `Corretor: ${proximo.nome}`,
+        },
+      });
+
+      await tx.historicoDistribuicao.create({
+        data: {
+          leadId: lead.id,
+          leadNome: nome,
+          leadTelefone: telefone,
+          corretorId: proximo.id,
+          corretorNome: proximo.nome,
+          distribuidoPor: 'automatico',
+          imobiliariaId,
+        },
+      });
+    } else {
+      await tx.historicoLead.create({
+        data: {
+          leadId: lead.id,
+          acao: `Lead recebido via ${origem} — sem corretor disponível na fila`,
+        },
+      });
+    }
+
+    return { lead, corretor };
+  });
+
+  if (result.corretor) {
+    notificarCorretor(result.corretor, result.lead, imobiliaria).catch(() => {});
+    enviarPushCorretor(
+      result.corretor.id,
+      '🏠 Novo lead!',
+      `Nome: ${result.lead.nome} | Tel: ${result.lead.telefone}`,
+    ).catch(() => {});
+  }
+
+  return result;
 }
 
 // GET /api/integracoes/meta/webhook — verificação do webhook pelo Meta
@@ -134,110 +248,27 @@ async function receberLeadMeta(req, res) {
           continue;
         }
 
-        const digitos = String(telefone).replace(/\D/g, '');
-        if (digitos.length < 10 || digitos.length > 15) {
-          console.warn(`[meta-webhook] Lead ${leadgenId} descartado: telefone "${telefone}" tem ${digitos.length} dígitos (fora do range 10–15)`);
+        const digitos = normalizarTelefone(telefone);
+        if (!digitos) {
+          console.warn(`[meta-webhook] Lead ${leadgenId} descartado: telefone "${telefone}" fora do range de 10–15 dígitos`);
           continue;
         }
 
-        const configAgente = await prisma.configAgente.findUnique({
-          where: { imobiliariaId },
-          select: { distribuicaoManual: true },
-        });
-        const modoManual = configAgente?.distribuicaoManual ?? false;
-
-        const result = await prisma.$transaction(async (tx) => {
-          const lead = await tx.lead.create({
-            data: {
-              nome: nomeSanitizado,
-              telefone: digitos,
-              whatsappJid: `${digitos}@s.whatsapp.net`,
-              status: 'lead',
-              origem: 'Meta Ads',
-              campanha: campanha || null,
-              conjuntoName: conjuntoName || null,
-              anuncioName: anuncioName || null,
-              adId: leadData.ad_id || null,
-              adsetId: leadData.adset_id || null,
-              campaignId: leadData.campaign_id || null,
-              imobiliariaId,
-            },
-          });
-
-          if (modoManual) {
-            await tx.historicoLead.create({
-              data: {
-                leadId: lead.id,
-                acao: 'Lead recebido via Meta Lead Ads — aguardando distribuição manual',
-              },
-            });
-            return { lead, corretor: null };
-          }
-
-          const corretores = await tx.corretor.findMany({
-            where: { imobiliariaId, ativo: true, disponivel: true },
-            orderBy: { posicaoFila: 'asc' },
-          });
-
-          let corretor = null;
-
-          if (corretores.length > 0) {
-            const proximo = corretores[0];
-            const maxPosicao = corretores[corretores.length - 1].posicaoFila;
-
-            await tx.corretor.update({
-              where: { id: proximo.id },
-              data: { leadsRecebidos: { increment: 1 }, posicaoFila: maxPosicao + 1 },
-            });
-
-            await tx.lead.update({
-              where: { id: lead.id },
-              data: { corretorId: proximo.id },
-            });
-
-            corretor = proximo;
-
-            await tx.historicoLead.create({
-              data: {
-                leadId: lead.id,
-                acao: 'Lead recebido via Meta Lead Ads e atribuído automaticamente',
-                detalhes: `Corretor: ${proximo.nome}`,
-              },
-            });
-
-            await tx.historicoDistribuicao.create({
-              data: {
-                leadId: lead.id,
-                leadNome: nomeSanitizado,
-                leadTelefone: digitos,
-                corretorId: proximo.id,
-                corretorNome: proximo.nome,
-                distribuidoPor: 'automatico',
-                imobiliariaId,
-              },
-            });
-          } else {
-            await tx.historicoLead.create({
-              data: {
-                leadId: lead.id,
-                acao: 'Lead recebido via Meta Lead Ads — sem corretor disponível na fila',
-              },
-            });
-          }
-
-          return { lead, corretor };
+        const result = await criarLeadEDistribuir({
+          nome: nomeSanitizado,
+          telefone: digitos,
+          origem: 'Meta Ads',
+          campanha,
+          conjuntoName,
+          anuncioName,
+          adId: leadData.ad_id,
+          adsetId: leadData.adset_id,
+          campaignId: leadData.campaign_id,
+          imobiliariaId,
+          imobiliaria,
         });
 
         console.log(`[meta-webhook] Lead criado: ${result.lead.id}`);
-
-        if (result.corretor) {
-          notificarCorretor(result.corretor, result.lead, imobiliaria).catch(() => {});
-          enviarPushCorretor(
-            result.corretor.id,
-            '🏠 Novo lead!',
-            `Nome: ${result.lead.nome} | Tel: ${result.lead.telefone}`,
-          ).catch(() => {});
-        }
       }
     }
   } catch (err) {
@@ -298,4 +329,104 @@ async function desconectarMeta(req, res) {
   res.json({ success: true });
 }
 
-module.exports = { verificarWebhookMeta, receberLeadMeta, statusMeta, conectarMeta, desconectarMeta };
+// POST /api/integracoes/make/webhook/:token — receber leads via Make (Integromat),
+// via alternativa para quando a conexão direta com a Meta falhar.
+async function receberLeadMake(req, res) {
+  const { token } = req.params;
+
+  const integracao = await prisma.makeIntegracao.findFirst({
+    where: { token, ativo: true },
+    include: { imobiliaria: true },
+  });
+  if (!integracao) {
+    return res.status(404).json({ error: 'Integração não encontrada ou inativa' });
+  }
+
+  const { imobiliariaId, imobiliaria } = integracao;
+  const body = req.body || {};
+
+  const nome = sanitizarTexto(body.nome);
+  if (!nome) {
+    return res.status(400).json({ error: 'nome é obrigatório' });
+  }
+
+  const digitos = normalizarTelefone(body.telefone);
+  if (!digitos) {
+    return res.status(400).json({ error: 'telefone é obrigatório e deve ter entre 10 e 15 dígitos' });
+  }
+
+  const result = await criarLeadEDistribuir({
+    nome,
+    telefone: digitos,
+    origem: 'Make',
+    campanha: sanitizarTexto(body.campanha),
+    conjuntoName: sanitizarTexto(body.conjuntoName),
+    anuncioName: sanitizarTexto(body.anuncioName),
+    adId: null,
+    adsetId: null,
+    campaignId: null,
+    imobiliariaId,
+    imobiliaria,
+  });
+
+  await prisma.makeIntegracao.update({
+    where: { id: integracao.id },
+    data: { ultimoUsoEm: new Date() },
+  });
+
+  res.status(200).json({ received: true, leadId: result.lead.id });
+}
+
+function urlWebhookMake(req, token) {
+  return `${req.protocol}://${req.get('host')}/api/integracoes/make/webhook/${token}`;
+}
+
+// POST /api/integracoes/make/gerar-token — idempotente: se já existe um token, devolve o
+// mesmo (reativando se estava desativado), sem invalidar links já configurados no Make.
+async function gerarTokenMake(req, res) {
+  const existente = await prisma.makeIntegracao.findUnique({
+    where: { imobiliariaId: req.imobiliariaId },
+  });
+
+  if (existente) {
+    if (!existente.ativo) {
+      await prisma.makeIntegracao.update({
+        where: { id: existente.id },
+        data: { ativo: true },
+      });
+    }
+    return res.json({ success: true, url: urlWebhookMake(req, existente.token) });
+  }
+
+  const token = crypto.randomBytes(24).toString('hex');
+  await prisma.makeIntegracao.create({
+    data: { imobiliariaId: req.imobiliariaId, token },
+  });
+
+  res.json({ success: true, url: urlWebhookMake(req, token) });
+}
+
+// POST /api/integracoes/make/regenerar-token — ação explícita e destrutiva: troca o token,
+// invalidando qualquer link do Make já configurado com o anterior.
+async function regenerarTokenMake(req, res) {
+  const token = crypto.randomBytes(24).toString('hex');
+
+  await prisma.makeIntegracao.upsert({
+    where: { imobiliariaId: req.imobiliariaId },
+    update: { token, ativo: true },
+    create: { imobiliariaId: req.imobiliariaId, token },
+  });
+
+  res.json({ success: true, url: urlWebhookMake(req, token) });
+}
+
+module.exports = {
+  verificarWebhookMeta,
+  receberLeadMeta,
+  statusMeta,
+  conectarMeta,
+  desconectarMeta,
+  receberLeadMake,
+  gerarTokenMake,
+  regenerarTokenMake,
+};
