@@ -45,7 +45,7 @@ model Imobiliaria {
   empreendimentos        Empreendimento[]
   mensagensLead          MensagemLead[]
   whatsappInstancia      WhatsappInstancia?
-  metaIntegracao         MetaIntegracao?
+  metaIntegracoes        MetaIntegracao[]
   makeIntegracao         MakeIntegracao?
   tours                  TourVirtual[]
   apresentacoes          Apresentacao[]
@@ -406,9 +406,9 @@ model WhatsappInstancia {
 
 model MetaIntegracao {
   id               String      @id @default(uuid())
-  imobiliariaId    String      @unique
+  imobiliariaId    String
   imobiliaria      Imobiliaria @relation(fields: [imobiliariaId], references: [id])
-  pageId           String
+  pageId           String?     @unique
   pageToken        String
   pageName         String?
   adAccountId      String?
@@ -417,6 +417,11 @@ model MetaIntegracao {
   ativo            Boolean     @default(true)
   criadoEm         DateTime    @default(now())
   atualizadoEm     DateTime    @updatedAt
+
+  adSpends   AdSpend[]
+  adStatuses AdStatus[]
+
+  @@index([imobiliariaId])
 }
 
 model MakeIntegracao {
@@ -508,31 +513,37 @@ model FotoApresentacao {
 }
 
 model AdSpend {
-  id            String      @id @default(uuid())
-  imobiliariaId String
-  imobiliaria   Imobiliaria @relation(fields: [imobiliariaId], references: [id])
-  adId          String
-  adName        String?
-  date          DateTime    @db.Date
-  spend         Decimal     @db.Decimal(12, 2)
-  currency      String      @default("BRL")
-  accountId     String
-  criadoEm      DateTime    @default(now())
-  atualizadoEm  DateTime    @updatedAt
+  id               String          @id @default(uuid())
+  imobiliariaId    String
+  imobiliaria      Imobiliaria     @relation(fields: [imobiliariaId], references: [id])
+  metaIntegracaoId String?
+  metaIntegracao   MetaIntegracao? @relation(fields: [metaIntegracaoId], references: [id], onDelete: SetNull)
+  adId             String
+  adName           String?
+  date             DateTime        @db.Date
+  spend            Decimal         @db.Decimal(12, 2)
+  currency         String          @default("BRL")
+  accountId        String
+  criadoEm         DateTime        @default(now())
+  atualizadoEm     DateTime        @updatedAt
 
   @@unique([imobiliariaId, adId, date])
   @@index([imobiliariaId, date])
+  @@index([metaIntegracaoId])
 }
 
 model AdStatus {
-  id              String      @id @default(uuid())
-  imobiliariaId   String
-  imobiliaria     Imobiliaria @relation(fields: [imobiliariaId], references: [id])
-  adId            String
-  effectiveStatus String?
-  atualizadoEm    DateTime    @updatedAt
+  id               String          @id @default(uuid())
+  imobiliariaId    String
+  imobiliaria      Imobiliaria     @relation(fields: [imobiliariaId], references: [id])
+  metaIntegracaoId String?
+  metaIntegracao   MetaIntegracao? @relation(fields: [metaIntegracaoId], references: [id], onDelete: SetNull)
+  adId             String
+  effectiveStatus  String?
+  atualizadoEm     DateTime        @updatedAt
 
   @@unique([imobiliariaId, adId])
+  @@index([metaIntegracaoId])
 }
 
 model ConfigAgente {

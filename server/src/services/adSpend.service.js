@@ -35,7 +35,7 @@ async function sincronizarGastoAnuncios(imobiliariaIdFiltro = null) {
 
   const integracoes = await prisma.metaIntegracao.findMany({
     where,
-    select: { imobiliariaId: true, adAccountId: true, adsToken: true },
+    select: { id: true, imobiliariaId: true, adAccountId: true, adsToken: true },
   });
 
   console.log(`[adspend] ${integracoes.length} integração(ões) ativa(s) com adAccountId.`);
@@ -73,9 +73,11 @@ async function sincronizarGastoAnuncios(imobiliariaIdFiltro = null) {
             spend: row.spend,
             adName: row.ad_name || null,
             accountId: integracao.adAccountId,
+            metaIntegracaoId: integracao.id,
           },
           create: {
             imobiliariaId: integracao.imobiliariaId,
+            metaIntegracaoId: integracao.id,
             adId: row.ad_id,
             adName: row.ad_name || null,
             date: new Date(row.date_start),
@@ -111,9 +113,10 @@ async function sincronizarGastoAnuncios(imobiliariaIdFiltro = null) {
               adId: ad.id,
             },
           },
-          update: { effectiveStatus: ad.effective_status || null },
+          update: { effectiveStatus: ad.effective_status || null, metaIntegracaoId: integracao.id },
           create: {
             imobiliariaId: integracao.imobiliariaId,
+            metaIntegracaoId: integracao.id,
             adId: ad.id,
             effectiveStatus: ad.effective_status || null,
           },

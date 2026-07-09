@@ -52,7 +52,10 @@ async function listarClientes(req, res) {
       limiteAcessos: true,
       permissoes: true,
       criadoEm: true,
-      metaIntegracao: { select: { adAccountId: true } },
+      metaIntegracoes: {
+        where: { ativo: true, pageId: { not: null } },
+        select: { pageId: true, pageName: true, adAccountId: true },
+      },
       _count: {
         select: {
           leads: true,
@@ -84,7 +87,11 @@ async function listarClientes(req, res) {
       limiteAcessos: imob.limiteAcessos,
       permissoes: imob.permissoes,
       criadoEm: imob.criadoEm,
-      adAccountId: imob.metaIntegracao?.adAccountId ?? null,
+      contasAnuncio: imob.metaIntegracoes.map((m) => ({
+        pageId: m.pageId,
+        pageName: m.pageName,
+        adAccountId: m.adAccountId,
+      })),
       totalLeads: imob._count.leads,
       totalCorretores: imob._count.corretores,
       totalUsuarios: imob._count.usuarios,
@@ -192,7 +199,7 @@ async function atualizarLimiteAcessos(req, res) {
 // ── atualizarAdAccount ────────────────────────────────────────────────────────
 
 async function atualizarAdAccount(req, res) {
-  const { id } = req.params;
+  const { id, pageId } = req.params;
   const { adAccountId } = req.body;
 
   if (typeof adAccountId !== 'string' || !adAccountId.trim()) {
@@ -208,17 +215,17 @@ async function atualizarAdAccount(req, res) {
   const imobiliaria = await prisma.imobiliaria.findUnique({ where: { id } });
   if (!imobiliaria) return res.status(404).json({ error: 'Imobiliária não encontrada' });
 
-  const integracao = await prisma.metaIntegracao.findUnique({ where: { imobiliariaId: id } });
-  if (!integracao) {
-    return res.status(400).json({ error: 'A integração Meta precisa ser conectada antes de cadastrar o ID da conta de anúncios' });
+  const integracao = await prisma.metaIntegracao.findUnique({ where: { pageId } });
+  if (!integracao || integracao.imobiliariaId !== id) {
+    return res.status(400).json({ error: 'Página não encontrada para esta imobiliária' });
   }
 
   const atualizado = await prisma.metaIntegracao.update({
-    where: { imobiliariaId: id },
+    where: { pageId },
     data: { adAccountId: normalizado },
   });
 
-  res.json({ id: atualizado.imobiliariaId, adAccountId: atualizado.adAccountId });
+  res.json({ id: atualizado.imobiliariaId, pageId: atualizado.pageId, adAccountId: atualizado.adAccountId });
 }
 
 // ── getPlanoCliente ───────────────────────────────────────────────────────────

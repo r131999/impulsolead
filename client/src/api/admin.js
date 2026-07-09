@@ -40,5 +40,5 @@ export const atualizarPermissoes = (id, data) =>
 export const atualizarLimiteAcessos = (id, data) =>
   adminApi.patch(`/admin/clientes/${id}/limite-acessos`, data)
 
-export const atualizarAdAccount = (id, data) =>
-  adminApi.patch(`/admin/clientes/${id}/ad-account`, data)
+export const atualizarAdAccount = (id, pageId, data) =>
+  adminApi.patch(`/admin/clientes/${id}/ad-account/${pageId}`, data)

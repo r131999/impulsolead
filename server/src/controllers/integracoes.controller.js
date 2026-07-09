@@ -278,17 +278,12 @@ async function receberLeadMeta(req, res) {
 
 // GET /api/integracoes/meta/status
 async function statusMeta(req, res) {
-  const integracao = await prisma.metaIntegracao.findUnique({
-    where: { imobiliariaId: req.imobiliariaId },
-    select: { pageId: true, pageName: true, ativo: true, criadoEm: true },
+  const integracoes = await prisma.metaIntegracao.findMany({
+    where: { imobiliariaId: req.imobiliariaId, ativo: true, pageId: { not: null } },
+    select: { pageId: true, pageName: true, adAccountId: true, criadoEm: true },
+    orderBy: { criadoEm: 'asc' },
   });
-  const conectado = !!integracao?.ativo && !!integracao?.pageId;
-  res.json({
-    ativo: conectado,
-    pageId: conectado ? integracao.pageId : null,
-    pageName: conectado ? (integracao.pageName || null) : null,
-    criadoEm: conectado ? integracao.criadoEm : null,
-  });
+  res.json({ conexoes: integracoes });
 }
 
 // POST /api/integracoes/meta/conectar
@@ -298,17 +293,23 @@ async function conectarMeta(req, res) {
     return res.status(400).json({ error: 'pageId e pageToken são obrigatórios' });
   }
 
+  const pageIdTrim = pageId.trim();
+
+  const existente = await prisma.metaIntegracao.findUnique({ where: { pageId: pageIdTrim } });
+  if (existente && existente.imobiliariaId !== req.imobiliariaId) {
+    return res.status(409).json({ error: 'Esta página já está conectada a outra imobiliária.' });
+  }
+
   const integracao = await prisma.metaIntegracao.upsert({
-    where: { imobiliariaId: req.imobiliariaId },
+    where: { pageId: pageIdTrim },
     update: {
-      pageId: pageId.trim(),
       pageToken: pageToken.trim(),
       ativo: true,
       adsToken: process.env.META_SYSTEM_USER_TOKEN,
     },
     create: {
       imobiliariaId: req.imobiliariaId,
-      pageId: pageId.trim(),
+      pageId: pageIdTrim,
       pageToken: pageToken.trim(),
       adsToken: process.env.META_SYSTEM_USER_TOKEN,
     },
@@ -317,15 +318,19 @@ async function conectarMeta(req, res) {
   res.json({ success: true, pageId: integracao.pageId });
 }
 
-// DELETE /api/integracoes/meta/desconectar
+// DELETE /api/integracoes/meta/desconectar/:pageId
 async function desconectarMeta(req, res) {
-  // pageId e pageToken são colunas obrigatórias no schema (não aceitam null), então não são
-  // zerados aqui — apenas ativo:false, que já é o que statusMeta e o webhook usam para tratar
-  // a integração como desconectada. adAccountId e adsToken ficam intactos para a reconexão.
-  await prisma.metaIntegracao.updateMany({
-    where: { imobiliariaId: req.imobiliariaId },
+  // pageToken é coluna obrigatória no schema (não aceita null), então não é zerada aqui —
+  // apenas ativo:false, que já é o que statusMeta e o webhook usam para tratar a integração
+  // como desconectada. adAccountId e adsToken ficam intactos para a reconexão.
+  const { pageId } = req.params;
+  const { count } = await prisma.metaIntegracao.updateMany({
+    where: { imobiliariaId: req.imobiliariaId, pageId },
     data: { ativo: false },
   });
+  if (count === 0) {
+    return res.status(404).json({ error: 'Integração não encontrada' });
+  }
   res.json({ success: true });
 }
 

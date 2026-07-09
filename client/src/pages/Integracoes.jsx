@@ -5,12 +5,11 @@ import { useAuth } from '../context/AuthContext'
 export default function Integracoes() {
   const { isGestor } = useAuth()
 
-  const [ativo, setAtivo]               = useState(false)
-  const [pageIdAtual, setPageIdAtual]   = useState(null)
-  const [pageNameAtual, setPageNameAtual] = useState(null)
-  const [criadoEm, setCriadoEm]         = useState(null)
+  const [conexoes, setConexoes]         = useState([])
+  const [mostrarWizard, setMostrarWizard] = useState(false)
   const [carregando, setCarregando]     = useState(true)
   const [salvando, setSalvando]         = useState(false)
+  const [desconectandoId, setDesconectandoId] = useState(null)
   const [erro, setErro]                 = useState(null)
   const [sucesso, setSucesso]           = useState(null)
 
@@ -31,12 +30,12 @@ export default function Integracoes() {
   async function carregarStatus() {
     try {
       const { data } = await getStatusMeta()
-      setAtivo(data.ativo)
-      setPageIdAtual(data.pageId)
-      setPageNameAtual(data.pageName)
-      setCriadoEm(data.criadoEm)
+      const lista = data.conexoes || []
+      setConexoes(lista)
+      setMostrarWizard(lista.length === 0)
     } catch {
-      setAtivo(false)
+      setConexoes([])
+      setMostrarWizard(true)
     } finally {
       setCarregando(false)
     }
@@ -90,12 +89,18 @@ export default function Integracoes() {
       const { data } = await selecionarPagina({ userAccessToken: userToken.trim(), pageId: selectedPageId })
       const pageName = data.pageName || paginasDisponiveis.find((p) => p.id === selectedPageId)?.name || selectedPageId
 
-      setAtivo(true)
-      setPageIdAtual(selectedPageId)
-      setPageNameAtual(pageName)
-      setCriadoEm(new Date().toISOString())
+      setConexoes((atual) => {
+        const semDuplicata = atual.filter((c) => c.pageId !== selectedPageId)
+        return [...semDuplicata, {
+          pageId: selectedPageId,
+          pageName,
+          adAccountId: null,
+          criadoEm: new Date().toISOString(),
+        }]
+      })
       setUserToken('')
       setPaginasDisponiveis([])
+      setMostrarWizard(false)
       setSucesso('Página conectada! Os leads do Facebook/Instagram serão recebidos automaticamente.')
     } catch (e) {
       setErro(e.response?.data?.error || 'Erro ao conectar. Tente novamente.')
@@ -104,22 +109,19 @@ export default function Integracoes() {
     }
   }
 
-  async function handleDesconectar() {
-    if (!window.confirm('Desconectar a integração com o Meta Lead Ads?')) return
+  async function handleDesconectar(pageId) {
+    if (!window.confirm('Desconectar esta página do Meta Lead Ads?')) return
     setErro(null)
     setSucesso(null)
-    setSalvando(true)
+    setDesconectandoId(pageId)
     try {
-      await desconectarMeta()
-      setAtivo(false)
-      setPageIdAtual(null)
-      setPageNameAtual(null)
-      setCriadoEm(null)
+      await desconectarMeta(pageId)
+      setConexoes((atual) => atual.filter((c) => c.pageId !== pageId))
       setSucesso('Integração removida.')
     } catch (e) {
       setErro(e.response?.data?.error || 'Erro ao remover integração.')
     } finally {
-      setSalvando(false)
+      setDesconectandoId(null)
     }
   }
 
@@ -195,47 +197,62 @@ export default function Integracoes() {
           </div>
           <div className="ml-auto flex items-center gap-2">
             <span className="inline-block rounded-full"
-              style={{ width: 8, height: 8, flexShrink: 0, backgroundColor: ativo ? '#10B981' : '#EF4444' }} />
-            <span className="text-xs font-semibold" style={{ color: ativo ? '#10B981' : '#EF4444' }}>
-              {ativo ? 'Conectado' : 'Desconectado'}
+              style={{ width: 8, height: 8, flexShrink: 0, backgroundColor: conexoes.length > 0 ? '#10B981' : '#EF4444' }} />
+            <span className="text-xs font-semibold" style={{ color: conexoes.length > 0 ? '#10B981' : '#EF4444' }}>
+              {conexoes.length > 0
+                ? `${conexoes.length} página${conexoes.length > 1 ? 's' : ''} conectada${conexoes.length > 1 ? 's' : ''}`
+                : 'Desconectado'}
             </span>
           </div>
         </div>
 
-        {/* Estado conectado */}
-        {ativo && pageIdAtual && (
-          <div className="mt-4 rounded-lg px-4 py-3"
+        {/* Páginas conectadas */}
+        {conexoes.map((conexao) => (
+          <div key={conexao.pageId} className="mt-4 rounded-lg px-4 py-3"
             style={{ backgroundColor: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)' }}>
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-sm font-semibold truncate" style={{ color: '#10B981' }}>
-                  {pageNameAtual || pageIdAtual}
+                  {conexao.pageName || conexao.pageId}
                 </p>
-                {criadoEm && (
+                {conexao.criadoEm && (
                   <p className="text-xs mt-0.5" style={{ color: '#6EE7B7' }}>
                     Conectado em{' '}
-                    {new Date(criadoEm).toLocaleDateString('pt-BR', {
+                    {new Date(conexao.criadoEm).toLocaleDateString('pt-BR', {
                       day: '2-digit', month: 'long', year: 'numeric',
                     })}
                   </p>
                 )}
               </div>
               <button
-                onClick={handleDesconectar}
-                disabled={salvando}
+                onClick={() => handleDesconectar(conexao.pageId)}
+                disabled={desconectandoId === conexao.pageId}
                 className="text-xs px-3 py-1 rounded-lg font-medium flex-shrink-0"
                 style={{
                   backgroundColor: 'rgba(239,68,68,0.12)',
                   color: '#F87171',
                   border: '1px solid rgba(239,68,68,0.25)',
-                  opacity: salvando ? 0.5 : 1,
-                  cursor: salvando ? 'not-allowed' : 'pointer',
+                  opacity: desconectandoId === conexao.pageId ? 0.5 : 1,
+                  cursor: desconectandoId === conexao.pageId ? 'not-allowed' : 'pointer',
                 }}
               >
-                {salvando ? 'Aguarde…' : 'Desconectar'}
+                {desconectandoId === conexao.pageId ? 'Aguarde…' : 'Desconectar'}
               </button>
             </div>
           </div>
+        ))}
+
+        {conexoes.length > 0 && !mostrarWizard && (
+          <button
+            onClick={() => setMostrarWizard(true)}
+            className="mt-4 text-xs font-semibold"
+            style={{
+              color: '#818cf8', background: 'none', border: 'none',
+              padding: 0, cursor: 'pointer',
+            }}
+          >
+            + Conectar outra página
+          </button>
         )}
       </div>
 
@@ -254,11 +271,22 @@ export default function Integracoes() {
       )}
 
       {/* Fluxo guiado de 3 passos */}
-      {!ativo && (
+      {mostrarWizard && (
         <>
-          <p className="text-xs font-semibold uppercase tracking-wide mb-4" style={{ color: '#64748B' }}>
-            Como conectar — 3 passos
-          </p>
+          <div className="flex items-center justify-between mb-4">
+            <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: '#64748B' }}>
+              Como conectar — 3 passos
+            </p>
+            {conexoes.length > 0 && (
+              <button
+                onClick={() => setMostrarWizard(false)}
+                className="text-xs"
+                style={{ color: '#64748B', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+              >
+                Cancelar
+              </button>
+            )}
+          </div>
 
           {/* ── PASSO 1 ── */}
           <div className="flex gap-3">

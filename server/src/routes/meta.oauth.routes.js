@@ -103,13 +103,8 @@ router.get('/meta/oauth/callback', async (req, res) => {
       );
     }
 
-    // Salva o array de páginas no banco (pendente de seleção)
-    await prisma.metaIntegracao.upsert({
-      where: { imobiliariaId },
-      create: { imobiliariaId, pageId: '', pageToken: '', ativo: false, paginasPendentes: pages },
-      update: { ativo: false, paginasPendentes: pages },
-    });
-
+    // A lista de páginas candidatas trafega só na URL de redirect — o usuário escolhe
+    // uma no frontend, que persiste a escolha via /meta/selecionar-pagina (por pageId).
     const paginasParam = encodeURIComponent(JSON.stringify(pages));
     return res.redirect(`${FRONTEND_URL}/integracoes?status=paginas_ok&paginas=${paginasParam}`);
   } catch (err) {

@@ -50,16 +50,22 @@ router.post(
       const pageToken = page.access_token; // token permanente da página
       const pageName  = page.name;
 
-      // 3. Inscreve a página no webhook de leadgen
+      // 3. Garante que a página não está conectada a outra imobiliária
+      const existente = await prisma.metaIntegracao.findUnique({ where: { pageId } });
+      if (existente && existente.imobiliariaId !== req.imobiliariaId) {
+        return res.status(409).json({ error: 'Esta página já está conectada a outra imobiliária.' });
+      }
+
+      // 4. Inscreve a página no webhook de leadgen
       await axios.post(
         `https://graph.facebook.com/v19.0/${pageId}/subscribed_apps`,
         new URLSearchParams({ subscribed_fields: 'leadgen', access_token: pageToken }).toString(),
         { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
       );
 
-      // 4. Salva no banco com o token permanente
+      // 5. Salva no banco com o token permanente
       await prisma.metaIntegracao.upsert({
-        where: { imobiliariaId: req.imobiliariaId },
+        where: { pageId },
         create: {
           imobiliariaId: req.imobiliariaId,
           pageId,
@@ -69,7 +75,6 @@ router.post(
           paginasPendentes: null,
         },
         update: {
-          pageId,
           pageToken,
           pageName,
           ativo: true,

@@ -20,7 +20,7 @@ router.post('/clientes', criarCliente);
 router.put('/clientes/:id/plano', atualizarPlano);
 router.patch('/clientes/:id/permissoes', atualizarPermissoes);
 router.patch('/clientes/:id/limite-acessos', atualizarLimiteAcessos);
-router.patch('/clientes/:id/ad-account', atualizarAdAccount);
+router.patch('/clientes/:id/ad-account/:pageId', atualizarAdAccount);
 router.get('/clientes/:id/plano', getPlanoCliente);
 router.get('/stats', getStats);
 

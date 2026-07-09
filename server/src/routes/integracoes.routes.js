@@ -20,7 +20,7 @@ router.post('/meta/webhook', receberLeadMeta);
 // Autenticadas — gerenciamento pelo gestor
 router.get('/meta/status', authMiddleware, requireRole('gestor', 'admin'), statusMeta);
 router.post('/meta/conectar', authMiddleware, requireRole('gestor', 'admin'), conectarMeta);
-router.delete('/meta/desconectar', authMiddleware, requireRole('gestor', 'admin'), desconectarMeta);
+router.delete('/meta/desconectar/:pageId', authMiddleware, requireRole('gestor', 'admin'), desconectarMeta);
 
 // Pública — chamada diretamente pelo Make (via alternativa quando a Meta falhar)
 router.post('/make/webhook/:token', receberLeadMake);

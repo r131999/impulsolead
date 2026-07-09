@@ -212,9 +212,9 @@ function ModalGerenciar({ cliente, onClose, onAtualizado }) {
   const [limite, setLimite] = useState(cliente.limiteAcessos ?? 5)
   const [salvandoLimite, setSalvandoLimite] = useState(false)
 
-  // ── ad account (Meta) ──
-  const [adAccountId, setAdAccountId] = useState(cliente.adAccountId ?? '')
-  const [salvandoAdAccount, setSalvandoAdAccount] = useState(false)
+  // ── ad accounts (Meta) — uma por página conectada ──
+  const [contasAnuncio, setContasAnuncio] = useState(cliente.contasAnuncio ?? [])
+  const [salvandoPageId, setSalvandoPageId] = useState(null)
 
   // ── feedback ──
   const [msg, setMsg] = useState({ texto: '', erro: false })
@@ -269,17 +269,23 @@ function ModalGerenciar({ cliente, onClose, onAtualizado }) {
     }
   }
 
-  const salvarAdAccount = async () => {
-    setSalvandoAdAccount(true)
+  const setAdAccountValor = (pageId, valor) =>
+    setContasAnuncio((atual) => atual.map((c) => (c.pageId === pageId ? { ...c, adAccountId: valor } : c)))
+
+  const salvarAdAccount = async (pageId) => {
+    const conta = contasAnuncio.find((c) => c.pageId === pageId)
+    setSalvandoPageId(pageId)
     try {
-      const res = await atualizarAdAccount(cliente.id, { adAccountId })
-      setAdAccountId(res.data.adAccountId)
+      const res = await atualizarAdAccount(cliente.id, pageId, { adAccountId: conta.adAccountId })
+      setContasAnuncio((atual) =>
+        atual.map((c) => (c.pageId === pageId ? { ...c, adAccountId: res.data.adAccountId } : c))
+      )
       onAtualizado()
       feedback('ID da conta de anúncios salvo')
     } catch (err) {
       feedback(err.response?.data?.error || 'Erro ao salvar ID da conta de anúncios', true)
     } finally {
-      setSalvandoAdAccount(false)
+      setSalvandoPageId(null)
     }
   }
 
@@ -405,21 +411,33 @@ function ModalGerenciar({ cliente, onClose, onAtualizado }) {
 
         {/* ── Seção Meta Ads ── */}
         <Section title="META ADS">
-          <div>
-            <label className="block text-xs mb-1.5" style={{ color: '#64748B' }}>ID da Conta de Anúncios (Meta)</label>
-            <input
-              type="text"
-              value={adAccountId}
-              onChange={(e) => setAdAccountId(e.target.value)}
-              placeholder="act_1234567890"
-              className="w-full rounded-lg px-3 py-2.5 text-sm outline-none"
-              style={inputStyle}
-            />
-          </div>
-
-          <SaveButton onClick={salvarAdAccount} loading={salvandoAdAccount}>
-            Salvar ID da conta de anúncios
-          </SaveButton>
+          {contasAnuncio.length === 0 ? (
+            <p className="text-xs" style={{ color: '#475569' }}>
+              Nenhuma página Meta conectada para este cliente.
+            </p>
+          ) : (
+            contasAnuncio.map((conta) => (
+              <div key={conta.pageId} className="space-y-2">
+                <label className="block text-xs mb-1.5" style={{ color: '#64748B' }}>
+                  ID da Conta de Anúncios — {conta.pageName || conta.pageId}
+                </label>
+                <input
+                  type="text"
+                  value={conta.adAccountId ?? ''}
+                  onChange={(e) => setAdAccountValor(conta.pageId, e.target.value)}
+                  placeholder="act_1234567890"
+                  className="w-full rounded-lg px-3 py-2.5 text-sm outline-none"
+                  style={inputStyle}
+                />
+                <SaveButton
+                  onClick={() => salvarAdAccount(conta.pageId)}
+                  loading={salvandoPageId === conta.pageId}
+                >
+                  Salvar
+                </SaveButton>
+              </div>
+            ))
+          )}
         </Section>
 
         {/* ── Seção Permissões ── */}
