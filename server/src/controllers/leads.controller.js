@@ -359,6 +359,15 @@ async function mudarStatus(req, res) {
       include: { corretor: { select: { id: true, nome: true } } },
     });
 
+    await tx.historicoEtapaLead.create({
+      data: {
+        leadId: lead.id,
+        imobiliariaId: lead.imobiliariaId,
+        statusAnterior: lead.status,
+        statusNovo: status,
+      },
+    });
+
     await tx.historicoLead.create({
       data: {
         leadId: id,

@@ -51,6 +51,7 @@ model Imobiliaria {
   apresentacoes          Apresentacao[]
   adSpends               AdSpend[]
   adStatuses             AdStatus[]
+  historicosEtapaLead    HistoricoEtapaLead[]
 }
 
 model Usuario {
@@ -136,9 +137,10 @@ model Lead {
   imobiliariaId String
   imobiliaria   Imobiliaria @relation(fields: [imobiliariaId], references: [id])
 
-  historico HistoricoLead[]
-  followUps FollowUp[]
-  mensagens MensagemLead[]
+  historico          HistoricoLead[]
+  followUps          FollowUp[]
+  mensagens          MensagemLead[]
+  historicoEtapaLead HistoricoEtapaLead[]
 
   ultimaNotificacaoGestor DateTime?
   etapaEntradaEm          DateTime?
@@ -157,6 +159,20 @@ model HistoricoLead {
 
   leadId String
   lead   Lead   @relation(fields: [leadId], references: [id])
+}
+
+model HistoricoEtapaLead {
+  id             String      @id @default(uuid())
+  leadId         String
+  lead           Lead        @relation(fields: [leadId], references: [id])
+  imobiliariaId  String
+  imobiliaria    Imobiliaria @relation(fields: [imobiliariaId], references: [id])
+  statusAnterior String
+  statusNovo     String
+  alteradoEm     DateTime    @default(now())
+
+  @@index([imobiliariaId, alteradoEm])
+  @@index([leadId])
 }
 
 model Equipe {
