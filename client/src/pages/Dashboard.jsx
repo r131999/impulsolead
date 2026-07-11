@@ -231,6 +231,9 @@ const FUNIL_CONFIG = [
   { status: 'venda',       label: 'Venda',       cor: '#10B981' },
 ]
 
+const CORES_CLARAS = ['#7BA9F3', '#9FA1F2', '#B69AF5', '#F0B44D', '#F49858', '#23E3A3']
+const CORES_ESCURAS = ['#0562F9', '#3034F1', '#6727F8', '#CA8003', '#DC5A00', '#098D61']
+
 function FunilVendas({ funil, perdidos, emEspera }) {
   const funnelData = FUNIL_CONFIG.map(({ status, label, cor }, i) => {
     const value = FUNIL_CONFIG.slice(i).reduce((sum, etapa) => {
@@ -241,33 +244,62 @@ function FunilVendas({ funil, perdidos, emEspera }) {
   })
 
   const N = FUNIL_CONFIG.length
-  const VIEWBOX_W = 400
+  const MAX_W = 710
+  const STAGE_H = 72
   const RAZAO = 0.685
-  const STAGE_H = VIEWBOX_W * 0.5 / N
-  const cx = VIEWBOX_W / 2
+  const GAP = 9
+  const FRAC_LABEL = 0.34
+  const GAP_LINHA = 22
+  const cx = MAX_W / 2
 
-  const topWidths = Array.from({ length: N }, (_, i) => VIEWBOX_W * Math.pow(RAZAO, i))
+  // gera N+1 valores -- a etapa N usa o (N+1)-esimo como sua propria base,
+  // seguindo a MESMA proporcao geometrica das demais (sem afunilar a ponto)
+  const topWidths = Array.from({ length: N + 1 }, (_, i) => MAX_W * Math.pow(RAZAO, i))
 
   return (
     <div className="card mb-6">
       <h2 className="font-semibold mb-5" style={{ color: '#F1F5F9' }}>Funil de Vendas</h2>
 
-      <svg width="100%" viewBox={`0 0 ${VIEWBOX_W} ${N * STAGE_H}`} xmlns="http://www.w3.org/2000/svg">
+      <svg width="100%" viewBox={`0 0 ${MAX_W} ${N * STAGE_H + 40}`} xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          {funnelData.map(({ label }, i) => (
+            <linearGradient key={label} id={`grad${i}`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={CORES_CLARAS[i]} />
+              <stop offset="100%" stopColor={CORES_ESCURAS[i]} />
+            </linearGradient>
+          ))}
+        </defs>
         {funnelData.map(({ label, value, cor }, i) => {
-          const y = i * STAGE_H
+          const y = 20 + i * STAGE_H
           const topW = topWidths[i]
-          const botW = i < N - 1 ? topWidths[i + 1] : 0
+          const botW = topWidths[i + 1]
           const tl = cx - topW / 2, tr = cx + topW / 2
           const bl = cx - botW / 2, br = cx + botW / 2
-          const d = `M ${tl},${y} L ${tr},${y} L ${br},${y + STAGE_H} L ${bl},${y + STAGE_H} Z`
-          const labelY = y + STAGE_H * 0.30
-          const valueY = labelY + 11
+          const yTop = y + (i > 0 ? GAP / 2 : 0)
+          const yBot = y + STAGE_H - (i < N - 1 ? GAP / 2 : 0)
+          const pct = Math.round((100 * value) / funnelData[0].value)
+
+          let d
+          if (i === 0) {
+            const r = 10
+            d = `M ${tl + r},${yTop} L ${tr - r},${yTop} Q ${tr},${yTop} ${tr},${yTop + r} L ${br},${yBot} L ${bl},${yBot} L ${tl},${yTop + r} Q ${tl},${yTop} ${tl + r},${yTop} Z`
+          } else if (i === N - 1) {
+            const r = 8
+            d = `M ${tl},${yTop} L ${tr},${yTop} L ${br},${yBot - r} Q ${br},${yBot} ${br - r},${yBot} L ${bl + r},${yBot} Q ${bl},${yBot} ${bl},${yBot - r} Z`
+          } else {
+            d = `M ${tl},${yTop} L ${tr},${yTop} L ${br},${yBot} L ${bl},${yBot} Z`
+          }
+
+          const labelY = y + STAGE_H * FRAC_LABEL
+          const valueY = labelY + GAP_LINHA
 
           return (
             <g key={label}>
-              <path d={d} fill={cor} />
-              <text x={cx} y={labelY} textAnchor="middle" fontSize="9" fontWeight="600" fill="#000000">{label}</text>
-              <text x={cx} y={valueY} textAnchor="middle" fontSize="12" fontWeight="700" fill="#000000">{value}</text>
+              <path d={d} fill={`url(#grad${i})`} />
+              <text x={cx} y={labelY} textAnchor="middle" fontSize="13" fontWeight="600" fill="#0B1220" opacity="0.85">{label}</text>
+              <text x={cx} y={valueY} textAnchor="middle" fontSize="19" fontWeight="800" fill="#0B1220">
+                {value} <tspan fontSize="12" fontWeight="600" opacity="0.65">({pct}%)</tspan>
+              </text>
             </g>
           )
         })}
