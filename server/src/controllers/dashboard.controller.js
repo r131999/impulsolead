@@ -293,13 +293,26 @@ async function getDashboardGerente(req, res) {
   }
 }
 
+function dataParaInstanteSeguro(str) {
+  const [ano, mes, dia] = str.split('-').map(Number);
+  return new Date(Date.UTC(ano, mes - 1, dia, 12, 0, 0)); // meio-dia UTC, longe de qualquer fronteira de dia
+}
+
 async function getFunil(req, res) {
   try {
     const imobiliariaId = req.imobiliariaId;
+    const { dataInicio, dataFim } = req.query;
+
+    const where = { imobiliariaId };
+    if (dataInicio || dataFim) {
+      where.criadoEm = {};
+      if (dataInicio) where.criadoEm.gte = inicioDiaBrasilia(dataParaInstanteSeguro(dataInicio));
+      if (dataFim) where.criadoEm.lte = fimDiaBrasilia(dataParaInstanteSeguro(dataFim));
+    }
 
     const contagens = await prisma.lead.groupBy({
       by: ['status'],
-      where: { imobiliariaId },
+      where,
       _count: { id: true },
     });
 

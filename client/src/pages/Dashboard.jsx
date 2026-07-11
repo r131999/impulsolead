@@ -32,6 +32,8 @@ export default function Dashboard() {
   const [followUps, setFollowUps] = useState([])
   const [loading, setLoading] = useState(true)
   const [erro, setErro] = useState(false)
+  const [dataInicio, setDataInicio] = useState(null)
+  const [dataFim, setDataFim] = useState(null)
   const navigate = useNavigate()
 
   const carregarFollowUps = () => {
@@ -50,6 +52,21 @@ export default function Dashboard() {
       .finally(() => setLoading(false))
     carregarFollowUps()
   }, [])
+
+  useEffect(() => {
+    if (!dataInicio && !dataFim) return
+    getFunil({ dataInicio, dataFim })
+      .then((f) => setFunil(f.data))
+      .catch(() => {})
+  }, [dataInicio, dataFim])
+
+  const limparFiltro = () => {
+    setDataInicio(null)
+    setDataFim(null)
+    getFunil()
+      .then((f) => setFunil(f.data))
+      .catch(() => {})
+  }
 
   const realizarFollowUp = async (id) => {
     await atualizarFollowUp(id, { status: 'realizado' })
@@ -148,6 +165,30 @@ export default function Dashboard() {
           <span className="text-lg" style={{ color: '#F59E0B' }}>→</span>
         </div>
       )}
+
+      <div className="card mb-3 flex flex-wrap items-end gap-3">
+        <div>
+          <label className="label block text-xs mb-1.5" style={{ color: '#64748B' }}>De</label>
+          <input
+            type="date"
+            className="input"
+            value={dataInicio || ''}
+            onChange={(e) => setDataInicio(e.target.value || null)}
+          />
+        </div>
+        <div>
+          <label className="label block text-xs mb-1.5" style={{ color: '#64748B' }}>Até</label>
+          <input
+            type="date"
+            className="input"
+            value={dataFim || ''}
+            onChange={(e) => setDataFim(e.target.value || null)}
+          />
+        </div>
+        {(dataInicio || dataFim) && (
+          <button className="btn-secondary" onClick={limparFiltro}>Limpar filtro</button>
+        )}
+      </div>
 
       {funil && (
         <FunilVendas
