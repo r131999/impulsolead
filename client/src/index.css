@@ -54,6 +54,10 @@
   .input::placeholder {
     color: #64748B;
   }
+  input[type="date"]::-webkit-calendar-picker-indicator {
+    filter: invert(1);
+    cursor: pointer;
+  }
   .input:focus {
     border-color: transparent;
     box-shadow: 0 0 0 2px #3B82F6;
