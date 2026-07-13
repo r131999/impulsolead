@@ -1,5 +1,5 @@
 ﻿const { STATUS_VALIDOS, proximoCorretor } = require('../services/fila.service');
-const { notificarCorretor } = require('../services/notificacao.service');
+const { notificarCorretorCloudApi } = require('../services/notificacao.service');
 const { enviarPushCorretor } = require('./push.controller');
 
 const prisma = require('../lib/prisma');
@@ -554,7 +554,7 @@ async function distribuir(req, res) {
     return result;
   });
 
-  notificarCorretor(corretorEscolhido, leadAtualizado, req.imobiliaria).catch(() => {});
+  notificarCorretorCloudApi(corretorEscolhido, leadAtualizado).catch(() => {});
   enviarPushCorretor(
     corretorEscolhido.id,
     '🏠 Novo lead!',

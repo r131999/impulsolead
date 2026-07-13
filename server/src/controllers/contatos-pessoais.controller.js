@@ -1,6 +1,7 @@
 ﻿const { parse } = require('csv-parse/sync');
 const XLSX = require('xlsx');
-const { notificarCorretor } = require('../services/notificacao.service');
+const { notificarCorretorCloudApi } = require('../services/notificacao.service');
+const { enviarPushCorretor } = require('./push.controller');
 
 const prisma = require('../lib/prisma');
 
@@ -217,7 +218,12 @@ async function converter(req, res) {
     include: { imobiliaria: { select: { id: true, nome: true } } },
   }).then((corretor) => {
     if (corretor) {
-      notificarCorretor(corretor, lead, corretor.imobiliaria).catch(() => {});
+      notificarCorretorCloudApi(corretor, lead).catch(() => {});
+      enviarPushCorretor(
+        corretor.id,
+        '🏠 Novo lead!',
+        `Nome: ${lead.nome} | Tel: ${lead.telefone}`,
+      ).catch(() => {});
     }
   }).catch(() => {});
 

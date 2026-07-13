@@ -1,7 +1,8 @@
 const { parse } = require('csv-parse/sync');
 const XLSX = require('xlsx');
 const axios = require('axios');
-const { notificarCorretor } = require('../services/notificacao.service');
+const { notificarCorretorCloudApi } = require('../services/notificacao.service');
+const { enviarPushCorretor } = require('./push.controller');
 
 const prisma = require('../lib/prisma');
 
@@ -301,7 +302,12 @@ async function transferir(req, res) {
   }
 
   if (result.corretor) {
-    notificarCorretor(result.corretor, result.lead, req.imobiliaria).catch(() => {});
+    notificarCorretorCloudApi(result.corretor, result.lead).catch(() => {});
+    enviarPushCorretor(
+      result.corretor.id,
+      '🏠 Novo lead!',
+      `Nome: ${result.lead.nome} | Tel: ${result.lead.telefone}`,
+    ).catch(() => {});
   }
 
   res.json({ ok: true, leadId: result.lead.id, semCorretor: !result.corretor });
@@ -401,7 +407,12 @@ async function transferirLote(req, res) {
   }
 
   for (const { corretor, lead } of notificacoes) {
-    notificarCorretor(corretor, lead, req.imobiliaria).catch(() => {});
+    notificarCorretorCloudApi(corretor, lead).catch(() => {});
+    enviarPushCorretor(
+      corretor.id,
+      '🏠 Novo lead!',
+      `Nome: ${lead.nome} | Tel: ${lead.telefone}`,
+    ).catch(() => {});
   }
 
   res.json({ sucesso, erros });

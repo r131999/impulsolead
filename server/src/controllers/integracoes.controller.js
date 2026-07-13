@@ -1,6 +1,6 @@
 const crypto = require('crypto');
 const prisma = require('../lib/prisma');
-const { notificarCorretor } = require('../services/notificacao.service');
+const { notificarCorretorCloudApi } = require('../services/notificacao.service');
 const { enviarPushCorretor } = require('./push.controller');
 
 function sanitizarTexto(valor) {
@@ -114,7 +114,7 @@ async function criarLeadEDistribuir({
   });
 
   if (result.corretor) {
-    notificarCorretor(result.corretor, result.lead, imobiliaria).catch(() => {});
+    notificarCorretorCloudApi(result.corretor, result.lead).catch(() => {});
     enviarPushCorretor(
       result.corretor.id,
       '🏠 Novo lead!',

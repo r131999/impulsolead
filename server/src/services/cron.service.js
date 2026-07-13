@@ -1,5 +1,6 @@
 ﻿const cron = require('node-cron');
 const { enviarWhatsApp } = require('./notificacao.service');
+const { enviarTemplate } = require('./whatsappCloudApi.service');
 const { sincronizarGastoAnuncios } = require('./adSpend.service');
 const { enviarPushCorretor } = require('../controllers/push.controller');
 
@@ -364,7 +365,7 @@ async function processarEscalonamentoCorretorGestor(imobiliaria, agora) {
       `Fale com o lead e registre a tratativa na observação do card.`;
 
     await enviarPushCorretor(corretor.id, '⏰ Leads aguardando atualização', texto);
-    await enviarWhatsApp(corretor.whatsapp || corretor.telefone, texto, imobiliaria.id);
+    await enviarTemplate(corretor.whatsapp || corretor.telefone, 'lead_parado_aviso_corretor', [grupo.length, imobiliaria.avisoLeadCorretorHoras]);
 
     await prisma.lead.updateMany({
       where: { id: { in: grupo.map((l) => l.id) } },
@@ -388,7 +389,7 @@ async function processarEscalonamentoCorretorGestor(imobiliaria, agora) {
         `${linhas}\n` +
         `Entre no CRM para falar com o corretor ou transferir o lead.`;
 
-      await enviarWhatsApp(telefoneGestor, texto, imobiliaria.id);
+      await enviarTemplate(telefoneGestor, 'lead_parado_escalonamento_gestor', [paraGestor.length, imobiliaria.avisoLeadGestorHoras]);
 
       console.log(`[cron] Escalonamento ao gestor enviado para ${imobiliaria.nome} (${paraGestor.length} lead(s))`);
     }
@@ -433,8 +434,7 @@ async function notificarLeadsAguardandoDistribuicao() {
         continue;
       }
 
-      const texto = `📊 Bom dia! Você tem ${total} lead(s) aguardando distribuição. Acesse o CRM para distribuir.`;
-      await enviarWhatsApp(telefoneGestor, texto, imobiliaria.id);
+      await enviarTemplate(telefoneGestor, 'leads_aguardando_distribuicao', [total]);
 
       console.log(`[cron] Alerta de leads aguardando distribuição enviado para ${imobiliaria.nome} (${total})`);
     } catch (err) {
