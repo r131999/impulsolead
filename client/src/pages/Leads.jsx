@@ -132,8 +132,12 @@ export default function Leads() {
 
   const removerLead = async (lead) => {
     if (!confirm(`Remover o lead "${lead.nome}"?`)) return
-    await leadsApi.remover(lead.id)
-    carregar()
+    try {
+      await leadsApi.remover(lead.id)
+      carregar()
+    } catch (err) {
+      setErro(err.response?.data?.error || 'Erro ao remover o lead')
+    }
   }
 
   return (

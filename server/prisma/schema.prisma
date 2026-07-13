@@ -158,13 +158,13 @@ model HistoricoLead {
   criadoEm DateTime @default(now())
 
   leadId String
-  lead   Lead   @relation(fields: [leadId], references: [id])
+  lead   Lead   @relation(fields: [leadId], references: [id], onDelete: Cascade)
 }
 
 model HistoricoEtapaLead {
   id             String      @id @default(uuid())
   leadId         String
-  lead           Lead        @relation(fields: [leadId], references: [id])
+  lead           Lead        @relation(fields: [leadId], references: [id], onDelete: Cascade)
   imobiliariaId  String
   imobiliaria    Imobiliaria @relation(fields: [imobiliariaId], references: [id])
   statusAnterior String
@@ -231,7 +231,7 @@ model FollowUp {
   atualizadoEm DateTime  @updatedAt
 
   leadId String
-  lead   Lead   @relation(fields: [leadId], references: [id])
+  lead   Lead   @relation(fields: [leadId], references: [id], onDelete: Cascade)
 
   corretorId String
   corretor   Corretor @relation(fields: [corretorId], references: [id])
@@ -392,7 +392,7 @@ model MensagemLead {
   criadoEm      DateTime @default(now())
 
   leadId String
-  lead   Lead   @relation(fields: [leadId], references: [id])
+  lead   Lead   @relation(fields: [leadId], references: [id], onDelete: Cascade)
 
   arquivoImovelId String?
   arquivoImovel   ArquivoImovel? @relation(fields: [arquivoImovelId], references: [id])

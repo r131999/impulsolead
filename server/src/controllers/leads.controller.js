@@ -390,14 +390,16 @@ async function remover(req, res) {
   });
   if (!lead) return res.status(404).json({ error: 'Lead não encontrado' });
 
-  await prisma.$transaction([
-    prisma.mensagemLead.deleteMany({ where: { leadId: id } }),
-    prisma.followUp.deleteMany({ where: { leadId: id } }),
-    prisma.historicoLead.deleteMany({ where: { leadId: id } }),
-    prisma.lead.delete({ where: { id } }),
-  ]);
-
-  res.json({ message: 'Lead removido' });
+  try {
+    await prisma.lead.delete({ where: { id } });
+    res.json({ message: 'Lead removido' });
+  } catch (err) {
+    console.error('[leads] erro ao remover lead:', err);
+    if (err.code === 'P2003') {
+      return res.status(409).json({ error: 'Não foi possível remover o lead: existem registros vinculados.' });
+    }
+    res.status(500).json({ error: 'Erro ao remover o lead' });
+  }
 }
 
 async function detalhes(req, res) {
