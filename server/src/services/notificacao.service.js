@@ -26,15 +26,12 @@ async function notificarCorretorCloudApi(corretor, lead) {
 
 async function notificarGestorPendencia(telefoneGestor, nomeCorretor, imobiliariaId) {
   const numero = formatarNumero(telefoneGestor);
-  const texto  = `⚠️ *${nomeCorretor}* foi pulado na fila.\nMotivo: lead parado há mais de 24h sem observação.`;
-  const body   = JSON.stringify({ imobiliariaId, number: numero, text: texto });
-
   try {
-    await httpPost('http://impulsolead-whatsapp:3010/send', body, {});
+    await enviarTemplate(numero, 'pendencia_corretor_pulado', { nome_corretor: nomeCorretor });
     console.log(`[notificacao] Pendência notificada ao gestor sobre ${nomeCorretor}`);
     return { enviado: true };
   } catch (err) {
-    console.error('[notificacao] Falha ao notificar gestor sobre pendência via Baileys:', err.message);
+    console.error('[notificacao] Falha ao notificar gestor sobre pendência via Cloud API:', err.message);
     return { enviado: false };
   }
 }
