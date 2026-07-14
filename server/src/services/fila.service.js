@@ -18,9 +18,12 @@ async function temPendencia(corretorId) {
   return count > 0;
 }
 
-async function proximoCorretor(imobiliariaId) {
+async function proximoCorretor(imobiliariaId, equipeId = null) {
+  const where = { imobiliariaId, ativo: true, disponivel: true };
+  if (equipeId) where.equipeId = equipeId;
+
   const corretores = await prisma.corretor.findMany({
-    where: { imobiliariaId, ativo: true, disponivel: true },
+    where,
     orderBy: { posicaoFila: 'asc' },
   });
 

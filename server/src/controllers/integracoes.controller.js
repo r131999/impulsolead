@@ -1,6 +1,7 @@
 const crypto = require('crypto');
 const prisma = require('../lib/prisma');
 const { notificarCorretorCloudApi } = require('../services/notificacao.service');
+const { proximoCorretor } = require('../services/fila.service');
 const { enviarPushCorretor } = require('./push.controller');
 
 function sanitizarTexto(valor) {
@@ -23,13 +24,30 @@ function normalizarTelefone(telefone) {
 // manual/sem corretor disponível), independente da origem (Meta Ads, Make, etc).
 async function criarLeadEDistribuir({
   nome, telefone, origem, campanha, conjuntoName, anuncioName,
-  adId, adsetId, campaignId, imobiliariaId, imobiliaria,
+  adId, adsetId, campaignId, formId, imobiliariaId, imobiliaria,
 }) {
-  const configAgente = await prisma.configAgente.findUnique({
-    where: { imobiliariaId },
-    select: { distribuicaoManual: true },
-  });
+  const configAgente = await prisma.configAgente.findUnique({ where: { imobiliariaId } });
   const modoManual = configAgente?.distribuicaoManual ?? false;
+
+  let equipeId = null;
+  if (formId && configAgente?.distribuicaoPorEquipeAtiva) {
+    const mapeamento = await prisma.formularioEquipe.findUnique({
+      where: { imobiliariaId_formId: { imobiliariaId, formId } },
+    });
+    equipeId = mapeamento?.equipeId || null;
+  }
+
+  const representadoPorEquipe = !!(equipeId && configAgente?.distribuicaoPorEquipeManual);
+
+  // proximoCorretor roda fora da transação de criação do lead — mesmo padrão já
+  // usado em leads.controller.js `distribuir`. Cobre os dois casos (equipeId
+  // null ou preenchido) e já aplica o filtro de pendência de 24h + notificação
+  // ao gestor quando pula corretor — vale pra todo lead de Meta Ads/Make agora,
+  // com ou sem roteamento por equipe.
+  let corretorEscolhido = null;
+  if (!modoManual && !representadoPorEquipe) {
+    corretorEscolhido = await proximoCorretor(imobiliariaId, equipeId);
+  }
 
   const result = await prisma.$transaction(async (tx) => {
     const lead = await tx.lead.create({
@@ -45,6 +63,7 @@ async function criarLeadEDistribuir({
         adId: adId || null,
         adsetId: adsetId || null,
         campaignId: campaignId || null,
+        formId: formId || null,
         imobiliariaId,
       },
     });
@@ -59,34 +78,27 @@ async function criarLeadEDistribuir({
       return { lead, corretor: null };
     }
 
-    const corretores = await tx.corretor.findMany({
-      where: { imobiliariaId, ativo: true, disponivel: true },
-      orderBy: { posicaoFila: 'asc' },
-    });
-
-    let corretor = null;
-
-    if (corretores.length > 0) {
-      const proximo = corretores[0];
-      const maxPosicao = corretores[corretores.length - 1].posicaoFila;
-
-      await tx.corretor.update({
-        where: { id: proximo.id },
-        data: { leadsRecebidos: { increment: 1 }, posicaoFila: maxPosicao + 1 },
+    if (representadoPorEquipe) {
+      await tx.historicoLead.create({
+        data: {
+          leadId: lead.id,
+          acao: `Lead recebido via ${origem} — aguardando distribuição manual da equipe`,
+        },
       });
+      return { lead, corretor: null };
+    }
 
+    if (corretorEscolhido) {
       await tx.lead.update({
         where: { id: lead.id },
-        data: { corretorId: proximo.id },
+        data: { corretorId: corretorEscolhido.id },
       });
-
-      corretor = proximo;
 
       await tx.historicoLead.create({
         data: {
           leadId: lead.id,
           acao: `Lead recebido via ${origem} e atribuído automaticamente`,
-          detalhes: `Corretor: ${proximo.nome}`,
+          detalhes: `Corretor: ${corretorEscolhido.nome}`,
         },
       });
 
@@ -95,8 +107,8 @@ async function criarLeadEDistribuir({
           leadId: lead.id,
           leadNome: nome,
           leadTelefone: telefone,
-          corretorId: proximo.id,
-          corretorNome: proximo.nome,
+          corretorId: corretorEscolhido.id,
+          corretorNome: corretorEscolhido.nome,
           distribuidoPor: 'automatico',
           imobiliariaId,
         },
@@ -110,7 +122,7 @@ async function criarLeadEDistribuir({
       });
     }
 
-    return { lead, corretor };
+    return { lead, corretor: corretorEscolhido };
   });
 
   if (result.corretor) {
@@ -264,6 +276,7 @@ async function receberLeadMeta(req, res) {
           adId: leadData.ad_id,
           adsetId: leadData.adset_id,
           campaignId: leadData.campaign_id,
+          formId: leadData.form_id,
           imobiliariaId,
           imobiliaria,
         });

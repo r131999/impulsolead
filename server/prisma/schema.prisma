@@ -52,6 +52,7 @@ model Imobiliaria {
   adSpends               AdSpend[]
   adStatuses             AdStatus[]
   historicosEtapaLead    HistoricoEtapaLead[]
+  formulariosEquipe      FormularioEquipe[]
 }
 
 model Usuario {
@@ -121,6 +122,7 @@ model Lead {
   adId         String?
   adsetId      String?
   campaignId   String?
+  formId       String?
   valorVenda   Decimal? @db.Decimal(12, 2)
   interesse    String?
   nomeEditado  String?
@@ -188,9 +190,22 @@ model Equipe {
   imobiliaria   Imobiliaria @relation(fields: [imobiliariaId], references: [id])
 
   corretores Corretor[] @relation("EquipeCorretores")
+  formularios FormularioEquipe[]
 
   criadoEm     DateTime @default(now())
   atualizadoEm DateTime @updatedAt
+}
+
+model FormularioEquipe {
+  id            String      @id @default(uuid())
+  imobiliariaId String
+  imobiliaria   Imobiliaria @relation(fields: [imobiliariaId], references: [id], onDelete: Cascade)
+  formId        String
+  equipeId      String
+  equipe        Equipe      @relation(fields: [equipeId], references: [id], onDelete: Cascade)
+  criadoEm      DateTime    @default(now())
+
+  @@unique([imobiliariaId, formId])
 }
 
 model ContatoImportado {
@@ -570,6 +585,8 @@ model ConfigAgente {
   tomAgente          String   @default("profissional mas leve")
   ativo              Boolean  @default(true)
   distribuicaoManual Boolean  @default(false)
+  distribuicaoPorEquipeAtiva  Boolean @default(false)
+  distribuicaoPorEquipeManual Boolean @default(false)
   criadoEm           DateTime @default(now())
   atualizadoEm       DateTime @updatedAt
 
