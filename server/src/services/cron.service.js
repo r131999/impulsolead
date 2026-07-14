@@ -209,21 +209,15 @@ async function enviarRelatorioSemanal() {
         }
       }
 
-      const texto = [
-        `📊 Relatório semanal — ${imob.nome}`,
-        ``,
-        `Semana de ${fmtDataBrasilia(seteDiasAtras)} a ${fmtDataBrasilia(agora)}`,
-        ``,
-        `📥 Leads recebidos: ${leadsRecebidos}`,
-        `✅ Vendas fechadas: ${vendasFechadas}`,
-        `📋 Em atendimento: ${emAtendimento}`,
-        ``,
-        `🏆 Destaque da semana: ${destaqueTexto}`,
-        ``,
-        `Acesse o CRM para ver todos os detalhes.`,
-      ].join('\n');
-
-      await enviarWhatsApp(telefoneGestor, texto, imob.id);
+      await enviarTemplate(telefoneGestor, 'relatorio_semanal', {
+        nome_imobiliaria: imob.nome,
+        data_inicio: fmtDataBrasilia(seteDiasAtras),
+        data_fim: fmtDataBrasilia(agora),
+        leads_recebidos: String(leadsRecebidos),
+        vendas_fechadas: String(vendasFechadas),
+        em_atendimento: String(emAtendimento),
+        destaque_texto: destaqueTexto,
+      });
       console.log(`[cron] Relatório semanal enviado para ${imob.nome}`);
     } catch (err) {
       console.error(`[cron] Erro no relatório de ${imob.nome}:`, err.message);
@@ -518,7 +512,10 @@ async function verificarFollowUpsPendentes() {
       const texto = `🔔 Lembrete de follow-up\n${followUp.lead.nome}\n${followUp.observacao || ''}`;
 
       await enviarPushCorretor(followUp.corretor.id, '🔔 Lembrete de follow-up', texto);
-      await enviarWhatsApp(numero, texto, followUp.lead.imobiliariaId);
+      await enviarTemplate(numero, 'lembrete_followup', {
+        nome_lead: followUp.lead.nome,
+        observacao: followUp.observacao || 'Sem observação',
+      });
 
       await prisma.followUp.update({
         where: { id: followUp.id },
