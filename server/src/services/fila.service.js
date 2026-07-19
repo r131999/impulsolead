@@ -29,31 +29,42 @@ async function proximoCorretor(imobiliariaId, equipeId = null) {
 
   if (corretores.length === 0) return null;
 
-  const gestor = await prisma.usuario.findFirst({
-    where: { imobiliariaId, role: 'gestor', telefone: { not: null } },
-    select: { telefone: true },
-    orderBy: { criadoEm: 'asc' },
+  const configAgente = await prisma.configAgente.findUnique({
+    where: { imobiliariaId },
+    select: { pularCorretorPendente: true },
   });
+  const checarPendencia = configAgente?.pularCorretorPendente ?? true;
 
   let escolhido = null;
-  for (const corretor of corretores) {
-    const pendente = await temPendencia(corretor.id);
-    if (!pendente) {
-      escolhido = corretor;
-      break;
-    }
-    console.log(`[fila] ${corretor.nome} pulado por pendência de atendimento`);
-    if (gestor?.telefone) {
-      notificarGestorPendencia(gestor.telefone, corretor.nome, imobiliariaId).catch((err) => {
-        console.error('[fila] Falha ao notificar gestor:', err.message);
-      });
-    }
-  }
 
-  // Todos com pendência: atribui ao primeiro para não travar a fila
-  if (!escolhido) {
+  if (!checarPendencia) {
     escolhido = corretores[0];
-    console.log(`[fila] Todos os corretores têm pendência — atribuindo ao primeiro (${escolhido.nome})`);
+  } else {
+    const gestor = await prisma.usuario.findFirst({
+      where: { imobiliariaId, role: 'gestor', telefone: { not: null } },
+      select: { telefone: true },
+      orderBy: { criadoEm: 'asc' },
+    });
+
+    for (const corretor of corretores) {
+      const pendente = await temPendencia(corretor.id);
+      if (!pendente) {
+        escolhido = corretor;
+        break;
+      }
+      console.log(`[fila] ${corretor.nome} pulado por pendência de atendimento`);
+      if (gestor?.telefone) {
+        notificarGestorPendencia(gestor.telefone, corretor.nome, imobiliariaId).catch((err) => {
+          console.error('[fila] Falha ao notificar gestor:', err.message);
+        });
+      }
+    }
+
+    // Todos com pendência: atribui ao primeiro para não travar a fila
+    if (!escolhido) {
+      escolhido = corretores[0];
+      console.log(`[fila] Todos os corretores têm pendência — atribuindo ao primeiro (${escolhido.nome})`);
+    }
   }
 
   const maxPosicao = corretores[corretores.length - 1].posicaoFila;

@@ -587,6 +587,7 @@ model ConfigAgente {
   distribuicaoManual Boolean  @default(false)
   distribuicaoPorEquipeAtiva  Boolean @default(false)
   distribuicaoPorEquipeManual Boolean @default(false)
+  pularCorretorPendente Boolean @default(true)
   criadoEm           DateTime @default(now())
   atualizadoEm       DateTime @updatedAt
 
