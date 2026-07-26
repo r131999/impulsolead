@@ -5,6 +5,7 @@ export const criar = (data) => api.post('/apresentacoes', data)
 export const buscar = (id) => api.get(`/apresentacoes/${id}`)
 export const atualizar = (id, data) => api.put(`/apresentacoes/${id}`, data)
 export const excluir = (id) => api.delete(`/apresentacoes/${id}`)
+export const duplicar = (id) => api.post(`/apresentacoes/${id}/duplicar`)
 
 export const uploadFoto = (apId, formData, onUploadProgress) =>
   api.post(`/apresentacoes/${apId}/fotos`, formData, {

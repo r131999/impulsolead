@@ -303,6 +303,7 @@ export default function Apresentacoes() {
   const [loading, setLoading] = useState(true)
   const [modal, setModal] = useState(null)
   const [excluindo, setExcluindo] = useState(null)
+  const [duplicando, setDuplicando] = useState(null)
   const [copiado, setCopiado] = useState(null)
 
   const carregar = async () => {
@@ -320,6 +321,13 @@ export default function Apresentacoes() {
     try { await apApi.excluir(id); setApresentacoes((p) => p.filter((a) => a.id !== id)) }
     catch {}
     finally { setExcluindo(null) }
+  }
+
+  const duplicar = async (id) => {
+    setDuplicando(id)
+    try { await apApi.duplicar(id); await carregar() }
+    catch {}
+    finally { setDuplicando(null) }
   }
 
   const copiarLink = (ap) => {
@@ -421,6 +429,9 @@ export default function Apresentacoes() {
                   </button>
                   <button onClick={() => excluir(ap.id)} disabled={excluindo === ap.id} className="text-xs py-1.5 rounded-lg disabled:opacity-50" style={{ backgroundColor: 'rgba(239,68,68,0.1)', color: '#EF4444' }} onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(239,68,68,0.2)' }} onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'rgba(239,68,68,0.1)' }}>
                     {excluindo === ap.id ? '...' : 'Excluir'}
+                  </button>
+                  <button onClick={() => duplicar(ap.id)} disabled={duplicando === ap.id} className="col-span-2 text-xs py-1.5 rounded-lg disabled:opacity-50" style={{ backgroundColor: '#1E293B', color: '#94A3B8' }} onMouseEnter={(e) => { e.currentTarget.style.color = '#F1F5F9' }} onMouseLeave={(e) => { e.currentTarget.style.color = '#94A3B8' }}>
+                    {duplicando === ap.id ? 'Duplicando...' : '⧉ Duplicar'}
                   </button>
                 </div>
               </div>

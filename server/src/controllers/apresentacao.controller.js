@@ -172,6 +172,121 @@ async function excluir(req, res) {
   }
 }
 
+async function duplicar(req, res) {
+  try {
+    const { id } = req.params;
+    const original = await prisma.apresentacao.findFirst({
+      where: whereAutorizado(req, id),
+      include: { fotos: { orderBy: { ordem: 'asc' } } },
+    });
+    if (!original) return res.status(404).json({ error: 'Apresentação não encontrada' });
+
+    let slug;
+    for (let i = 0; i < 10; i++) {
+      slug = gerarSlug();
+      const existe = await prisma.apresentacao.findUnique({ where: { slug } });
+      if (!existe) break;
+    }
+
+    const copia = await prisma.apresentacao.create({
+      data: {
+        nomeImóvel: original.nomeImóvel,
+        nomeLocal: original.nomeLocal,
+        descricao: original.descricao,
+        valor: original.valor,
+        quartos: original.quartos,
+        banheiros: original.banheiros,
+        vagas: original.vagas,
+        areaM2: original.areaM2,
+        estado: original.estado,
+        cidade: original.cidade,
+        bairro: original.bairro,
+        rua: original.rua,
+        numero: original.numero,
+        latitude: original.latitude,
+        longitude: original.longitude,
+        slug,
+        publicado: false,
+        nomeLeadPersonalizado: original.nomeLeadPersonalizado,
+        whatsappCorretor: original.whatsappCorretor,
+        nomeCorretor: original.nomeCorretor,
+        corretorId: req.corretorId || null,
+        imobiliariaId: req.imobiliariaId,
+      },
+    });
+
+    const srcDir = path.join(UPLOAD_DIR, original.id);
+    const destDir = path.join(UPLOAD_DIR, copia.id);
+
+    // Fotos: copia arquivos físicos (web + thumb) e recria as linhas em FotoApresentacao
+    for (const foto of original.fotos) {
+      try {
+        const baseName = path.basename(foto.url);
+        const thumbName = baseName.replace(/\.[^.]+$/, '_thumb.jpg');
+        const srcWeb = path.join(srcDir, baseName);
+        const srcThumb = path.join(srcDir, thumbName);
+
+        if (!fs.existsSync(srcWeb)) {
+          console.warn(`[apresentacao] duplicar: arquivo ausente, pulando foto ${foto.id}: ${srcWeb}`);
+          continue;
+        }
+
+        fs.mkdirSync(destDir, { recursive: true });
+        const destWeb = path.join(destDir, baseName);
+        fs.copyFileSync(srcWeb, destWeb);
+
+        if (fs.existsSync(srcThumb)) {
+          fs.copyFileSync(srcThumb, path.join(destDir, thumbName));
+        } else {
+          console.warn(`[apresentacao] duplicar: thumb ausente, seguindo sem: ${srcThumb}`);
+        }
+
+        const { size: tamanho } = fs.statSync(destWeb);
+        await prisma.fotoApresentacao.create({
+          data: {
+            apresentacaoId: copia.id,
+            url: `/uploads/apresentacoes/${copia.id}/${baseName}`,
+            tamanho,
+            ambiente: foto.ambiente,
+            ordem: foto.ordem,
+          },
+        });
+      } catch (err) {
+        console.warn(`[apresentacao] duplicar: erro ao copiar foto ${foto.id}:`, err.message);
+      }
+    }
+
+    // Vídeo (opcional)
+    if (original.videoUrl) {
+      try {
+        const baseName = path.basename(original.videoUrl);
+        const srcVideo = path.join(srcDir, baseName);
+        if (fs.existsSync(srcVideo)) {
+          fs.mkdirSync(destDir, { recursive: true });
+          fs.copyFileSync(srcVideo, path.join(destDir, baseName));
+          await prisma.apresentacao.update({
+            where: { id: copia.id },
+            data: { videoUrl: `/uploads/apresentacoes/${copia.id}/${baseName}` },
+          });
+        } else {
+          console.warn(`[apresentacao] duplicar: vídeo ausente, pulando: ${srcVideo}`);
+        }
+      } catch (err) {
+        console.warn('[apresentacao] duplicar: erro ao copiar vídeo:', err.message);
+      }
+    }
+
+    const resultado = await prisma.apresentacao.findUnique({
+      where: { id: copia.id },
+      include: { fotos: { orderBy: { ordem: 'asc' } } },
+    });
+    res.status(201).json({ apresentacao: resultado });
+  } catch (err) {
+    console.error('[apresentacao] duplicar:', err.message);
+    res.status(500).json({ error: 'Erro ao duplicar apresentação' });
+  }
+}
+
 async function buscarPublico(req, res) {
   try {
     const { slug } = req.params;
@@ -420,4 +535,4 @@ async function uploadVideo(req, res) {
   });
 }
 
-module.exports = { listar, criar, buscar, atualizar, excluir, buscarPublico, ogApresentacao, uploadFoto, excluirFoto, uploadVideo };
+module.exports = { listar, criar, buscar, atualizar, excluir, duplicar, buscarPublico, ogApresentacao, uploadFoto, excluirFoto, uploadVideo };
