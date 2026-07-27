@@ -29,6 +29,7 @@ const NAV_CORRETOR = [
   { to: '/meus-contatos',  label: 'Meus Contatos',     icon: ContactIcon },
   { to: '/materiais',       label: 'Materiais',          icon: DownloadIcon },
   { to: '/apresentacoes',  label: 'Apresentações',      icon: ApresentacaoIcon },
+  { to: '/educacional',    label: 'Educacional',        icon: GraduationCapIcon },
   { to: '/chat',           label: 'Assistente IA',      icon: ChatIAIcon },
 ]
 
@@ -40,6 +41,7 @@ const NAV_GERENTE = [
   { to: '/imoveis',              label: 'Imóveis',              icon: BuildingIcon },
   { to: '/arquivos-imoveis',     label: 'Arquivos de Imóveis',  icon: FolderIcon },
   { to: '/meus-contatos',        label: 'Meus Contatos',        icon: ContactIcon },
+  { to: '/educacional',          label: 'Educacional',          icon: GraduationCapIcon },
   { to: '/chat',                 label: 'Assistente IA',        icon: ChatIAIcon },
 ]
 

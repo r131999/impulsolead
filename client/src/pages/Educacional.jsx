@@ -19,13 +19,13 @@ const TRILHAS = [
   },
 ]
 
+// TODO: religar este bloqueio quando houver conteúdo real — hoje todos veem "Em breve" (Opção B)
+const GATE_ATIVO = false
+
 export default function Educacional() {
   const podeEducacional = usePermissao('educacional')
 
-  if (!podeEducacional) {
-    // TODO(decisão pendente): o que o plano Construção deve ver aqui ainda não foi
-    // definido. Por ora segue o padrão de bloqueio total (igual Imoveis.jsx) —
-    // trocar quando a decisão A/B for tomada.
+  if (GATE_ATIVO && !podeEducacional) {
     return (
       <div className="p-4 md:p-6 max-w-3xl mx-auto">
         <h1 className="text-xl font-bold mb-6" style={{ color: '#F1F5F9' }}>Educacional</h1>
