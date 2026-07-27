@@ -54,7 +54,7 @@ function diasColor(dias) {
 // ─── dados de planos ─────────────────────────────────────────────────────────
 
 const PLANOS_OPCOES = [
-  { value: 'construcao',    label: 'Construção — R$147/mês' },
+  { value: 'construcao',    label: 'Construção — R$199/mês' },
   { value: 'desenvolvimento', label: 'Desenvolvimento — R$347/mês' },
   { value: 'sucesso',       label: 'Sucesso — R$597/mês' },
   { value: 'trial',         label: 'Trial' },

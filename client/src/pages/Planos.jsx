@@ -5,7 +5,7 @@ const PLANOS = [
   {
     id: 'construcao',
     nome: 'Construção',
-    preco: 'R$ 147',
+    preco: 'R$ 199',
     periodo: '/mês',
     acessos: 5,
     descricao: 'Para imobiliárias em crescimento que querem organizar e distribuir seus leads com eficiência.',
