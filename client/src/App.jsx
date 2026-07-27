@@ -30,6 +30,7 @@ import ConectarWhatsApp from './pages/ConectarWhatsApp'
 import Cadastro from './pages/Cadastro'
 import Planos from './pages/Planos'
 import Integracoes from './pages/Integracoes'
+import Educacional from './pages/Educacional'
 
 function HomeRedirect() {
   const { usuario } = useAuth()
@@ -67,6 +68,7 @@ export default function App() {
             <Route path="whatsapp" element={<ConectarWhatsApp />} />
             <Route path="planos" element={<Planos />} />
             <Route path="integracoes" element={<Integracoes />} />
+            <Route path="educacional" element={<Educacional />} />
 
             {/* Apresentações */}
             <Route path="apresentacoes" element={<Apresentacoes />} />

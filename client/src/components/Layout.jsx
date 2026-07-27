@@ -19,6 +19,7 @@ const NAV_GESTOR = [
   { to: '/config',           label: 'Agente IA',            icon: BotIcon },
   { to: '/whatsapp',         label: 'WhatsApp',             icon: WhatsAppNavIcon },
   { to: '/integracoes',      label: 'Integrações',          icon: IntegracaoIcon },
+  { to: '/educacional',      label: 'Educacional',          icon: GraduationCapIcon },
   { to: '/chat',             label: 'Assistente IA',        icon: ChatIAIcon,       permissao: 'agenteIA' },
 ]
 
@@ -465,6 +466,14 @@ function DownloadIcon({ className }) {
   return (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+    </svg>
+  )
+}
+
+function GraduationCapIcon({ className }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.42A12.083 12.083 0 0121 13.5c0 2.9-1.09 5.55-2.88 7.5H5.88A12.077 12.077 0 013 13.5c0-1.28.25-2.5.71-3.62L12 14zm0 0v7" />
     </svg>
   )
 }
