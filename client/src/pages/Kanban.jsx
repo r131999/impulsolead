@@ -861,6 +861,23 @@ function ModalDetalhes({ lead, onClose, onSalvo }) {
             </div>
           )}
 
+          {/* Respostas do formulário — perguntas extras capturadas no Meta Ads além de nome/telefone */}
+          {lead.respostasFormulario?.length > 0 && (
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: '#64748B' }}>
+                Respostas do formulário
+              </p>
+              <div className="rounded-lg px-3 py-3 space-y-2" style={{ backgroundColor: '#0B1120', border: '1px solid #1E293B' }}>
+                {lead.respostasFormulario.map(({ pergunta, resposta }, i) => (
+                  <div key={i}>
+                    <p className="text-xs" style={{ color: '#64748B' }}>{pergunta}</p>
+                    <p className="text-sm font-medium break-words" style={{ color: '#E2E8F0' }}>{resposta}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Lead de Campanha — visível apenas para gestor e gerente */}
           {!isCorretor && (
             <div>

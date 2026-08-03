@@ -25,6 +25,7 @@ function normalizarTelefone(telefone) {
 async function criarLeadEDistribuir({
   nome, telefone, origem, campanha, conjuntoName, anuncioName,
   adId, adsetId, campaignId, formId, imobiliariaId, imobiliaria,
+  respostasFormulario,
 }) {
   const configAgente = await prisma.configAgente.findUnique({ where: { imobiliariaId } });
   const modoManual = configAgente?.distribuicaoManual ?? false;
@@ -64,6 +65,7 @@ async function criarLeadEDistribuir({
         adsetId: adsetId || null,
         campaignId: campaignId || null,
         formId: formId || null,
+        respostasFormulario: respostasFormulario || null,
         imobiliariaId,
       },
     });
@@ -198,30 +200,25 @@ async function receberLeadMeta(req, res) {
         const normStr = (s) =>
           String(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 
-        // Nome: 1º canônico full_name, 2º campo cujo nome contenha 'nome'/'name'
-        const nome =
-          fieldData.find((f) => f.name === 'full_name')?.values?.[0] ??
-          (() => {
-            for (const f of fieldData) {
-              const n = normStr(f.name);
-              if ((n.includes('nome') || n.includes('name')) && f?.values?.[0]) return f.values[0];
-            }
-            return null;
-          })();
+        // Nome: 1º canônico full_name, 2º campo cujo nome contenha 'nome'/'name'.
+        // Guarda o campo inteiro (não só o valor) pra excluí-lo depois das respostas extras.
+        const campoNome =
+          fieldData.find((f) => f.name === 'full_name' && f?.values?.[0]) ??
+          fieldData.find((f) => {
+            const n = normStr(f.name);
+            return (n.includes('nome') || n.includes('name')) && f?.values?.[0];
+          }) ??
+          null;
+        const nome = campoNome?.values?.[0] ?? null;
 
         // Telefone — 3 prioridades:
         // 1º canônico phone_number (campo padrão do Meta, independe do idioma)
         // 2º campo cujo nome normalizado contenha keyword de telefone
         // 3º fallback regex: prefere +55 (score 3) > começa com 55 (score 2) > 10-13 dígitos (score 1)
         const phoneKeywords = ['telefone', 'telefono', 'telemovel', 'celular', 'whatsapp', 'whats', 'contato', 'fone', 'phone', 'numero'];
-        const telefone =
-          fieldData.find((f) => f.name === 'phone_number')?.values?.[0] ??
-          (() => {
-            for (const f of fieldData) {
-              if (phoneKeywords.some((kw) => normStr(f.name).includes(kw)) && f?.values?.[0]) return f.values[0];
-            }
-            return null;
-          })() ??
+        const campoTelefone =
+          fieldData.find((f) => f.name === 'phone_number' && f?.values?.[0]) ??
+          fieldData.find((f) => phoneKeywords.some((kw) => normStr(f.name).includes(kw)) && f?.values?.[0]) ??
           (() => {
             let best = null;
             let bestScore = 0;
@@ -234,13 +231,29 @@ async function receberLeadMeta(req, res) {
                 : digits.startsWith('55') ? 2
                 : (digits.length >= 10 && digits.length <= 13) ? 1
                 : 0;
-              if (score > bestScore) { bestScore = score; best = val; }
+              if (score > bestScore) { bestScore = score; best = f; }
               if (bestScore === 3) break;
             }
             return best;
           })();
+        const telefone = campoTelefone?.values?.[0] ?? null;
 
         const email = fieldData.find((f) => f.name === 'email')?.values?.[0] ?? null;
+
+        // Respostas extras do formulário (perguntas de qualificação além de nome/telefone/email),
+        // já com nome do campo e valores "deslugificados" pra ficarem legíveis no detalhe do lead.
+        const formatarTextoFormulario = (s) => {
+          const texto = String(s ?? '').replace(/_+/g, ' ').replace(/\s+/g, ' ').trim();
+          return texto.charAt(0).toUpperCase() + texto.slice(1);
+        };
+        const camposReconhecidos = new Set([campoNome?.name, campoTelefone?.name, 'email'].filter(Boolean));
+        const respostasExtras = fieldData
+          .filter((f) => f?.name && !camposReconhecidos.has(f.name) && Array.isArray(f.values) && f.values.length > 0)
+          .map((f) => ({
+            pergunta: sanitizarTexto(formatarTextoFormulario(f.name)),
+            resposta: sanitizarTexto(f.values.map((v) => formatarTextoFormulario(v)).join(', ')),
+          }));
+        const respostasFormulario = respostasExtras.length > 0 ? respostasExtras : null;
         const campanha = sanitizarTexto(leadData.campaign_name || fieldData.find((f) => f.name === 'campaign_name')?.values?.[0] || value.campaign_name || null);
         const conjuntoName = sanitizarTexto(leadData.adset_name || fieldData.find((f) => f.name === 'adset_name')?.values?.[0] || value.adset_name || null);
         const anuncioName = sanitizarTexto(leadData.ad_name || fieldData.find((f) => f.name === 'ad_name')?.values?.[0] || value.ad_name || null);
@@ -277,6 +290,7 @@ async function receberLeadMeta(req, res) {
           adsetId: leadData.adset_id,
           campaignId: leadData.campaign_id,
           formId: leadData.form_id,
+          respostasFormulario,
           imobiliariaId,
           imobiliaria,
         });

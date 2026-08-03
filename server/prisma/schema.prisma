@@ -127,6 +127,8 @@ model Lead {
   interesse    String?
   nomeEditado  String?
 
+  respostasFormulario Json?
+
   status            String  @default("lead")
   motivoPerda       String?
   observacoes       String?

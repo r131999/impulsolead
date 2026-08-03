@@ -63,7 +63,7 @@ async function listar(req, res) {
         restricaoCpf: true, valorEntrada: true,
         urgencia: true, regiao: true, faixaValor: true,
         observacoes: true, criadoEm: true, atualizadoEm: true, etapaEntradaEm: true,
-        temConversa: true,
+        temConversa: true, respostasFormulario: true,
         corretor: { select: { id: true, nome: true } },
       },
     }),
