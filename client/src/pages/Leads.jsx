@@ -44,6 +44,7 @@ export default function Leads() {
   const [statusForm, setStatusForm] = useState({ status: '', observacao: '', motivoPerda: '' })
   const [salvando, setSalvando] = useState(false)
   const [erro, setErro] = useState('')
+  const [exportando, setExportando] = useState(false)
 
   const [histDist, setHistDist] = useState([])
   const [histTotal, setHistTotal] = useState(0)
@@ -140,6 +141,42 @@ export default function Leads() {
     }
   }
 
+  const exportarLeads = async () => {
+    if (total > 2000) {
+      const confirmado = confirm(
+        `Sua busca retornou ${total} leads. A exportação traz os 2.000 mais recentes.`,
+      )
+      if (!confirmado) return
+    }
+
+    setExportando(true)
+    setErro('')
+    try {
+      const params = {}
+      if (filtros.status) params.status = filtros.status
+      if (filtros.busca) params.busca = filtros.busca
+      const res = await leadsApi.exportarCsv(params)
+
+      const disposition = res.headers['content-disposition'] || ''
+      const match = disposition.match(/filename="?([^"]+)"?/)
+      const filename = match ? match[1] : 'leads.csv'
+
+      const blob = new Blob([res.data], { type: 'text/csv;charset=utf-8' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = filename
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      setErro('Erro ao exportar leads')
+    } finally {
+      setExportando(false)
+    }
+  }
+
   return (
     <div className="p-4 md:p-6 max-w-7xl mx-auto">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
@@ -150,7 +187,14 @@ export default function Leads() {
           </p>
         </div>
         {aba === 'leads' && (
-          <button onClick={abrirCriar} className="btn-primary self-start sm:self-auto">+ Novo lead</button>
+          <div className="flex gap-2 self-start sm:self-auto">
+            {isGestor && (
+              <button onClick={exportarLeads} className="btn-secondary" disabled={exportando}>
+                {exportando ? 'Exportando...' : 'Exportar CSV'}
+              </button>
+            )}
+            <button onClick={abrirCriar} className="btn-primary">+ Novo lead</button>
+          </div>
         )}
       </div>
 

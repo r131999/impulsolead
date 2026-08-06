@@ -1,4 +1,5 @@
-﻿const { STATUS_VALIDOS, proximoCorretor } = require('../services/fila.service');
+﻿const { stringify } = require('csv-stringify');
+const { STATUS_VALIDOS, proximoCorretor } = require('../services/fila.service');
 const { notificarCorretorCloudApi } = require('../services/notificacao.service');
 const { enviarPushCorretor } = require('./push.controller');
 
@@ -9,9 +10,10 @@ const CAMPOS_QUALIFICACAO = [
   'valorEntrada', 'urgencia', 'regiao', 'faixaValor',
 ];
 
-async function listar(req, res) {
-  const { status, corretorId, dataInicio, dataFim, busca, page = 1, limit = 50 } = req.query;
-  console.log('[leads] listar imobiliariaId:', req.imobiliariaId);
+const LIMITE_EXPORTACAO_CSV = 2000;
+
+async function montarWhereLeads(req, query) {
+  const { status, corretorId, dataInicio, dataFim, busca } = query;
 
   const where = { imobiliariaId: req.imobiliariaId };
 
@@ -48,6 +50,15 @@ async function listar(req, res) {
     ];
   }
 
+  return where;
+}
+
+async function listar(req, res) {
+  const { page = 1, limit = 50 } = req.query;
+  console.log('[leads] listar imobiliariaId:', req.imobiliariaId);
+
+  const where = await montarWhereLeads(req, req.query);
+
   const skip = (Number(page) - 1) * Number(limit);
 
   const [leads, total] = await prisma.$transaction([
@@ -71,6 +82,71 @@ async function listar(req, res) {
   ]);
 
   res.json({ leads, total, page: Number(page), limit: Number(limit) });
+}
+
+function sanitizarCelulaCsv(valor) {
+  if (valor === null || valor === undefined) return '';
+  const texto = String(valor);
+  // Neutraliza injeção de fórmula: Excel/Sheets interpretam células
+  // iniciadas com = + - @ como fórmula ao abrir o CSV.
+  return /^[=+\-@]/.test(texto) ? `'${texto}` : texto;
+}
+
+const REGEX_DIACRITICOS = new RegExp('[\\u0300-\\u036f]', 'g');
+
+function slugificar(texto) {
+  return texto
+    .normalize('NFD')
+    .replace(REGEX_DIACRITICOS, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '');
+}
+
+async function exportarCsv(req, res) {
+  const where = await montarWhereLeads(req, req.query);
+
+  const leads = await prisma.lead.findMany({
+    where,
+    take: LIMITE_EXPORTACAO_CSV,
+    orderBy: { criadoEm: 'desc' },
+    select: { nome: true, telefone: true, conjuntoName: true },
+  });
+
+  const slugImobiliaria = slugificar(req.imobiliaria?.nome || 'imobiliaria') || 'imobiliaria';
+  const dataArquivo = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date());
+  const filename = `leads-${slugImobiliaria}-${dataArquivo}.csv`;
+
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+
+  const stringifier = stringify({
+    delimiter: ';',
+    header: true,
+    columns: [
+      { key: 'nome', header: 'Nome' },
+      { key: 'telefone', header: 'Telefone' },
+      { key: 'conjuntoName', header: 'Conjunto de Anúncios' },
+    ],
+  });
+
+  stringifier.on('error', (err) => {
+    console.error('[leads] erro ao gerar CSV de exportação:', err);
+    if (!res.headersSent) res.status(500);
+    res.end();
+  });
+
+  res.write(String.fromCharCode(0xfeff));
+  stringifier.pipe(res);
+
+  for (const lead of leads) {
+    stringifier.write({
+      nome: sanitizarCelulaCsv(lead.nome),
+      telefone: sanitizarCelulaCsv(lead.telefone),
+      conjuntoName: sanitizarCelulaCsv(lead.conjuntoName),
+    });
+  }
+  stringifier.end();
 }
 
 async function buscarPorId(req, res) {
@@ -600,4 +676,4 @@ async function listarHistoricoDistribuicao(req, res) {
   res.json({ registros, total, page: Number(page), limit: Number(limit) });
 }
 
-module.exports = { listar, buscarPorId, criar, atualizar, mudarStatus, remover, detalhes, getHistoricoConversa, distribuir, listarHistoricoDistribuicao };
+module.exports = { listar, exportarCsv, buscarPorId, criar, atualizar, mudarStatus, remover, detalhes, getHistoricoConversa, distribuir, listarHistoricoDistribuicao };
