@@ -19,6 +19,12 @@ const CORES_FUNIL = {
 const CORES_PIE = ['#6366f1', '#f59e0b', '#ef4444', '#10B981', '#8b5cf6', '#f97316']
 const CORES_EQUIPES = ['#6366f1', '#10B981', '#f59e0b', '#3b82f6', '#ef4444', '#8b5cf6', '#f97316']
 
+const TEMPERATURA_INFO = {
+  quente: { icone: '🔥', label: 'Quente', cor: '#EF4444', bg: 'rgba(239,68,68,0.12)' },
+  morno:  { icone: '🌤️', label: 'Morno',  cor: '#F59E0B', bg: 'rgba(245,158,11,0.12)' },
+  frio:   { icone: '❄️', label: 'Frio',   cor: '#60A5FA', bg: 'rgba(96,165,250,0.12)' },
+}
+
 const TOOLTIP_STYLE = {
   backgroundColor: '#111827',
   border: '1px solid #1E293B',
@@ -238,6 +244,69 @@ export default function Relatorios() {
                     </div>
                   </>
                 )}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="card">
+                <h2 className="font-semibold mb-4" style={{ color: '#F1F5F9' }}>Distribuição por temperatura</h2>
+                {(() => {
+                  const dadosTemperatura = [
+                    ...dados.porTemperatura
+                      .filter((t) => t.total > 0)
+                      .map((t) => ({ label: TEMPERATURA_INFO[t.temperatura].label, total: t.total, cor: TEMPERATURA_INFO[t.temperatura].cor })),
+                    ...(dados.semTemperatura > 0 ? [{ label: 'Sem temperatura', total: dados.semTemperatura, cor: '#64748B' }] : []),
+                  ]
+                  return dadosTemperatura.length === 0 ? (
+                    <div className="flex items-center justify-center h-48 text-sm" style={{ color: '#64748B' }}>
+                      Nenhum lead no período
+                    </div>
+                  ) : (
+                    <>
+                      <ResponsiveContainer width="100%" height={200}>
+                        <PieChart>
+                          <Pie
+                            data={dadosTemperatura}
+                            dataKey="total"
+                            nameKey="label"
+                            cx="50%"
+                            cy="50%"
+                            outerRadius={80}
+                          >
+                            {dadosTemperatura.map((entry, i) => (
+                              <Cell key={i} fill={entry.cor} />
+                            ))}
+                          </Pie>
+                          <Tooltip contentStyle={TOOLTIP_STYLE} labelStyle={LABEL_STYLE} formatter={(v, n) => [v, n]} />
+                        </PieChart>
+                      </ResponsiveContainer>
+                      <div className="mt-3 pt-3 space-y-1.5" style={{ borderTop: '1px solid #1E293B' }}>
+                        {dadosTemperatura.map((t) => (
+                          <div key={t.label} className="flex items-center gap-2 text-sm">
+                            <span className="flex-shrink-0 w-3 h-3 rounded-sm" style={{ backgroundColor: t.cor }} />
+                            <span className="flex-1 truncate" style={{ color: '#94A3B8' }}>{t.label}</span>
+                            <span className="font-medium flex-shrink-0" style={{ color: '#F1F5F9' }}>{t.total}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )
+                })()}
+              </div>
+
+              <div className="card">
+                <h2 className="font-semibold mb-4" style={{ color: '#F1F5F9' }}>Mudanças de temperatura no período</h2>
+                <p className="text-xs mb-4" style={{ color: '#64748B' }}>Quantos leads passaram a ter cada temperatura nos últimos {periodo} dias</p>
+                <div className="grid grid-cols-3 gap-3">
+                  {dados.mudancasTemperatura.map((m) => (
+                    <div key={m.temperatura} className="rounded-xl p-3 text-center" style={{ backgroundColor: TEMPERATURA_INFO[m.temperatura].bg }}>
+                      <p className="text-2xl font-bold" style={{ color: TEMPERATURA_INFO[m.temperatura].cor }}>{m.total}</p>
+                      <p className="text-xs mt-1" style={{ color: TEMPERATURA_INFO[m.temperatura].cor }}>
+                        {TEMPERATURA_INFO[m.temperatura].icone} viraram {TEMPERATURA_INFO[m.temperatura].label.toLowerCase()}
+                      </p>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
 

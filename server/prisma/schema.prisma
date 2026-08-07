@@ -30,29 +30,30 @@ model Imobiliaria {
   telefoneNotificacoes       String?
   ultimoAlertaSemCorretorEm  DateTime?
 
-  usuarios               Usuario[]
-  corretores             Corretor[]
-  leads                  Lead[]
-  configAgente           ConfigAgente?
-  equipes                Equipe[]
-  contatosImportados     ContatoImportado[]
-  modelosMensagem        ModeloMensagem[]
-  contatosPessoais       ContatoPessoal[]
-  imoveis                Imovel[]
-  sessoesAgente          SessaoAgente[]
-  historicosDistribuicao HistoricoDistribuicao[]
-  arquivosImovel         ArquivoImovel[]
-  empreendimentos        Empreendimento[]
-  mensagensLead          MensagemLead[]
-  whatsappInstancia      WhatsappInstancia?
-  metaIntegracoes        MetaIntegracao[]
-  makeIntegracao         MakeIntegracao?
-  tours                  TourVirtual[]
-  apresentacoes          Apresentacao[]
-  adSpends               AdSpend[]
-  adStatuses             AdStatus[]
-  historicosEtapaLead    HistoricoEtapaLead[]
-  formulariosEquipe      FormularioEquipe[]
+  usuarios                  Usuario[]
+  corretores                Corretor[]
+  leads                     Lead[]
+  configAgente              ConfigAgente?
+  equipes                   Equipe[]
+  contatosImportados        ContatoImportado[]
+  modelosMensagem           ModeloMensagem[]
+  contatosPessoais          ContatoPessoal[]
+  imoveis                   Imovel[]
+  sessoesAgente             SessaoAgente[]
+  historicosDistribuicao    HistoricoDistribuicao[]
+  arquivosImovel            ArquivoImovel[]
+  empreendimentos           Empreendimento[]
+  mensagensLead             MensagemLead[]
+  whatsappInstancia         WhatsappInstancia?
+  metaIntegracoes           MetaIntegracao[]
+  makeIntegracao            MakeIntegracao?
+  tours                     TourVirtual[]
+  apresentacoes             Apresentacao[]
+  adSpends                  AdSpend[]
+  adStatuses                AdStatus[]
+  historicosEtapaLead       HistoricoEtapaLead[]
+  historicosTemperaturaLead HistoricoTemperaturaLead[]
+  formulariosEquipe         FormularioEquipe[]
 }
 
 model Usuario {
@@ -134,6 +135,7 @@ model Lead {
   observacoes       String?
   historicoConversa String?
   temConversa       Boolean @default(false)
+  temperatura       String?
 
   corretorId String?
   corretor   Corretor? @relation(fields: [corretorId], references: [id])
@@ -141,10 +143,11 @@ model Lead {
   imobiliariaId String
   imobiliaria   Imobiliaria @relation(fields: [imobiliariaId], references: [id])
 
-  historico          HistoricoLead[]
-  followUps          FollowUp[]
-  mensagens          MensagemLead[]
-  historicoEtapaLead HistoricoEtapaLead[]
+  historico                HistoricoLead[]
+  followUps                FollowUp[]
+  mensagens                MensagemLead[]
+  historicoEtapaLead       HistoricoEtapaLead[]
+  historicoTemperaturaLead HistoricoTemperaturaLead[]
 
   ultimaNotificacaoGestor DateTime?
   etapaEntradaEm          DateTime?
@@ -174,6 +177,20 @@ model HistoricoEtapaLead {
   statusAnterior String
   statusNovo     String
   alteradoEm     DateTime    @default(now())
+
+  @@index([imobiliariaId, alteradoEm])
+  @@index([leadId])
+}
+
+model HistoricoTemperaturaLead {
+  id                  String      @id @default(uuid())
+  leadId              String
+  lead                Lead        @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  imobiliariaId       String
+  imobiliaria         Imobiliaria @relation(fields: [imobiliariaId], references: [id])
+  temperaturaAnterior String?
+  temperaturaNova     String?
+  alteradoEm          DateTime    @default(now())
 
   @@index([imobiliariaId, alteradoEm])
   @@index([leadId])

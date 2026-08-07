@@ -16,6 +16,13 @@ const STATUS_BADGE_STYLE = {
 
 const STATUS_LIST = ['lead', 'atendimento', 'agendamento', 'visita', 'proposta', 'venda', 'perdido']
 
+const TEMPERATURA_LABEL = {
+  quente: '🔥 Quente',
+  morno: '🌤️ Morno',
+  frio: '❄️ Frio',
+}
+const TEMPERATURA_LIST = ['quente', 'morno', 'frio']
+
 const FORM_VAZIO = {
   nome: '', telefone: '', corretorId: '', observacoes: '',
   urgencia: '', regiao: '', faixaValor: '', primeiroImovel: '',
@@ -37,7 +44,7 @@ export default function Leads() {
   const [total, setTotal] = useState(0)
   const [corretores, setCorretores] = useState([])
   const [loading, setLoading] = useState(true)
-  const [filtros, setFiltros] = useState({ status: '', busca: '', page: 1 })
+  const [filtros, setFiltros] = useState({ status: '', temperatura: '', busca: '', page: 1 })
   const [modal, setModal] = useState(null)
   const [leadSelecionado, setLeadSelecionado] = useState(null)
   const [form, setForm] = useState(FORM_VAZIO)
@@ -55,6 +62,7 @@ export default function Leads() {
   const carregar = useCallback(() => {
     const params = { page: filtros.page, limit: 30 }
     if (filtros.status) params.status = filtros.status
+    if (filtros.temperatura) params.temperatura = filtros.temperatura
     if (filtros.busca) params.busca = filtros.busca
     leadsApi
       .listar(params)
@@ -154,6 +162,7 @@ export default function Leads() {
     try {
       const params = {}
       if (filtros.status) params.status = filtros.status
+      if (filtros.temperatura) params.temperatura = filtros.temperatura
       if (filtros.busca) params.busca = filtros.busca
       const res = await leadsApi.exportarCsv(params)
 
@@ -345,6 +354,13 @@ export default function Leads() {
           {STATUS_LIST.map((s) => (
             <option key={s} value={s}>{s}</option>
           ))}
+        </select>
+        <select className="input sm:max-w-[180px]" value={filtros.temperatura} onChange={setFiltro('temperatura')}>
+          <option value="">Todas as temperaturas</option>
+          {TEMPERATURA_LIST.map((t) => (
+            <option key={t} value={t}>{TEMPERATURA_LABEL[t]}</option>
+          ))}
+          <option value="nenhuma">Sem temperatura definida</option>
         </select>
       </div>
 

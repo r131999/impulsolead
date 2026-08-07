@@ -3,6 +3,7 @@ const prisma = require('../lib/prisma');
 
 const PERIODOS_VALIDOS = [7, 30, 90];
 const STATUS_ORDEM = ['lead', 'atendimento', 'em_espera', 'agendamento', 'visita', 'proposta', 'venda', 'perdido'];
+const TEMPERATURA_ORDEM = ['quente', 'morno', 'frio'];
 
 // Brasília = UTC-3. Midnight Brasília = 03:00 UTC.
 
@@ -36,11 +37,11 @@ async function getRelatorios(req, res) {
   const whereAnterior = { imobiliariaId, criadoEm: { gte: periodoAnteriorInicio, lt: dataInicio } };
 
   // Busca todos os leads do período com dados necessários
-  const [leads, leadsAnterior, corretores] = await prisma.$transaction([
+  const [leads, leadsAnterior, corretores, mudancasTemperaturaRaw] = await prisma.$transaction([
     prisma.lead.findMany({
       where,
       select: {
-        id: true, status: true, criadoEm: true, atualizadoEm: true,
+        id: true, status: true, temperatura: true, criadoEm: true, atualizadoEm: true,
         motivoPerda: true, regiao: true, faixaValor: true, urgencia: true, campanha: true,
         corretor: { select: { id: true, nome: true } },
       },
@@ -53,6 +54,14 @@ async function getRelatorios(req, res) {
         id: true, nome: true, leadsRecebidos: true,
         _count: { select: { leads: true } },
       },
+    }),
+    // Transições de temperatura no período. A tabela HistoricoTemperaturaLead também
+    // permite, no futuro, tempo médio de transição entre temperaturas (ex: morno -> quente)
+    // e cruzamento com taxa de venda — não implementado ainda por não ser necessário agora.
+    prisma.historicoTemperaturaLead.groupBy({
+      by: ['temperaturaNova'],
+      where: { imobiliariaId, alteradoEm: { gte: dataInicio } },
+      _count: { _all: true },
     }),
   ]);
 
@@ -67,6 +76,19 @@ async function getRelatorios(req, res) {
     acc[s] = leads.filter((l) => l.status === s).length;
     return acc;
   }, {});
+
+  // Leads por temperatura (distribuição atual)
+  const porTemperatura = TEMPERATURA_ORDEM.map((t) => ({
+    temperatura: t,
+    total: leads.filter((l) => l.temperatura === t).length,
+  }));
+  const semTemperatura = leads.filter((l) => !l.temperatura).length;
+
+  // Quantos leads passaram a ter cada temperatura no período (a partir do histórico)
+  const mudancasTemperatura = TEMPERATURA_ORDEM.map((t) => ({
+    temperatura: t,
+    total: mudancasTemperaturaRaw.find((m) => m.temperaturaNova === t)?._count?._all || 0,
+  }));
 
   // Taxa de conversão
   const naoPerdidos = leads.filter((l) => l.status !== 'perdido').length;
@@ -148,6 +170,9 @@ async function getRelatorios(req, res) {
       leadsCampanha,
     },
     funil: STATUS_ORDEM.map((s) => ({ status: s, total: porStatus[s] })),
+    porTemperatura,
+    semTemperatura,
+    mudancasTemperatura,
     leadsPorDia: serie,
     porCorretor,
     motivosPerda: Object.entries(motivosPerda)

@@ -10,10 +10,12 @@ const CAMPOS_QUALIFICACAO = [
   'valorEntrada', 'urgencia', 'regiao', 'faixaValor',
 ];
 
+const TEMPERATURAS_VALIDAS = ['quente', 'morno', 'frio'];
+
 const LIMITE_EXPORTACAO_CSV = 2000;
 
 async function montarWhereLeads(req, query) {
-  const { status, corretorId, dataInicio, dataFim, busca } = query;
+  const { status, corretorId, dataInicio, dataFim, busca, temperatura } = query;
 
   const where = { imobiliariaId: req.imobiliariaId };
 
@@ -36,6 +38,9 @@ async function montarWhereLeads(req, query) {
   if (status) {
     const statusList = status.split(',').map((s) => s.trim());
     where.status = statusList.length === 1 ? statusList[0] : { in: statusList };
+  }
+  if (temperatura) {
+    where.temperatura = temperatura === 'nenhuma' ? null : temperatura;
   }
   if (dataInicio || dataFim) {
     where.criadoEm = {};
@@ -68,7 +73,7 @@ async function listar(req, res) {
       take: Number(limit),
       orderBy: { criadoEm: 'desc' },
       select: {
-        id: true, nome: true, nomeEditado: true, telefone: true, status: true,
+        id: true, nome: true, nomeEditado: true, telefone: true, status: true, temperatura: true,
         origem: true, campanha: true, conjuntoName: true, anuncioName: true, interesse: true,
         primeiroImovel: true, tipoRenda: true, rendaMensal: true,
         restricaoCpf: true, valorEntrada: true,
@@ -480,7 +485,13 @@ async function remover(req, res) {
 
 async function detalhes(req, res) {
   const { id } = req.params;
-  const { nome, origem, observacoes, campanha, interesse } = req.body;
+  const { nome, origem, observacoes, campanha, interesse, temperatura } = req.body;
+
+  if (temperatura !== undefined && temperatura && !TEMPERATURAS_VALIDAS.includes(temperatura)) {
+    return res.status(400).json({
+      error: `Temperatura inválida. Valores aceitos: ${TEMPERATURAS_VALIDAS.join(', ')}`,
+    });
+  }
 
   const where = { id, imobiliariaId: req.imobiliariaId };
   if (req.role === 'corretor') {
@@ -526,10 +537,32 @@ async function detalhes(req, res) {
     }
   }
 
-  const atualizado = await prisma.lead.update({
-    where: { id },
-    data,
-    include: { corretor: { select: { id: true, nome: true } } },
+  let temperaturaMudou = false;
+  if (temperatura !== undefined) {
+    const temperaturaNova = temperatura || null;
+    temperaturaMudou = temperaturaNova !== lead.temperatura;
+    data.temperatura = temperaturaNova;
+  }
+
+  const atualizado = await prisma.$transaction(async (tx) => {
+    const result = await tx.lead.update({
+      where: { id },
+      data,
+      include: { corretor: { select: { id: true, nome: true } } },
+    });
+
+    if (temperaturaMudou) {
+      await tx.historicoTemperaturaLead.create({
+        data: {
+          leadId: id,
+          imobiliariaId: lead.imobiliariaId,
+          temperaturaAnterior: lead.temperatura,
+          temperaturaNova: data.temperatura,
+        },
+      });
+    }
+
+    return result;
   });
 
   return res.json({ lead: atualizado });

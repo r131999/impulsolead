@@ -26,6 +26,12 @@ const URGENCIA_COR = {
   baixa: '#10B981',
 }
 
+const TEMPERATURA_INFO = {
+  quente: { label: 'Quente', icone: '🔥', cor: '#EF4444', bg: 'rgba(239,68,68,0.15)' },
+  morno:  { label: 'Morno',  icone: '🌤️', cor: '#F59E0B', bg: 'rgba(245,158,11,0.15)' },
+  frio:   { label: 'Frio',   icone: '❄️', cor: '#60A5FA', bg: 'rgba(96,165,250,0.15)' },
+}
+
 function tempoNaEtapa(etapaEntradaEm, atualizadoEm) {
   const referencia = etapaEntradaEm || atualizadoEm
   const diffMs = Date.now() - new Date(referencia).getTime()
@@ -392,6 +398,20 @@ function LeadCard({ lead, atualizando, followUp, podeGerenciar, bloqueado, chatH
           {lead.nome}
         </button>
         <div className="flex items-center gap-1 flex-shrink-0">
+          {lead.temperatura && TEMPERATURA_INFO[lead.temperatura] && (
+            <span
+              className="text-xs font-bold rounded px-1.5 py-0.5"
+              style={{
+                backgroundColor: TEMPERATURA_INFO[lead.temperatura].bg,
+                color: TEMPERATURA_INFO[lead.temperatura].cor,
+                fontSize: 10,
+                lineHeight: '16px',
+              }}
+              title={`Temperatura: ${TEMPERATURA_INFO[lead.temperatura].label}`}
+            >
+              {TEMPERATURA_INFO[lead.temperatura].icone} {TEMPERATURA_INFO[lead.temperatura].label}
+            </span>
+          )}
           {pendente && (
             <span
               className="text-xs font-bold rounded px-1.5 py-0.5"
@@ -722,6 +742,7 @@ function ModalDetalhes({ lead, onClose, onSalvo }) {
   const [origem, setOrigem] = useState(lead.origem || '')
   const [leadCampanha, setLeadCampanha] = useState(!!lead.campanha)
   const [interesse, setInteresse] = useState(lead.interesse || '')
+  const [temperatura, setTemperatura] = useState(lead.temperatura || '')
   const [observacoes, setObservacoes] = useState(conteudoInicial)
   const [ultimaAtualizacao] = useState(tsInicial)
   const [salvando, setSalvando] = useState(false)
@@ -750,6 +771,7 @@ function ModalDetalhes({ lead, onClose, onSalvo }) {
         campanha: leadCampanha ? 'Anúncio' : null,
         interesse: interesse.trim() || null,
         observacoes: observacoes.trim() || null,
+        temperatura: temperatura || null,
       })
       onSalvo()
     } catch (e) {
@@ -829,6 +851,24 @@ function ModalDetalhes({ lead, onClose, onSalvo }) {
             >
               <option value="">Selecionar origem...</option>
               {ORIGENS.map((o) => <option key={o} value={o}>{o}</option>)}
+            </select>
+          </div>
+
+          {/* Temperatura */}
+          <div>
+            <label className="text-xs font-semibold uppercase tracking-wide block mb-1.5" style={{ color: '#64748B' }}>
+              Temperatura do Lead
+            </label>
+            <select
+              value={temperatura}
+              onChange={(e) => setTemperatura(e.target.value)}
+              className="input w-full"
+              style={{ backgroundColor: '#0B1120', color: '#E2E8F0' }}
+            >
+              <option value="">Sem temperatura definida</option>
+              {Object.entries(TEMPERATURA_INFO).map(([valor, info]) => (
+                <option key={valor} value={valor}>{info.icone} {info.label}</option>
+              ))}
             </select>
           </div>
 
