@@ -21,6 +21,7 @@ import Chat from './pages/Chat'
 import Imoveis from './pages/Imoveis'
 import AdminLogin from './pages/admin/AdminLogin'
 import AdminDashboard from './pages/admin/AdminDashboard'
+import AdminCobrancas from './pages/admin/AdminCobrancas'
 import ArquivosImovel from './pages/ArquivosImovel'
 import MateriaisCorretor from './pages/MateriaisCorretor'
 import Apresentacoes from './pages/Apresentacoes'
@@ -107,6 +108,14 @@ export default function App() {
               element={
                 <AdminProtectedRoute>
                   <AdminDashboard />
+                </AdminProtectedRoute>
+              }
+            />
+            <Route
+              path="cobrancas"
+              element={
+                <AdminProtectedRoute>
+                  <AdminCobrancas />
                 </AdminProtectedRoute>
               }
             />

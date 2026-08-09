@@ -51,6 +51,7 @@ async function listarClientes(req, res) {
       planoBloqueadoEm: true,
       limiteAcessos: true,
       permissoes: true,
+      valorCobrancaPersonalizado: true,
       criadoEm: true,
       metaIntegracoes: {
         where: { ativo: true, pageId: { not: null } },
@@ -86,6 +87,7 @@ async function listarClientes(req, res) {
       planoBloqueadoEm: imob.planoBloqueadoEm,
       limiteAcessos: imob.limiteAcessos,
       permissoes: imob.permissoes,
+      valorCobrancaPersonalizado: imob.valorCobrancaPersonalizado != null ? Number(imob.valorCobrancaPersonalizado) : null,
       criadoEm: imob.criadoEm,
       contasAnuncio: imob.metaIntegracoes.map((m) => ({
         pageId: m.pageId,
@@ -226,6 +228,51 @@ async function atualizarAdAccount(req, res) {
   });
 
   res.json({ id: atualizado.imobiliariaId, pageId: atualizado.pageId, adAccountId: atualizado.adAccountId });
+}
+
+// ── atualizarValorCobranca ────────────────────────────────────────────────────
+
+async function atualizarValorCobranca(req, res) {
+  const { id } = req.params;
+  const { valorCobrancaPersonalizado } = req.body;
+
+  if (
+    valorCobrancaPersonalizado !== null &&
+    (typeof valorCobrancaPersonalizado !== 'number' || !Number.isFinite(valorCobrancaPersonalizado) || valorCobrancaPersonalizado < 0)
+  ) {
+    return res.status(400).json({ error: 'valorCobrancaPersonalizado deve ser um número >= 0 ou null' });
+  }
+
+  const imobiliaria = await prisma.imobiliaria.findUnique({ where: { id } });
+  if (!imobiliaria) return res.status(404).json({ error: 'Imobiliária não encontrada' });
+
+  const atualizado = await prisma.imobiliaria.update({
+    where: { id },
+    data: { valorCobrancaPersonalizado },
+  });
+  res.json({
+    id: atualizado.id,
+    valorCobrancaPersonalizado: atualizado.valorCobrancaPersonalizado != null ? Number(atualizado.valorCobrancaPersonalizado) : null,
+  });
+}
+
+// ── listarCobrancas ───────────────────────────────────────────────────────────
+
+async function listarCobrancas(req, res) {
+  const cobrancas = await prisma.cobranca.findMany({
+    select: {
+      id: true,
+      valor: true,
+      plano: true,
+      statusEntrega: true,
+      statusEntregaEm: true,
+      criadoEm: true,
+      imobiliaria: { select: { id: true, nome: true } },
+    },
+    orderBy: { criadoEm: 'desc' },
+    take: 200,
+  });
+  res.json(cobrancas.map((c) => ({ ...c, valor: Number(c.valor) })));
 }
 
 // ── getPlanoCliente ───────────────────────────────────────────────────────────
@@ -399,6 +446,8 @@ module.exports = {
   atualizarPermissoes,
   atualizarLimiteAcessos,
   atualizarAdAccount,
+  atualizarValorCobranca,
+  listarCobrancas,
   getPlanoCliente,
   criarCliente,
   getStats,

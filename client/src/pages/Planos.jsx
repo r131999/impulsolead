@@ -1,11 +1,16 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
+import { getPlanos } from '../api/planos'
 
-const PLANOS = [
+// Preço de tabela padrão, usado como fallback enquanto GET /api/planos carrega
+// ou se a chamada falhar — evita a tela quebrar sem valor nenhum. Fonte da
+// verdade é o backend (server/src/config/permissoes-planos.js).
+const PRECO_PADRAO = { construcao: 199, desenvolvimento: 347, sucesso: 597 }
+
+const PLANOS_BASE = [
   {
     id: 'construcao',
     nome: 'Construção',
-    preco: 'R$ 199',
     periodo: '/mês',
     acessos: 5,
     descricao: 'Para imobiliárias em crescimento que querem organizar e distribuir seus leads com eficiência.',
@@ -25,7 +30,6 @@ const PLANOS = [
   {
     id: 'desenvolvimento',
     nome: 'Desenvolvimento',
-    preco: 'R$ 347',
     periodo: '/mês',
     acessos: 12,
     descricao: 'Para equipes maiores que precisam de gestão completa de imóveis, relatórios e apresentações.',
@@ -46,7 +50,6 @@ const PLANOS = [
   {
     id: 'sucesso',
     nome: 'Sucesso',
-    preco: 'R$ 597',
     periodo: '/mês',
     acessos: 25,
     descricao: 'Para operações completas com análise de campanhas e importação de listas.',
@@ -66,8 +69,20 @@ const PLANOS = [
 export default function Planos() {
   const { planoInfo } = useAuth()
   const [modalPlano, setModalPlano] = useState(null)
+  const [precos, setPrecos] = useState(PRECO_PADRAO)
+
+  useEffect(() => {
+    getPlanos()
+      .then((res) => {
+        const p = {}
+        for (const [id, info] of Object.entries(res.data)) p[id] = info.valor
+        setPrecos((atual) => ({ ...atual, ...p }))
+      })
+      .catch(() => {}) // mantém PRECO_PADRAO em caso de falha
+  }, [])
 
   const planoAtual = planoInfo?.plano
+  const PLANOS = PLANOS_BASE.map((p) => ({ ...p, preco: `R$ ${precos[p.id]}` }))
 
   return (
     <div className="p-4 sm:p-6 max-w-4xl mx-auto">

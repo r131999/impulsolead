@@ -1,9 +1,10 @@
 import { useEffect, useState, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, NavLink } from 'react-router-dom'
 import { useAdminAuth } from '../../context/AdminAuthContext'
 import {
   getStats, getClientes, criarCliente,
   atualizarPlano, atualizarPermissoes, atualizarLimiteAcessos, atualizarAdAccount,
+  atualizarValorCobranca, getPlanos,
 } from '../../api/admin'
 
 // ─── helpers ────────────────────────────────────────────────────────────────
@@ -53,14 +54,20 @@ function diasColor(dias) {
 
 // ─── dados de planos ─────────────────────────────────────────────────────────
 
-const PLANOS_OPCOES = [
-  { value: 'construcao',    label: 'Construção — R$199/mês' },
-  { value: 'desenvolvimento', label: 'Desenvolvimento — R$347/mês' },
-  { value: 'sucesso',       label: 'Sucesso — R$597/mês' },
-  { value: 'trial',         label: 'Trial' },
-  { value: 'legado',        label: 'Legado' },
-  { value: 'cancelado',     label: 'Cancelado' },
-]
+// Fallback enquanto GET /api/planos carrega ou se a chamada falhar. Fonte da
+// verdade é o backend (server/src/config/permissoes-planos.js).
+const PRECO_PADRAO = { construcao: 199, desenvolvimento: 347, sucesso: 597 }
+
+function planosOpcoes(precos) {
+  return [
+    { value: 'construcao',      label: `Construção — R$${precos.construcao}/mês` },
+    { value: 'desenvolvimento', label: `Desenvolvimento — R$${precos.desenvolvimento}/mês` },
+    { value: 'sucesso',         label: `Sucesso — R$${precos.sucesso}/mês` },
+    { value: 'trial',           label: 'Trial' },
+    { value: 'legado',          label: 'Legado' },
+    { value: 'cancelado',       label: 'Cancelado' },
+  ]
+}
 
 const PERMISSOES_ATUAIS = [
   { key: 'importacaoListas',          label: 'Importação de listas' },
@@ -189,7 +196,7 @@ function SaveButton({ onClick, loading, children }) {
 
 // ─── modal gerenciar ────────────────────────────────────────────────────────
 
-function ModalGerenciar({ cliente, onClose, onAtualizado }) {
+function ModalGerenciar({ cliente, onClose, onAtualizado, precos }) {
   // ── plano ──
   const [planoSel, setPlanoSel] = useState(cliente.plano)
   const [expiraEm, setExpiraEm] = useState(
@@ -199,6 +206,12 @@ function ModalGerenciar({ cliente, onClose, onAtualizado }) {
   )
   const [diasTrial, setDiasTrial] = useState(30)
   const [salvandoPlano, setSalvandoPlano] = useState(false)
+
+  // ── valor de cobrança personalizado ──
+  const [valorPersonalizado, setValorPersonalizado] = useState(
+    cliente.valorCobrancaPersonalizado != null ? String(cliente.valorCobrancaPersonalizado) : ''
+  )
+  const [salvandoValor, setSalvandoValor] = useState(false)
 
   // ── permissões ──
   const [perms, setPerms] = useState(
@@ -240,6 +253,24 @@ function ModalGerenciar({ cliente, onClose, onAtualizado }) {
       feedback(err.response?.data?.error || 'Erro ao atualizar plano', true)
     } finally {
       setSalvandoPlano(false)
+    }
+  }
+
+  const salvarValorPersonalizado = async () => {
+    setSalvandoValor(true)
+    try {
+      const valor = valorPersonalizado.trim() === '' ? null : Number(valorPersonalizado)
+      if (valor !== null && (!Number.isFinite(valor) || valor < 0)) {
+        feedback('Valor inválido', true)
+        return
+      }
+      await atualizarValorCobranca(cliente.id, { valorCobrancaPersonalizado: valor })
+      onAtualizado()
+      feedback('Valor de cobrança salvo')
+    } catch (err) {
+      feedback(err.response?.data?.error || 'Erro ao salvar valor de cobrança', true)
+    } finally {
+      setSalvandoValor(false)
     }
   }
 
@@ -332,7 +363,7 @@ function ModalGerenciar({ cliente, onClose, onAtualizado }) {
             className="w-full rounded-lg px-3 py-2.5 text-sm outline-none"
             style={inputStyle}
           >
-            {PLANOS_OPCOES.map((p) => (
+            {planosOpcoes(precos).map((p) => (
               <option key={p.value} value={p.value}>{p.label}</option>
             ))}
           </select>
@@ -373,6 +404,31 @@ function ModalGerenciar({ cliente, onClose, onAtualizado }) {
 
           <SaveButton onClick={salvarPlano} loading={salvandoPlano}>
             Salvar plano
+          </SaveButton>
+
+          <div className="my-2" style={{ borderTop: '1px solid #1e2d3d' }} />
+
+          <div>
+            <label className="block text-xs mb-1.5" style={{ color: '#64748B' }}>
+              Valor de cobrança personalizado (R$)
+            </label>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={valorPersonalizado}
+              onChange={(e) => setValorPersonalizado(e.target.value)}
+              placeholder={`Vazio = preço padrão do plano (R$${precos[planoSel] ?? PRECO_PADRAO[planoSel] ?? '—'})`}
+              className="w-full rounded-lg px-3 py-2.5 text-sm outline-none"
+              style={inputStyle}
+            />
+            <p className="text-xs mt-1" style={{ color: '#475569' }}>
+              Sobrescreve o preço de tabela para este cliente. Deixe vazio para usar o preço padrão.
+            </p>
+          </div>
+
+          <SaveButton onClick={salvarValorPersonalizado} loading={salvandoValor}>
+            Salvar valor de cobrança
           </SaveButton>
         </Section>
 
@@ -619,6 +675,7 @@ export default function AdminDashboard() {
   const [busca, setBusca] = useState('')
   const [clienteGerenciar, setClienteGerenciar] = useState(null)
   const [modalNovo, setModalNovo] = useState(false)
+  const [precos, setPrecos] = useState(PRECO_PADRAO)
 
   const carregar = useCallback(async () => {
     setLoading(true)
@@ -632,6 +689,16 @@ export default function AdminDashboard() {
   }, [busca])
 
   useEffect(() => { carregar() }, [carregar])
+
+  useEffect(() => {
+    getPlanos()
+      .then((res) => {
+        const p = {}
+        for (const [id, info] of Object.entries(res.data)) p[id] = info.valor
+        setPrecos((atual) => ({ ...atual, ...p }))
+      })
+      .catch(() => {}) // mantém PRECO_PADRAO em caso de falha
+  }, [])
 
   const handleLogout = () => {
     logout()
@@ -655,6 +722,9 @@ export default function AdminDashboard() {
           <div>
             <p className="text-white text-sm font-semibold leading-none">Impulso Produções</p>
             <p className="text-indigo-400 text-xs">Painel Admin</p>
+          </div>
+          <div className="ml-4">
+            <AdminTabs />
           </div>
         </div>
 
@@ -818,6 +888,7 @@ export default function AdminDashboard() {
           cliente={clienteGerenciar}
           onClose={() => setClienteGerenciar(null)}
           onAtualizado={carregar}
+          precos={precos}
         />
       )}
 
@@ -840,6 +911,24 @@ function LogoutIcon() {
       <polyline points="16 17 21 12 16 7" />
       <line x1="21" y1="12" x2="9" y2="12" />
     </svg>
+  )
+}
+
+export function AdminTabs() {
+  const tabStyle = ({ isActive }) => ({
+    padding: '6px 14px',
+    borderRadius: 8,
+    fontSize: 13,
+    fontWeight: 500,
+    color: isActive ? '#F1F5F9' : '#64748B',
+    backgroundColor: isActive ? 'rgba(99,102,241,0.15)' : 'transparent',
+  })
+
+  return (
+    <nav className="flex items-center gap-1">
+      <NavLink to="/admin/dashboard" style={tabStyle}>Clientes</NavLink>
+      <NavLink to="/admin/cobrancas" style={tabStyle}>Cobranças</NavLink>
+    </nav>
   )
 }
 

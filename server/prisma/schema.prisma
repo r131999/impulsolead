@@ -18,6 +18,7 @@ model Imobiliaria {
   planoExpiraEm         DateTime?
   planoBloqueadoEm      DateTime?
   notificacaoVencimento Boolean   @default(false)
+  valorCobrancaPersonalizado Decimal? @db.Decimal(10, 2)
   permissoes            Json      @default("{}")
   limiteAcessos         Int       @default(5)
   apiKey                String    @unique
@@ -54,6 +55,7 @@ model Imobiliaria {
   historicosEtapaLead       HistoricoEtapaLead[]
   historicosTemperaturaLead HistoricoTemperaturaLead[]
   formulariosEquipe         FormularioEquipe[]
+  cobrancas                 Cobranca[]
 }
 
 model Usuario {
@@ -594,6 +596,28 @@ model AdStatus {
 
   @@unique([imobiliariaId, adId])
   @@index([metaIntegracaoId])
+}
+
+// Registro de auditoria de cada cobrança gerada. Nesta entrega só a estrutura
+// existe — nada grava aqui ainda. O disparo e a atualização de statusEntrega
+// via webhook do WhatsApp vêm em uma entrega futura.
+model Cobranca {
+  id            String   @id @default(uuid())
+  imobiliariaId String
+  imobiliaria   Imobiliaria @relation(fields: [imobiliariaId], references: [id])
+
+  valor         Decimal  @db.Decimal(10, 2)
+  plano         String // snapshot do plano da imobiliária no momento da cobrança
+
+  whatsappMsgId   String?   // id retornado pela Cloud API — correlaciona com o webhook de status
+  statusEntrega   String?   // sent | delivered | failed — atualizado pelo webhook (entrega futura)
+  statusEntregaEm DateTime?
+  erroEntrega     String?
+
+  criadoEm DateTime @default(now())
+
+  @@index([imobiliariaId, criadoEm])
+  @@index([whatsappMsgId])
 }
 
 model ConfigAgente {

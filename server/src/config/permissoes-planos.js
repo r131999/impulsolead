@@ -32,6 +32,7 @@ const PERMISSOES_POR_PLANO = {
       educacional:               false,
     },
     limiteAcessos: 5,
+    valor: 199,
   },
   desenvolvimento: {
     permissoes: {
@@ -49,6 +50,7 @@ const PERMISSOES_POR_PLANO = {
       educacional:               true,
     },
     limiteAcessos: 12,
+    valor: 347,
   },
   sucesso: {
     permissoes: {
@@ -66,6 +68,7 @@ const PERMISSOES_POR_PLANO = {
       educacional:               true,
     },
     limiteAcessos: 25,
+    valor: 597,
   },
   legado: {
     permissoes: {
