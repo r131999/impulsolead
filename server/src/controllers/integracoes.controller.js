@@ -25,7 +25,7 @@ function normalizarTelefone(telefone) {
 async function criarLeadEDistribuir({
   nome, telefone, origem, campanha, conjuntoName, anuncioName,
   adId, adsetId, campaignId, formId, imobiliariaId, imobiliaria,
-  respostasFormulario,
+  respostasFormulario, leadgenId, email,
 }) {
   const configAgente = await prisma.configAgente.findUnique({ where: { imobiliariaId } });
   const modoManual = configAgente?.distribuicaoManual ?? false;
@@ -66,6 +66,8 @@ async function criarLeadEDistribuir({
         campaignId: campaignId || null,
         formId: formId || null,
         respostasFormulario: respostasFormulario || null,
+        leadgenId: leadgenId || null,
+        email: email || null,
         imobiliariaId,
       },
     });
@@ -279,21 +281,35 @@ async function receberLeadMeta(req, res) {
           continue;
         }
 
-        const result = await criarLeadEDistribuir({
-          nome: nomeSanitizado,
-          telefone: digitos,
-          origem: 'Meta Ads',
-          campanha,
-          conjuntoName,
-          anuncioName,
-          adId: leadData.ad_id,
-          adsetId: leadData.adset_id,
-          campaignId: leadData.campaign_id,
-          formId: leadData.form_id,
-          respostasFormulario,
-          imobiliariaId,
-          imobiliaria,
-        });
+        let result;
+        try {
+          result = await criarLeadEDistribuir({
+            nome: nomeSanitizado,
+            telefone: digitos,
+            origem: 'Meta Ads',
+            campanha,
+            conjuntoName,
+            anuncioName,
+            adId: leadData.ad_id,
+            adsetId: leadData.adset_id,
+            campaignId: leadData.campaign_id,
+            formId: leadData.form_id,
+            respostasFormulario,
+            leadgenId,
+            email,
+            imobiliariaId,
+            imobiliaria,
+          });
+        } catch (e) {
+          const target = e?.meta?.target;
+          const isLeadgenIdDuplicado = e?.code === 'P2002'
+            && (Array.isArray(target) ? target.includes('leadgenId') : String(target || '').includes('leadgenId'));
+          if (isLeadgenIdDuplicado) {
+            console.warn(`[meta-webhook] Lead ${leadgenId} ja processado anteriormente (leadgen_id duplicado) — ignorado`);
+            continue;
+          }
+          throw e;
+        }
 
         console.log(`[meta-webhook] Lead criado: ${result.lead.id}`);
       }
