@@ -2,6 +2,7 @@
 const { STATUS_VALIDOS, proximoCorretor } = require('../services/fila.service');
 const { notificarCorretorCloudApi } = require('../services/notificacao.service');
 const { enviarPushCorretor } = require('./push.controller');
+const { enviarEventoQualificacao } = require('../services/metaConversionsApi.service');
 
 const prisma = require('../lib/prisma');
 
@@ -459,6 +460,15 @@ async function mudarStatus(req, res) {
 
     return result;
   });
+
+  if (status === 'agendamento') {
+    prisma.metaIntegracao
+      .findFirst({
+        where: { imobiliariaId: atualizado.imobiliariaId, ativo: true, metaDatasetId: { not: null } },
+      })
+      .then((integracao) => enviarEventoQualificacao(atualizado, integracao, 'Schedule'))
+      .catch(() => {});
+  }
 
   res.json({ lead: atualizado });
 }
