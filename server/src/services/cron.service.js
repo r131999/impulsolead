@@ -3,6 +3,8 @@ const { enviarWhatsApp } = require('./notificacao.service');
 const { enviarTemplate } = require('./whatsappCloudApi.service');
 const { sincronizarGastoAnuncios } = require('./adSpend.service');
 const { enviarPushCorretor } = require('../controllers/push.controller');
+const { buscarPagamentoPendente, buscarPixCopiaECola } = require('./asaas.service');
+const { resolverValorCobranca, obterTelefoneGestorParaCobranca, elegivelParaCobranca } = require('./cobranca.service');
 
 const prisma = require('../lib/prisma');
 
@@ -292,6 +294,108 @@ async function verificarPlanoVencimento() {
   }
 
   console.log('[cron] Verificação de planos concluída');
+
+  await enviarLembretesCobranca(agora);
+}
+
+// ── Job 3b: lembrete de cobrança Asaas via WhatsApp — 1 dia antes e 3 dias
+// depois do vencimento. Nunca bloqueia acesso — isso é decisão deliberada;
+// o bloqueio de 5 dias acima é o único mecanismo de corte automático e
+// continua intocado por este fluxo. ─────────────────────────────────────────
+
+// A janela cobre mais de um dia (proteção contra cron fora do ar), então o
+// texto não pode assumir "amanhã" ou "há 3 dias" fixo — descreve o dia real
+// em que está disparando. O template no Meta Business Manager precisa usar
+// {{situacao_vencimento}} no lugar de um texto de prazo fixo.
+function descreverVencimento(diasParaVencer) {
+  if (diasParaVencer === 0) return 'vence hoje';
+  if (diasParaVencer > 0) return `vence em ${diasParaVencer} dia${diasParaVencer === 1 ? '' : 's'}`;
+  const diasVencido = Math.abs(diasParaVencer);
+  return `venceu há ${diasVencido} dia${diasVencido === 1 ? '' : 's'}`;
+}
+
+async function jaEnviouLembreteNesteCiclo(imobiliariaId, tipo, planoExpiraEm) {
+  // planoExpiraEm só avança (via webhook de pagamento) em ciclos de ~30 dias,
+  // então qualquer lembrete do mesmo tipo registrado nos últimos 10 dias antes
+  // do vencimento atual já pertence ao ciclo corrente.
+  const desde = new Date(new Date(planoExpiraEm).getTime() - 10 * 24 * 60 * 60 * 1000);
+  const existente = await prisma.cobranca.findFirst({
+    where: { imobiliariaId, tipo, criadoEm: { gte: desde } },
+    select: { id: true },
+  });
+  return !!existente;
+}
+
+async function enviarLembretesCobranca(agora) {
+  console.log('[cron] Verificando lembretes de cobrança...');
+
+  const imobiliarias = await prisma.imobiliaria.findMany({
+    where: {
+      plano: { in: ['construcao', 'desenvolvimento', 'sucesso'] },
+      asaasSubscriptionId: { not: null },
+      planoExpiraEm: { not: null },
+    },
+    select: {
+      id: true,
+      nome: true,
+      plano: true,
+      planoExpiraEm: true,
+      valorCobrancaPersonalizado: true,
+      asaasSubscriptionId: true,
+    },
+  });
+
+  for (const imob of imobiliarias) {
+    try {
+      if (!(await elegivelParaCobranca(imob))) continue;
+
+      const diasParaVencer = Math.round((new Date(imob.planoExpiraEm) - agora) / (1000 * 60 * 60 * 24));
+      const ehAntes = diasParaVencer >= 0 && diasParaVencer <= 1;   // vence hoje ou amanhã
+      // Bloqueio automático (bloco 2 acima) só entra em vigor no dia +6 (ha5Dias
+      // usa "< agora-5dias", ou seja, exige elapsed > 5 dias inteiros). A janela
+      // do lembrete de vencido cobre +3 a +5 — 3 disparos diários de tentativa —
+      // pra garantir que o lembrete saia mesmo se o cron ficar fora do ar por até
+      // 2 dias seguidos, sempre antes do bloqueio de +6.
+      const ehDepois = diasParaVencer <= -3 && diasParaVencer >= -5;
+      if (!ehAntes && !ehDepois) continue;
+
+      const tipo = ehAntes ? 'lembrete_antes' : 'lembrete_depois';
+      if (await jaEnviouLembreteNesteCiclo(imob.id, tipo, imob.planoExpiraEm)) continue;
+
+      const paymentId = await buscarPagamentoPendente(imob.asaasSubscriptionId);
+      if (!paymentId) {
+        console.log(`[cron] ${imob.nome} sem pagamento pendente no Asaas — lembrete de cobrança pulado.`);
+        continue;
+      }
+
+      const pix = await buscarPixCopiaECola(paymentId);
+      if (!pix) {
+        console.log(`[cron] ${imob.nome} sem PIX disponível para o pagamento ${paymentId} — lembrete pulado.`);
+        continue;
+      }
+
+      const telefoneGestor = await obterTelefoneGestorParaCobranca(imob.id);
+      const { whatsappMsgId } = await enviarTemplate(telefoneGestor, 'lembrete_cobranca_pix', {
+        nome_imobiliaria: imob.nome,
+        situacao_vencimento: descreverVencimento(diasParaVencer),
+        codigo_pix: pix.payload,
+      });
+
+      await prisma.cobranca.create({
+        data: {
+          imobiliariaId: imob.id,
+          tipo,
+          valor: resolverValorCobranca(imob),
+          plano: imob.plano,
+          whatsappMsgId,
+        },
+      });
+
+      console.log(`[cron] Lembrete de cobrança (${tipo}) enviado para ${imob.nome}`);
+    } catch (err) {
+      console.error(`[cron] Erro no lembrete de cobrança de ${imob.nome}:`, err.message);
+    }
+  }
 }
 
 // ── Job 5: alerta escalonado de leads sem tratativa (corretor → gestor) ──────

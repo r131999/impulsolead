@@ -19,6 +19,8 @@ model Imobiliaria {
   planoBloqueadoEm      DateTime?
   notificacaoVencimento Boolean   @default(false)
   valorCobrancaPersonalizado Decimal? @db.Decimal(10, 2)
+  asaasCustomerId       String?   @unique
+  asaasSubscriptionId   String?   @unique
   permissoes            Json      @default("{}")
   limiteAcessos         Int       @default(5)
   apiKey                String    @unique
@@ -602,16 +604,23 @@ model AdStatus {
   @@index([metaIntegracaoId])
 }
 
-// Registro de auditoria de cada cobrança gerada. Nesta entrega só a estrutura
-// existe — nada grava aqui ainda. O disparo e a atualização de statusEntrega
-// via webhook do WhatsApp vêm em uma entrega futura.
+// Registro de auditoria de cada cobrança: lembretes de vencimento disparados
+// via WhatsApp (cron.service.js) e pagamentos confirmados pelo webhook do
+// Asaas (asaas-webhook.controller.js). A atualização de statusEntrega via
+// webhook de status do WhatsApp segue pendente (entrega futura).
 model Cobranca {
   id            String   @id @default(uuid())
   imobiliariaId String
   imobiliaria   Imobiliaria @relation(fields: [imobiliariaId], references: [id])
 
+  // lembrete_antes | lembrete_depois (lembrete de vencimento via WhatsApp) |
+  // pagamento_confirmado (evento de pagamento recebido do Asaas)
+  tipo          String
+
   valor         Decimal  @db.Decimal(10, 2)
   plano         String // snapshot do plano da imobiliária no momento da cobrança
+
+  asaasPaymentId  String?   @unique // id do payment no Asaas — garante idempotência do webhook
 
   whatsappMsgId   String?   // id retornado pela Cloud API — correlaciona com o webhook de status
   statusEntrega   String?   // sent | delivered | failed — atualizado pelo webhook (entrega futura)

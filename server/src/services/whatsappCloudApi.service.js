@@ -45,7 +45,7 @@ async function enviarTemplate(telefone, templateName, parametros) {
     const json = await resp.json();
     if (!resp.ok) throw new Error(json?.error?.message || `HTTP ${resp.status}`);
     console.log(`[whatsappCloudApi] Template "${templateName}" enviado para ${numero}`);
-    return { enviado: true };
+    return { enviado: true, whatsappMsgId: json.messages?.[0]?.id };
   } catch (err) {
     console.error(`[whatsappCloudApi] Falha ao enviar template "${templateName}" para ${telefone}:`, err.message);
     return { enviado: false, motivo: err.message };

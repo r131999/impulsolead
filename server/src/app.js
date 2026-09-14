@@ -36,6 +36,7 @@ const metaOauthRoutes = require('./routes/meta.oauth.routes');
 const metaPaginaRoutes = require('./routes/meta.pagina.routes');
 const desempenhoAnunciosRoutes = require('./routes/desempenho-anuncios.routes');
 const whatsappWebhookRoutes = require('./routes/whatsapp-webhook.routes');
+const asaasWebhookRoutes = require('./routes/asaas-webhook.routes');
 const planosRoutes = require('./routes/planos.routes');
 const { listarInstanciasInterno } = require('./controllers/whatsapp.controller');
 const { iniciarCrons } = require('./services/cron.service');
@@ -100,6 +101,7 @@ app.use('/api/integracoes', metaOauthRoutes);
 app.use('/api/integracoes', metaPaginaRoutes);
 app.use('/api/desempenho-anuncios', desempenhoAnunciosRoutes);
 app.use('/api/webhook', whatsappWebhookRoutes);
+app.use('/api/webhook', asaasWebhookRoutes);
 app.use('/api/planos', planosRoutes);
 
 // Endpoint interno: chamado pelo manager para carregar tenants ativos

@@ -28,9 +28,9 @@ async function obterTelefoneGestorParaCobranca(imobiliariaId) {
   return gestor?.telefone || null;
 }
 
-// Regra de elegibilidade para cobrança — usada pela entrega futura que dispara
-// a cobrança. Aqui só documentada e testável isoladamente, ainda não chamada
-// por nenhum job/rota.
+// Regra de elegibilidade para cobrança — usada pelo lembrete de vencimento
+// (enviarLembretesCobranca em cron.service.js) antes de buscar o PIX e disparar
+// o WhatsApp.
 async function elegivelParaCobranca(imobiliaria) {
   // Legado é isenção vitalícia INTENCIONAL — é o cliente responsável pela
   // criação do ImpulsoLead. Não é bug, não "esqueceram de migrar"; não cobrar
@@ -45,6 +45,10 @@ async function elegivelParaCobranca(imobiliaria) {
 
   const telefoneGestor = await obterTelefoneGestorParaCobranca(imobiliaria.id);
   if (!telefoneGestor) return false;
+
+  // Cadastro no Asaas é manual e gradual — sem assinatura vinculada não há
+  // cobrança/PIX pra buscar, então a imobiliária ainda não é elegível.
+  if (!imobiliaria.asaasSubscriptionId) return false;
 
   return true;
 }
