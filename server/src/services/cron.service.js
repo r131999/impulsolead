@@ -701,4 +701,4 @@ function iniciarCrons() {
   console.log('[cron] Jobs iniciados: relatorio-semanal (dom 8h) | plano-vencimento (diário 9h) | ad-spend (20min) | leads-sem-tratativa (15min) | leads-aguardando-distribuicao (diário 8h BRT) | followups-pendentes (5min)');
 }
 
-module.exports = { iniciarCrons };
+module.exports = { iniciarCrons, enviarLembretesCobranca };
