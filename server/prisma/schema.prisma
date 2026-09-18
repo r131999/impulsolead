@@ -329,16 +329,17 @@ model SessaoAgente {
   id            String      @id @default(uuid())
   telefone      String
   nome          String?
+  tipo          String      @default("qualificacao") // "qualificacao" | "triagem"
   etapaAtual    Int         @default(0)
   respostas     Json        @default("{}")
-  status        String      @default("em_andamento") // "em_andamento" | "finalizado"
+  status        String      @default("em_andamento") // "em_andamento" | "finalizado" | "descartado"
   instancia     String
   imobiliariaId String
   imobiliaria   Imobiliaria @relation(fields: [imobiliariaId], references: [id])
   criadoEm      DateTime    @default(now())
   atualizadoEm  DateTime    @updatedAt
 
-  @@unique([telefone, imobiliariaId])
+  @@unique([telefone, imobiliariaId, tipo])
 }
 
 model ChatConversa {
@@ -644,6 +645,7 @@ model ConfigAgente {
   distribuicaoPorEquipeAtiva  Boolean @default(false)
   distribuicaoPorEquipeManual Boolean @default(false)
   pularCorretorPendente Boolean @default(true)
+  atenderNumeroDesconhecido Boolean @default(false)
   criadoEm           DateTime @default(now())
   atualizadoEm       DateTime @updatedAt
 

@@ -148,19 +148,41 @@ async function fetchBlockedNumbers(tenant) {
 // ── Mensagem de boas-vindas ────────────────────────────────────────────────────
 const DEFAULT_BV = 'Em breve um de nossos consultores entrará em contato com você.';
 
-async function fetchMensagemBoasVindas(tenant) {
+async function fetchConfigAgente(tenant) {
   try {
     const res = await httpReq('GET', `${API_BASE}/webhook/mensagem-boasvindas`, null, {
       'x-api-key': tenant.apiKey,
     });
     if (res.status === 200) {
       const json = JSON.parse(res.data);
-      if (json.mensagem) return json.mensagem;
+      return {
+        mensagem: json.mensagem || DEFAULT_BV,
+        atenderNumeroDesconhecido: !!json.atenderNumeroDesconhecido,
+      };
     }
   } catch (err) {
-    tag(`Erro boas-vindas fetch: ${err.message}`, tenant.imobiliariaId);
+    tag(`Erro config-agente fetch: ${err.message}`, tenant.imobiliariaId);
   }
-  return DEFAULT_BV;
+  return { mensagem: DEFAULT_BV, atenderNumeroDesconhecido: false };
+}
+
+// ── Triagem de número desconhecido (ConfigAgente.atenderNumeroDesconhecido) ───
+// Decisão de conversa fica no backend (agente.controller.js); o manager só
+// envia o texto que a API mandar de volta, porque é ele quem tem o socket.
+async function processarTriagem(tenant, { telefone, mensagem, pushName }) {
+  try {
+    const res = await httpReq(
+      'POST',
+      `${API_BASE}/agente/triagem`,
+      { telefone, mensagem, instancia: tenant.imobiliariaId, pushName },
+      { 'x-api-key': tenant.apiKey },
+    );
+    if (res.status === 200) return JSON.parse(res.data);
+    tag(`Triagem — status inesperado: ${res.status}`, tenant.imobiliariaId);
+  } catch (err) {
+    tag(`Erro triagem: ${err.message}`, tenant.imobiliariaId);
+  }
+  return { ok: false, acao: 'ignorado' };
 }
 
 // ── Verificar lead ativo ───────────────────────────────────────────────────────
@@ -285,104 +307,136 @@ async function handleMessage(tenant, msg) {
       return;
     }
 
-    tag(`Lead novo — criando no CRM`, tenant.imobiliariaId);
-    // ── CAMINHO 2: Novo lead ──────────────────────────────────────────────────
+    const configAgente = await fetchConfigAgente(tenant);
     const senderPnRaw = (key.senderPn || msg.participant || '').split('@')[0].replace(/\D/g, '');
-    if (tenant.recentLeads.has(phone) || (senderPnRaw && tenant.recentLeads.has(senderPnRaw))) {
-      tag(`Lead recente (24h): ${phone}`, tenant.imobiliariaId);
-      return;
-    }
 
-    const chaveConteudo = `${tenant.imobiliariaId}:${text.trim().toLowerCase().slice(0, 50)}`;
-    const tsConteudo = deduplicacaoConteudo.get(chaveConteudo);
-    if (tsConteudo && Date.now() - tsConteudo < CONTEUDO_DEDUPE_TTL) {
-      tag(`Conteúdo duplicado (5min) — descartando: ${chaveConteudo}`, tenant.imobiliariaId);
-      return;
-    }
-    deduplicacaoConteudo.set(chaveConteudo, Date.now());
-
-    const campanha = detectCampaign(text);
-    tag(`Novo lead: ${phone} (${nome})${campanha ? ` | campanha: ${campanha}` : ''}`, tenant.imobiliariaId);
-
-    try {
-      const mensagemBV = await fetchMensagemBoasVindas(tenant);
-      await tenant.sock.sendMessage(realJid, { text: mensagemBV });
-    } catch (err) {
-      tag(`Erro boas-vindas: ${err.message}`, tenant.imobiliariaId);
-    }
-
-    await new Promise((r) => setTimeout(r, 1000));
-
-    const now = Date.now();
-    tenant.recentLeads.set(phone, now);
-    if (senderPnRaw && senderPnRaw !== phone) tenant.recentLeads.set(senderPnRaw, now);
-
-    let res;
-    try {
-      res = await httpReq(
-        'POST',
-        `${API_BASE}/webhook/lead`,
-        {
-          nome,
-          telefone: phone,
-          whatsappJid: realJid,
-          campanha: campanha || undefined,
-          imobiliariaId: tenant.imobiliariaId,
-        },
-        { 'x-api-key': tenant.apiKey },
-      );
-    } catch (err) {
-      tag(`Erro ao criar lead, adicionando à fila de retry: ${err.message}`, tenant.imobiliariaId);
-      retryQueue.push({
-        phone,
-        nome,
-        text,
-        realJid,
-        campanha,
-        msgId,
-        imobiliariaId: tenant.imobiliariaId,
-        apiKey: tenant.apiKey,
-        tentativas: 0,
-        maxTentativas: 3,
-        proximaTentativa: Date.now() + 30000,
-      });
-      return;
-    }
-
-    tag(`Lead enviado — status: ${res.status}`, tenant.imobiliariaId);
-
-    if (res.status >= 500) {
-      tag(`Erro servidor ao criar lead (${res.status}), adicionando à fila de retry`, tenant.imobiliariaId);
-      retryQueue.push({
-        phone,
-        nome,
-        text,
-        realJid,
-        campanha,
-        msgId,
-        imobiliariaId: tenant.imobiliariaId,
-        apiKey: tenant.apiKey,
-        tentativas: 0,
-        maxTentativas: 3,
-        proximaTentativa: Date.now() + 30000,
-      });
-      return;
-    }
-
-    if (res.status === 201 && text.trim()) {
-      try {
-        const body = JSON.parse(res.data);
-        const leadId = body?.lead?.id;
-        if (leadId) {
-          await salvarMensagemRecebida(tenant, leadId, text, msgId, nome);
-          tag(`Mensagem inicial salva — lead ${leadId}`, tenant.imobiliariaId);
-        }
-      } catch (err) {
-        tag(`Erro msg inicial: ${err.message}`, tenant.imobiliariaId);
+    if (!configAgente.atenderNumeroDesconhecido) {
+      // ── CAMINHO 2: Novo lead — cria direto, sem triagem (comportamento padrão) ─
+      if (tenant.recentLeads.has(phone) || (senderPnRaw && tenant.recentLeads.has(senderPnRaw))) {
+        tag(`Lead recente (24h): ${phone}`, tenant.imobiliariaId);
+        return;
       }
+
+      const chaveConteudo = `${tenant.imobiliariaId}:${text.trim().toLowerCase().slice(0, 50)}`;
+      const tsConteudo = deduplicacaoConteudo.get(chaveConteudo);
+      if (tsConteudo && Date.now() - tsConteudo < CONTEUDO_DEDUPE_TTL) {
+        tag(`Conteúdo duplicado (5min) — descartando: ${chaveConteudo}`, tenant.imobiliariaId);
+        return;
+      }
+      deduplicacaoConteudo.set(chaveConteudo, Date.now());
+
+      const campanha = detectCampaign(text);
+      tag(`Novo lead: ${phone} (${nome})${campanha ? ` | campanha: ${campanha}` : ''}`, tenant.imobiliariaId);
+
+      try {
+        await tenant.sock.sendMessage(realJid, { text: configAgente.mensagem });
+      } catch (err) {
+        tag(`Erro boas-vindas: ${err.message}`, tenant.imobiliariaId);
+      }
+
+      await new Promise((r) => setTimeout(r, 1000));
+
+      const now = Date.now();
+      tenant.recentLeads.set(phone, now);
+      if (senderPnRaw && senderPnRaw !== phone) tenant.recentLeads.set(senderPnRaw, now);
+
+      await criarLeadEEnviarMsgInicial(tenant, { phone, realJid, text, msgId, nome, campanha });
+      return;
+    }
+
+    // ── CAMINHO 3: Triagem — número desconhecido, ConfigAgente.atenderNumeroDesconhecido = true ─
+    tag(`Triagem — mensagem de número desconhecido: ${phone}`, tenant.imobiliariaId);
+
+    const resultado = await processarTriagem(tenant, { telefone: phone, mensagem: text, pushName: msg.pushName });
+
+    if (resultado.mensagemResposta) {
+      try {
+        await tenant.sock.sendMessage(realJid, { text: resultado.mensagemResposta });
+      } catch (err) {
+        tag(`Erro ao enviar mensagem de triagem: ${err.message}`, tenant.imobiliariaId);
+      }
+    }
+
+    if (resultado.acao === 'lead_confirmado') {
+      tag(`Triagem confirmou lead — criando: ${phone}`, tenant.imobiliariaId);
+      tenant.recentLeads.set(phone, Date.now());
+      if (senderPnRaw && senderPnRaw !== phone) tenant.recentLeads.set(senderPnRaw, Date.now());
+      await criarLeadEEnviarMsgInicial(tenant, { phone, realJid, text, msgId, nome, campanha: detectCampaign(text) });
+    } else if (resultado.acao === 'descartado') {
+      tag(`Triagem descartou o contato (não é lead): ${phone}`, tenant.imobiliariaId);
     }
   } catch (err) {
     tag(`Erro handleMessage: ${err.message}`, tenant.imobiliariaId);
+  }
+}
+
+// ── Criação de lead + mensagem inicial (com fila de retry) ─────────────────────
+// Reaproveitado tanto pelo caminho direto (toggle desligado) quanto pelo
+// caminho de triagem (toggle ligado, após confirmar que é lead real).
+async function criarLeadEEnviarMsgInicial(tenant, { phone, realJid, text, msgId, nome, campanha }) {
+  let res;
+  try {
+    res = await httpReq(
+      'POST',
+      `${API_BASE}/webhook/lead`,
+      {
+        nome,
+        telefone: phone,
+        whatsappJid: realJid,
+        campanha: campanha || undefined,
+        imobiliariaId: tenant.imobiliariaId,
+      },
+      { 'x-api-key': tenant.apiKey },
+    );
+  } catch (err) {
+    tag(`Erro ao criar lead, adicionando à fila de retry: ${err.message}`, tenant.imobiliariaId);
+    retryQueue.push({
+      phone,
+      nome,
+      text,
+      realJid,
+      campanha,
+      msgId,
+      imobiliariaId: tenant.imobiliariaId,
+      apiKey: tenant.apiKey,
+      tentativas: 0,
+      maxTentativas: 3,
+      proximaTentativa: Date.now() + 30000,
+    });
+    return;
+  }
+
+  tag(`Lead enviado — status: ${res.status}`, tenant.imobiliariaId);
+
+  if (res.status >= 500) {
+    tag(`Erro servidor ao criar lead (${res.status}), adicionando à fila de retry`, tenant.imobiliariaId);
+    retryQueue.push({
+      phone,
+      nome,
+      text,
+      realJid,
+      campanha,
+      msgId,
+      imobiliariaId: tenant.imobiliariaId,
+      apiKey: tenant.apiKey,
+      tentativas: 0,
+      maxTentativas: 3,
+      proximaTentativa: Date.now() + 30000,
+    });
+    return;
+  }
+
+  if (res.status === 201 && text.trim()) {
+    try {
+      const body = JSON.parse(res.data);
+      const leadId = body?.lead?.id;
+      if (leadId) {
+        await salvarMensagemRecebida(tenant, leadId, text, msgId, nome);
+        tag(`Mensagem inicial salva — lead ${leadId}`, tenant.imobiliariaId);
+      }
+    } catch (err) {
+      tag(`Erro msg inicial: ${err.message}`, tenant.imobiliariaId);
+    }
   }
 }
 

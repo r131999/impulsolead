@@ -102,7 +102,7 @@ async function getConfigAgente(req, res) {
 
 async function atualizarConfigAgente(req, res) {
   try {
-    const { mensagemBoasVindas, perguntas, nomeAgente, tomAgente, ativo } = req.body;
+    const { mensagemBoasVindas, perguntas, nomeAgente, tomAgente, ativo, atenderNumeroDesconhecido } = req.body;
 
     if (perguntas !== undefined) {
       if (!Array.isArray(perguntas) || perguntas.length === 0) {
@@ -113,6 +113,10 @@ async function atualizarConfigAgente(req, res) {
       }
     }
 
+    if (atenderNumeroDesconhecido !== undefined && typeof atenderNumeroDesconhecido !== 'boolean') {
+      return res.status(400).json({ error: 'atenderNumeroDesconhecido deve ser boolean' });
+    }
+
     const config = await prisma.configAgente.upsert({
       where: { imobiliariaId: req.imobiliariaId },
       update: {
@@ -121,6 +125,7 @@ async function atualizarConfigAgente(req, res) {
         ...(nomeAgente !== undefined && { nomeAgente }),
         ...(tomAgente !== undefined && { tomAgente }),
         ...(ativo !== undefined && { ativo }),
+        ...(atenderNumeroDesconhecido !== undefined && { atenderNumeroDesconhecido }),
       },
       create: {
         imobiliariaId: req.imobiliariaId,
@@ -129,6 +134,7 @@ async function atualizarConfigAgente(req, res) {
         nomeAgente: nomeAgente || 'Lia',
         tomAgente: tomAgente || 'profissional mas leve',
         ativo: ativo !== undefined ? ativo : true,
+        atenderNumeroDesconhecido: atenderNumeroDesconhecido !== undefined ? atenderNumeroDesconhecido : false,
       },
     });
 

@@ -214,6 +214,7 @@ export default function ConfigAgente() {
         mensagemBoasVindas: form.mensagemBoasVindas,
         perguntas: form.perguntas,
         ativo: form.ativo,
+        atenderNumeroDesconhecido: form.atenderNumeroDesconhecido,
       })
       setConfig(res.data.config)
       setSucesso(true)
@@ -412,6 +413,34 @@ export default function ConfigAgente() {
                 <option value="descontraído">Descontraído</option>
                 <option value="empático">Empático</option>
               </select>
+            </div>
+          </div>
+        </div>
+
+        {/* Número desconhecido */}
+        <div className="card">
+          <div className="flex items-center justify-between gap-4">
+            <div className="min-w-0">
+              <h2 className="font-semibold" style={{ color: '#F1F5F9' }}>Atender número desconhecido</h2>
+              <p className="text-xs mt-1" style={{ color: '#94A3B8' }}>
+                {form.atenderNumeroDesconhecido
+                  ? 'Ligado: quando um número que ainda não é lead escreve no WhatsApp, o agente conversa primeiro para confirmar que é um lead de verdade (e não corretor parceiro ou outro assunto) antes de criar o lead no CRM.'
+                  : 'Desligado (padrão): o agente só responde automaticamente números que já são leads no CRM. Mensagens de números novos não geram lead nem resposta automática.'}
+              </p>
+            </div>
+            <div
+              onClick={() => setForm((f) => ({ ...f, atenderNumeroDesconhecido: !f.atenderNumeroDesconhecido }))}
+              className="relative flex-shrink-0 rounded-full transition-colors cursor-pointer"
+              style={{ width: 44, height: 24, backgroundColor: form.atenderNumeroDesconhecido ? '#4f46e5' : '#1E293B' }}
+              title={form.atenderNumeroDesconhecido ? 'Desligar' : 'Ligar'}
+            >
+              <span
+                className="absolute top-1 rounded-full bg-white shadow transition-transform"
+                style={{
+                  width: 16, height: 16, left: 4,
+                  transform: form.atenderNumeroDesconhecido ? 'translateX(20px)' : 'translateX(0)',
+                }}
+              />
             </div>
           </div>
         </div>

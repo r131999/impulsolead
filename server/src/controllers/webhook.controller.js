@@ -293,11 +293,11 @@ async function mensagemBoasVindas(req, res) {
   try {
     const config = await prisma.configAgente.findUnique({
       where: { imobiliariaId: req.imobiliariaId },
-      select: { mensagemBoasVindas: true },
+      select: { mensagemBoasVindas: true, atenderNumeroDesconhecido: true },
     });
     const mensagem = config?.mensagemBoasVindas
       || 'Em breve um de nossos consultores entrará em contato com você.';
-    res.json({ mensagem });
+    res.json({ mensagem, atenderNumeroDesconhecido: !!config?.atenderNumeroDesconhecido });
   } catch (err) {
     console.error('[webhook] mensagemBoasVindas:', err.message);
     res.status(500).json({ error: 'Erro ao buscar mensagem' });

@@ -3,6 +3,7 @@ const https = require('https');
 const http = require('http');
 
 const prisma = require('../lib/prisma');
+const { enviarWhatsApp } = require('../services/notificacao.service');
 
 // ─── Mensagens fixas por etapa ────────────────────────────────────────────────
 
@@ -289,7 +290,7 @@ async function receberMensagem(req, res) {
 
   // 1. Busca ou cria sessão
   let sessao = await prisma.sessaoAgente.findUnique({
-    where: { telefone_imobiliariaId: { telefone: telefoneLimpo, imobiliariaId } },
+    where: { telefone_imobiliariaId_tipo: { telefone: telefoneLimpo, imobiliariaId, tipo: 'qualificacao' } },
   });
 
   if (!sessao) {
@@ -299,6 +300,7 @@ async function receberMensagem(req, res) {
         data: {
           telefone:     telefoneLimpo,
           nome:         pushName || null,
+          tipo:         'qualificacao',
           etapaAtual:   0,
           respostas:    {},
           status:       'em_andamento',
@@ -311,7 +313,7 @@ async function receberMensagem(req, res) {
       if (err.code !== 'P2002') throw err;
       // Criação concorrente: outro request já criou a sessão
       sessao = await prisma.sessaoAgente.findUnique({
-        where: { telefone_imobiliariaId: { telefone: telefoneLimpo, imobiliariaId } },
+        where: { telefone_imobiliariaId_tipo: { telefone: telefoneLimpo, imobiliariaId, tipo: 'qualificacao' } },
       });
       if (!sessao) throw err;
     }
@@ -380,4 +382,195 @@ async function receberMensagem(req, res) {
   return res.json({ ok: true, etapa: proximaEtapa });
 }
 
-module.exports = { receberMensagem };
+// ─── Triagem de número desconhecido (ConfigAgente.atenderNumeroDesconhecido) ──
+//
+// Usado pelo manager Baileys (server/whatsapp/manager.js) quando a mensagem vem
+// de um número que ainda não é lead no CRM e a imobiliária optou por conversar
+// antes de criar o lead, em vez de criar automaticamente. Este controller nunca
+// envia mensagem no WhatsApp — só decide o quê responder; quem envia é o manager,
+// dono do socket Baileys.
+//
+// Classificação e resposta vêm da mesma IA (OpenAI, já usada em `detectarGenero`
+// acima e nos assistentes internos) — o objetivo é conversa natural, não um
+// reconhecimento de palavras-chave. O limite de mensagens é só rede de segurança
+// para a IA não ficar pedindo esclarecimento pra sempre; não é o caminho comum.
+
+const LIMITE_MENSAGENS_TRIAGEM = 4; // troca esse tanto de mensagens sem confirmação → desiste
+
+const MENSAGEM_TRIAGEM_FALLBACK =
+  'Desculpa, pode repetir? Não consegui entender direito 🙂';
+
+const CLASSIFICACOES_VALIDAS = ['lead_anuncio', 'corretor_parceiro', 'outro', 'indefinido'];
+
+const SYSTEM_PROMPT_TRIAGEM = `Você é a assistente de triagem de uma imobiliária, respondendo pelo WhatsApp. A pessoa que está te escrevendo ainda não é um lead cadastrado no CRM. Sua tarefa é conduzir uma conversa curta, natural e cordial (nunca robótica ou de formulário) para descobrir quem é essa pessoa antes de qualificá-la como lead.
+
+Classifique CADA mensagem em uma destas categorias:
+- "lead_anuncio": a pessoa demonstra interesse genuíno em comprar ou alugar um imóvel (cliente em potencial).
+- "corretor_parceiro": a pessoa se identifica como corretor(a), representante de outra imobiliária, ou propõe parceria/indicação comercial — não é cliente final.
+- "outro": qualquer assunto que não seja interesse em imóvel nem parceria (número errado, spam, cobrança, suporte, reclamação, etc.).
+- "indefinido": ainda não dá para saber com confiança — a conversa deve continuar.
+
+Responda SEMPRE em JSON válido, exatamente neste formato:
+{"classificacao": "lead_anuncio" | "corretor_parceiro" | "outro" | "indefinido", "resposta": "texto curto e natural para responder ao contato"}
+
+Regras:
+- Fale como uma pessoa real e atenciosa, nunca como um robô ou formulário.
+- Nunca invente disponibilidade de imóveis, preços, prazos ou dados que você não tem.
+- Se classificar como "lead_anuncio", a resposta deve confirmar de forma calorosa que um corretor vai continuar o atendimento.
+- Se classificar como "corretor_parceiro" ou "outro", a resposta deve ser educada, breve, e encerrar a conversa sem prometer atendimento comercial.
+- Se "indefinido", a resposta deve ser uma pergunta natural (não repetitiva) que ajude a entender se a pessoa busca um imóvel.`;
+
+async function classificarViaIA(historico) {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    console.warn('[agente] OPENAI_API_KEY não configurada — triagem tratando mensagem como indefinida');
+    return { classificacao: 'indefinido', resposta: MENSAGEM_TRIAGEM_FALLBACK };
+  }
+
+  try {
+    const response = await axios.post(
+      'https://api.openai.com/v1/chat/completions',
+      {
+        model: 'gpt-4o-mini',
+        messages: [{ role: 'system', content: SYSTEM_PROMPT_TRIAGEM }, ...historico],
+        response_format: { type: 'json_object' },
+        max_tokens: 300,
+        temperature: 0.6,
+      },
+      {
+        headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+        timeout: 10000,
+      },
+    );
+
+    const bruto = response.data.choices[0]?.message?.content || '{}';
+    const parsed = JSON.parse(bruto);
+
+    const classificacao = CLASSIFICACOES_VALIDAS.includes(parsed.classificacao)
+      ? parsed.classificacao
+      : 'indefinido';
+    const resposta = typeof parsed.resposta === 'string' && parsed.resposta.trim()
+      ? parsed.resposta.trim()
+      : MENSAGEM_TRIAGEM_FALLBACK;
+
+    return { classificacao, resposta };
+  } catch (err) {
+    console.warn('[agente] Falha na triagem via IA — tratando como indefinido:', err.message);
+    return { classificacao: 'indefinido', resposta: MENSAGEM_TRIAGEM_FALLBACK };
+  }
+}
+
+async function obterTelefoneGestor(imobiliariaId) {
+  const imobiliaria = await prisma.imobiliaria.findUnique({
+    where: { id: imobiliariaId },
+    select: {
+      telefoneNotificacoes: true,
+      usuarios: {
+        where: { role: 'gestor', telefone: { not: null } },
+        select: { telefone: true },
+        orderBy: { criadoEm: 'asc' },
+        take: 1,
+      },
+    },
+  });
+  return imobiliaria?.telefoneNotificacoes || imobiliaria?.usuarios?.[0]?.telefone || null;
+}
+
+async function notificarGestorTriagem(imobiliariaId, telefoneContato, motivo) {
+  const telefoneGestor = await obterTelefoneGestor(imobiliariaId);
+  if (!telefoneGestor) return;
+
+  const textos = {
+    corretor_parceiro: `🤝 O agente identificou que o contato ${telefoneContato} parece ser corretor(a)/parceiro(a), não um lead. Nenhum lead foi criado.`,
+    outro: `ℹ️ O agente conversou com ${telefoneContato}, mas não era sobre interesse em imóvel. Nenhum lead foi criado.`,
+    limite_mensagens: `🤔 O agente conversou com ${telefoneContato} mas não conseguiu confirmar se é um lead depois de algumas mensagens. A conversa foi encerrada sem criar lead — avalie se vale um contato manual.`,
+  };
+
+  await enviarWhatsApp(telefoneGestor, textos[motivo] || textos.limite_mensagens, imobiliariaId);
+}
+
+// Cria (1ª mensagem) ou atualiza (mensagens seguintes) a sessão de triagem numa
+// única chamada atômica — evita a corrida de criação concorrente sem precisar
+// do try/create + catch P2002 usado no fluxo de qualificação acima.
+function salvarSessaoTriagem({ telefoneLimpo, pushName, instancia, imobiliariaId, numeroMensagens, historico, status, motivoDescarte }) {
+  const respostas = motivoDescarte ? { historico, _motivoDescarte: motivoDescarte } : { historico };
+
+  return prisma.sessaoAgente.upsert({
+    where: { telefone_imobiliariaId_tipo: { telefone: telefoneLimpo, imobiliariaId, tipo: 'triagem' } },
+    update: { etapaAtual: numeroMensagens, respostas, status },
+    create: {
+      telefone: telefoneLimpo,
+      nome: pushName || null,
+      tipo: 'triagem',
+      etapaAtual: numeroMensagens,
+      respostas,
+      status,
+      instancia,
+      imobiliariaId,
+    },
+  });
+}
+
+// POST /api/agente/triagem
+async function processarTriagem(req, res) {
+  const { telefone, mensagem, instancia, pushName } = req.body;
+  const imobiliariaId = req.imobiliariaId;
+
+  if (!telefone || !mensagem || !instancia) {
+    return res.status(400).json({ error: 'Campos obrigatórios: telefone, mensagem, instancia' });
+  }
+
+  const telefoneLimpo = String(telefone).replace(/\D/g, '');
+  if (!telefoneLimpo || telefoneLimpo.length < 10) {
+    return res.status(400).json({ error: 'Telefone inválido' });
+  }
+
+  const sessao = await prisma.sessaoAgente.findUnique({
+    where: { telefone_imobiliariaId_tipo: { telefone: telefoneLimpo, imobiliariaId, tipo: 'triagem' } },
+  });
+
+  // Sessão já concluída (virou lead, foi descartada ou bateu o limite) — não responde mais.
+  if (sessao && sessao.status !== 'em_andamento') {
+    return res.json({ ok: true, acao: 'ignorado' });
+  }
+
+  const historicoAnterior = sessao?.respostas?.historico || [];
+  const historico = [...historicoAnterior, { role: 'user', content: mensagem.trim() }];
+  const numeroMensagens = (sessao?.etapaAtual || 0) + 1;
+  const noLimite = numeroMensagens >= LIMITE_MENSAGENS_TRIAGEM;
+
+  const { classificacao, resposta } = await classificarViaIA(historico);
+  const historicoFinal = [...historico, { role: 'assistant', content: resposta }];
+
+  const salvarComum = (status, motivoDescarte) => salvarSessaoTriagem({
+    telefoneLimpo, pushName, instancia, imobiliariaId, numeroMensagens, historico: historicoFinal, status, motivoDescarte,
+  });
+
+  if (classificacao === 'lead_anuncio') {
+    await salvarComum('finalizado');
+    return res.json({ ok: true, acao: 'lead_confirmado', mensagemResposta: resposta });
+  }
+
+  if (classificacao === 'corretor_parceiro' || classificacao === 'outro') {
+    await salvarComum('descartado', classificacao);
+    notificarGestorTriagem(imobiliariaId, telefoneLimpo, classificacao).catch((err) => {
+      console.error('[agente] Falha ao notificar gestor (triagem):', err.message);
+    });
+    return res.json({ ok: true, acao: 'descartado', mensagemResposta: resposta });
+  }
+
+  // "indefinido": no limite de mensagens é exceção — desiste em vez de insistir pra sempre
+  if (noLimite) {
+    await salvarComum('descartado', 'limite_mensagens');
+    notificarGestorTriagem(imobiliariaId, telefoneLimpo, 'limite_mensagens').catch((err) => {
+      console.error('[agente] Falha ao notificar gestor (triagem):', err.message);
+    });
+    return res.json({ ok: true, acao: 'descartado' });
+  }
+
+  // Caminho comum: ainda indefinido, dentro do limite — segue a conversa
+  await salvarComum('em_andamento');
+  return res.json({ ok: true, acao: 'pergunta', mensagemResposta: resposta });
+}
+
+module.exports = { receberMensagem, processarTriagem };
