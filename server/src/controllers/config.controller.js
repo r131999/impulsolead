@@ -100,9 +100,14 @@ async function getConfigAgente(req, res) {
   }
 }
 
+const REGEX_HORARIO = /^([01]\d|2[0-3]):[0-5]\d$/; // "HH:MM", 00:00–23:59
+
 async function atualizarConfigAgente(req, res) {
   try {
-    const { mensagemBoasVindas, perguntas, nomeAgente, tomAgente, ativo, atenderNumeroDesconhecido } = req.body;
+    const {
+      mensagemBoasVindas, perguntas, nomeAgente, tomAgente, ativo, atenderNumeroDesconhecido,
+      horarioAtendimentoInicio, horarioAtendimentoFim,
+    } = req.body;
 
     if (perguntas !== undefined) {
       if (!Array.isArray(perguntas) || perguntas.length === 0) {
@@ -117,6 +122,14 @@ async function atualizarConfigAgente(req, res) {
       return res.status(400).json({ error: 'atenderNumeroDesconhecido deve ser boolean' });
     }
 
+    if (horarioAtendimentoInicio !== undefined && !REGEX_HORARIO.test(horarioAtendimentoInicio)) {
+      return res.status(400).json({ error: 'horarioAtendimentoInicio deve estar no formato HH:MM' });
+    }
+
+    if (horarioAtendimentoFim !== undefined && !REGEX_HORARIO.test(horarioAtendimentoFim)) {
+      return res.status(400).json({ error: 'horarioAtendimentoFim deve estar no formato HH:MM' });
+    }
+
     const config = await prisma.configAgente.upsert({
       where: { imobiliariaId: req.imobiliariaId },
       update: {
@@ -126,6 +139,8 @@ async function atualizarConfigAgente(req, res) {
         ...(tomAgente !== undefined && { tomAgente }),
         ...(ativo !== undefined && { ativo }),
         ...(atenderNumeroDesconhecido !== undefined && { atenderNumeroDesconhecido }),
+        ...(horarioAtendimentoInicio !== undefined && { horarioAtendimentoInicio }),
+        ...(horarioAtendimentoFim !== undefined && { horarioAtendimentoFim }),
       },
       create: {
         imobiliariaId: req.imobiliariaId,
@@ -135,6 +150,8 @@ async function atualizarConfigAgente(req, res) {
         tomAgente: tomAgente || 'profissional mas leve',
         ativo: ativo !== undefined ? ativo : true,
         atenderNumeroDesconhecido: atenderNumeroDesconhecido !== undefined ? atenderNumeroDesconhecido : false,
+        horarioAtendimentoInicio: horarioAtendimentoInicio || '00:00',
+        horarioAtendimentoFim: horarioAtendimentoFim || '23:59',
       },
     });
 

@@ -158,12 +158,32 @@ async function fetchConfigAgente(tenant) {
       return {
         mensagem: json.mensagem || DEFAULT_BV,
         atenderNumeroDesconhecido: !!json.atenderNumeroDesconhecido,
+        horarioAtendimentoInicio: json.horarioAtendimentoInicio || '00:00',
+        horarioAtendimentoFim: json.horarioAtendimentoFim || '23:59',
       };
     }
   } catch (err) {
     tag(`Erro config-agente fetch: ${err.message}`, tenant.imobiliariaId);
   }
-  return { mensagem: DEFAULT_BV, atenderNumeroDesconhecido: false };
+  return { mensagem: DEFAULT_BV, atenderNumeroDesconhecido: false, horarioAtendimentoInicio: '00:00', horarioAtendimentoFim: '23:59' };
+}
+
+// ── Horário de atendimento (ConfigAgente.horarioAtendimentoInicio/Fim) ────────
+// Mesma convenção de fuso já usada em cron.service.js (Brasília = UTC-3, sem
+// horário de verão). "00:00"–"23:59" (default) cobre o dia inteiro = 24/7.
+function dentroDoHorarioAtendimento({ horarioAtendimentoInicio, horarioAtendimentoFim }) {
+  const agoraBrasilia = new Date(Date.now() - 3 * 60 * 60 * 1000);
+  const minutosAgora = agoraBrasilia.getUTCHours() * 60 + agoraBrasilia.getUTCMinutes();
+
+  const [hi, mi] = horarioAtendimentoInicio.split(':').map(Number);
+  const [hf, mf] = horarioAtendimentoFim.split(':').map(Number);
+  const minutosInicio = hi * 60 + mi;
+  const minutosFim = hf * 60 + mf;
+
+  if (minutosInicio <= minutosFim) {
+    return minutosAgora >= minutosInicio && minutosAgora <= minutosFim;
+  }
+  return minutosAgora >= minutosInicio || minutosAgora <= minutosFim; // janela atravessa a meia-noite
 }
 
 // ── Triagem de número desconhecido (ConfigAgente.atenderNumeroDesconhecido) ───
@@ -309,6 +329,11 @@ async function handleMessage(tenant, msg) {
 
     const configAgente = await fetchConfigAgente(tenant);
     const senderPnRaw = (key.senderPn || msg.participant || '').split('@')[0].replace(/\D/g, '');
+
+    if (!dentroDoHorarioAtendimento(configAgente)) {
+      tag(`Fora do horário de atendimento (${configAgente.horarioAtendimentoInicio}–${configAgente.horarioAtendimentoFim}) — ignorando`, tenant.imobiliariaId);
+      return;
+    }
 
     if (!configAgente.atenderNumeroDesconhecido) {
       // ── CAMINHO 2: Novo lead — cria direto, sem triagem (comportamento padrão) ─

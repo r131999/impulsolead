@@ -646,6 +646,8 @@ model ConfigAgente {
   distribuicaoPorEquipeManual Boolean @default(false)
   pularCorretorPendente Boolean @default(true)
   atenderNumeroDesconhecido Boolean @default(false)
+  horarioAtendimentoInicio String @default("00:00") // "HH:MM", Brasília
+  horarioAtendimentoFim    String @default("23:59") // "HH:MM", Brasília — 00:00–23:59 = 24/7
   criadoEm           DateTime @default(now())
   atualizadoEm       DateTime @updatedAt
 

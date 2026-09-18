@@ -215,6 +215,8 @@ export default function ConfigAgente() {
         perguntas: form.perguntas,
         ativo: form.ativo,
         atenderNumeroDesconhecido: form.atenderNumeroDesconhecido,
+        horarioAtendimentoInicio: form.horarioAtendimentoInicio,
+        horarioAtendimentoFim: form.horarioAtendimentoFim,
       })
       setConfig(res.data.config)
       setSucesso(true)
@@ -440,6 +442,50 @@ export default function ConfigAgente() {
                   width: 16, height: 16, left: 4,
                   transform: form.atenderNumeroDesconhecido ? 'translateX(20px)' : 'translateX(0)',
                 }}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Horário de atendimento */}
+        <div className="card">
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <h2 className="font-semibold" style={{ color: '#F1F5F9' }}>Horário de atendimento</h2>
+              <p className="text-xs mt-0.5" style={{ color: '#94A3B8' }}>
+                Fora desse horário, o agente não responde nem cria lead automaticamente.
+              </p>
+            </div>
+            {form.horarioAtendimentoInicio === '00:00' && form.horarioAtendimentoFim === '23:59' ? (
+              <span className="text-xs font-medium flex-shrink-0" style={{ color: '#10B981' }}>24 horas por dia</span>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setForm((f) => ({ ...f, horarioAtendimentoInicio: '00:00', horarioAtendimentoFim: '23:59' }))}
+                className="text-xs font-medium hover:opacity-80 transition-opacity flex-shrink-0"
+                style={{ color: '#60A5FA' }}
+              >
+                Ativar 24/7
+              </button>
+            )}
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="label">Início</label>
+              <input
+                type="time"
+                className="input"
+                value={form.horarioAtendimentoInicio}
+                onChange={set('horarioAtendimentoInicio')}
+              />
+            </div>
+            <div>
+              <label className="label">Fim</label>
+              <input
+                type="time"
+                className="input"
+                value={form.horarioAtendimentoFim}
+                onChange={set('horarioAtendimentoFim')}
               />
             </div>
           </div>
