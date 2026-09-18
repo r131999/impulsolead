@@ -160,12 +160,13 @@ async function fetchConfigAgente(tenant) {
         atenderNumeroDesconhecido: !!json.atenderNumeroDesconhecido,
         horarioAtendimentoInicio: json.horarioAtendimentoInicio || '00:00',
         horarioAtendimentoFim: json.horarioAtendimentoFim || '23:59',
+        qualificacaoAutomatica: !!json.qualificacaoAutomatica,
       };
     }
   } catch (err) {
     tag(`Erro config-agente fetch: ${err.message}`, tenant.imobiliariaId);
   }
-  return { mensagem: DEFAULT_BV, atenderNumeroDesconhecido: false, horarioAtendimentoInicio: '00:00', horarioAtendimentoFim: '23:59' };
+  return { mensagem: DEFAULT_BV, atenderNumeroDesconhecido: false, horarioAtendimentoInicio: '00:00', horarioAtendimentoFim: '23:59', qualificacaoAutomatica: false };
 }
 
 // ── Horário de atendimento (ConfigAgente.horarioAtendimentoInicio/Fim) ────────
@@ -201,6 +202,27 @@ async function processarTriagem(tenant, { telefone, mensagem, pushName }) {
     tag(`Triagem — status inesperado: ${res.status}`, tenant.imobiliariaId);
   } catch (err) {
     tag(`Erro triagem: ${err.message}`, tenant.imobiliariaId);
+  }
+  return { ok: false, acao: 'ignorado' };
+}
+
+// ── Qualificação automática (ConfigAgente.qualificacaoAutomatica) ──────────────
+// Chamada quando um lead já criado (leadAtivo.emQualificacaoAutomatica) manda
+// mensagem — a Lia conduz o roteiro configurado até concluir, ser transferida
+// pro humano, ou bater o limite de mensagens. Timeout de 30min sem resposta é
+// tratado por um cron no backend (server), não aqui.
+async function processarQualificacao(tenant, { telefone, mensagem, pushName, leadId, msgId }) {
+  try {
+    const res = await httpReq(
+      'POST',
+      `${API_BASE}/agente/qualificacao`,
+      { telefone, mensagem, instancia: tenant.imobiliariaId, pushName, leadId, whatsappMsgId: msgId },
+      { 'x-api-key': tenant.apiKey },
+    );
+    if (res.status === 200) return JSON.parse(res.data);
+    tag(`Qualificação — status inesperado: ${res.status}`, tenant.imobiliariaId);
+  } catch (err) {
+    tag(`Erro qualificação: ${err.message}`, tenant.imobiliariaId);
   }
   return { ok: false, acao: 'ignorado' };
 }
@@ -316,6 +338,20 @@ async function handleMessage(tenant, msg) {
     const leadAtivo = await verificarLeadAtivo(tenant, phone, realJid);
     tag(`Lead ativo: ${leadAtivo.existe} | leadId: ${leadAtivo.leadId}`, tenant.imobiliariaId);
     if (leadAtivo.existe && leadAtivo.leadId) {
+      if (leadAtivo.emQualificacaoAutomatica) {
+        tag(`Lead em qualificação automática — repassando pra Lia`, tenant.imobiliariaId);
+        const resultado = await processarQualificacao(tenant, {
+          telefone: phone, mensagem: text, pushName: msg.pushName, leadId: leadAtivo.leadId, msgId,
+        });
+        if (resultado.mensagemResposta) {
+          try {
+            await tenant.sock.sendMessage(realJid, { text: resultado.mensagemResposta });
+          } catch (err) {
+            tag(`Erro ao enviar mensagem de qualificação: ${err.message}`, tenant.imobiliariaId);
+          }
+        }
+        return;
+      }
       tag(`Lead já existe — salvando mensagem`, tenant.imobiliariaId);
       await salvarMensagemRecebida(tenant, leadAtivo.leadId, text, msgId, nome);
       return;
@@ -365,7 +401,11 @@ async function handleMessage(tenant, msg) {
       tenant.recentLeads.set(phone, now);
       if (senderPnRaw && senderPnRaw !== phone) tenant.recentLeads.set(senderPnRaw, now);
 
-      await criarLeadEEnviarMsgInicial(tenant, { phone, realJid, text, msgId, nome, campanha });
+      await criarLeadEEnviarMsgInicial(tenant, {
+        phone, realJid, text, msgId, nome, campanha,
+        viaAgenteQualificacao: configAgente.qualificacaoAutomatica,
+        mensagemInicial: text,
+      });
       return;
     }
 
@@ -386,7 +426,11 @@ async function handleMessage(tenant, msg) {
       tag(`Triagem confirmou lead — criando: ${phone}`, tenant.imobiliariaId);
       tenant.recentLeads.set(phone, Date.now());
       if (senderPnRaw && senderPnRaw !== phone) tenant.recentLeads.set(senderPnRaw, Date.now());
-      await criarLeadEEnviarMsgInicial(tenant, { phone, realJid, text, msgId, nome, campanha: detectCampaign(text) });
+      await criarLeadEEnviarMsgInicial(tenant, {
+        phone, realJid, text, msgId, nome, campanha: detectCampaign(text),
+        viaAgenteQualificacao: configAgente.qualificacaoAutomatica,
+        mensagemInicial: text,
+      });
     } else if (resultado.acao === 'descartado') {
       tag(`Triagem descartou o contato (não é lead): ${phone}`, tenant.imobiliariaId);
     }
@@ -398,7 +442,7 @@ async function handleMessage(tenant, msg) {
 // ── Criação de lead + mensagem inicial (com fila de retry) ─────────────────────
 // Reaproveitado tanto pelo caminho direto (toggle desligado) quanto pelo
 // caminho de triagem (toggle ligado, após confirmar que é lead real).
-async function criarLeadEEnviarMsgInicial(tenant, { phone, realJid, text, msgId, nome, campanha }) {
+async function criarLeadEEnviarMsgInicial(tenant, { phone, realJid, text, msgId, nome, campanha, viaAgenteQualificacao, mensagemInicial }) {
   let res;
   try {
     res = await httpReq(
@@ -410,6 +454,8 @@ async function criarLeadEEnviarMsgInicial(tenant, { phone, realJid, text, msgId,
         whatsappJid: realJid,
         campanha: campanha || undefined,
         imobiliariaId: tenant.imobiliariaId,
+        viaAgenteQualificacao: viaAgenteQualificacao || undefined,
+        mensagemInicial: mensagemInicial || undefined,
       },
       { 'x-api-key': tenant.apiKey },
     );
@@ -422,6 +468,8 @@ async function criarLeadEEnviarMsgInicial(tenant, { phone, realJid, text, msgId,
       realJid,
       campanha,
       msgId,
+      viaAgenteQualificacao,
+      mensagemInicial,
       imobiliariaId: tenant.imobiliariaId,
       apiKey: tenant.apiKey,
       tentativas: 0,
@@ -442,6 +490,8 @@ async function criarLeadEEnviarMsgInicial(tenant, { phone, realJid, text, msgId,
       realJid,
       campanha,
       msgId,
+      viaAgenteQualificacao,
+      mensagemInicial,
       imobiliariaId: tenant.imobiliariaId,
       apiKey: tenant.apiKey,
       tentativas: 0,
@@ -451,11 +501,14 @@ async function criarLeadEEnviarMsgInicial(tenant, { phone, realJid, text, msgId,
     return;
   }
 
-  if (res.status === 201 && text.trim()) {
+  if (res.status === 201) {
     try {
       const body = JSON.parse(res.data);
       const leadId = body?.lead?.id;
-      if (leadId) {
+      // historicoBackfilled === true significa que essa mensagem já entrou no chat
+      // via o histórico de triagem que o backend gravou retroativamente — logar de
+      // novo aqui duplicaria a última mensagem da conversa.
+      if (leadId && text.trim() && !body?.historicoBackfilled) {
         await salvarMensagemRecebida(tenant, leadId, text, msgId, nome);
         tag(`Mensagem inicial salva — lead ${leadId}`, tenant.imobiliariaId);
       }
@@ -900,6 +953,8 @@ process.on('unhandledRejection', (reason) => console.error('[manager] unhandledR
             whatsappJid: item.realJid,
             campanha: item.campanha || undefined,
             imobiliariaId: item.imobiliariaId,
+            viaAgenteQualificacao: item.viaAgenteQualificacao || undefined,
+            mensagemInicial: item.mensagemInicial || undefined,
           },
           { 'x-api-key': item.apiKey },
         );

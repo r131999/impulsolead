@@ -3,7 +3,10 @@ const https = require('https');
 const http = require('http');
 
 const prisma = require('../lib/prisma');
-const { enviarWhatsApp } = require('../services/notificacao.service');
+const { enviarWhatsApp, notificarCorretorCloudApi } = require('../services/notificacao.service');
+const { proximoCorretor } = require('../services/fila.service');
+const { enviarPushCorretor } = require('./push.controller');
+const { emitirMensagem } = require('../services/socketio.service');
 
 // ─── Mensagens fixas por etapa ────────────────────────────────────────────────
 
@@ -402,7 +405,16 @@ const MENSAGEM_TRIAGEM_FALLBACK =
 
 const CLASSIFICACOES_VALIDAS = ['lead_anuncio', 'corretor_parceiro', 'outro', 'indefinido'];
 
-const SYSTEM_PROMPT_TRIAGEM = `Você é a assistente de triagem de uma imobiliária, respondendo pelo WhatsApp. A pessoa que está te escrevendo ainda não é um lead cadastrado no CRM. Sua tarefa é conduzir uma conversa curta, natural e cordial (nunca robótica ou de formulário) para descobrir quem é essa pessoa antes de qualificá-la como lead.
+function buildSystemPromptTriagem(qualificacaoAutomatica) {
+  // A regra do "lead_anuncio" muda conforme o que acontece depois da confirmação:
+  // sem qualificação automática, o corretor assume na hora (promessa correta);
+  // com ela ligada, é a própria Lia quem continua a conversa — prometer um
+  // corretor aqui seria falso e quebraria a continuidade pedida no fluxo.
+  const regraLeadAnuncio = qualificacaoAutomatica
+    ? '- Se classificar como "lead_anuncio", a resposta deve confirmar de forma calorosa o interesse, sem prometer um corretor — apenas diga que você vai continuar te ajudando a entender melhor o que a pessoa procura.'
+    : '- Se classificar como "lead_anuncio", a resposta deve confirmar de forma calorosa que um corretor vai continuar o atendimento.';
+
+  return `Você é a assistente de triagem de uma imobiliária, respondendo pelo WhatsApp. A pessoa que está te escrevendo ainda não é um lead cadastrado no CRM. Sua tarefa é conduzir uma conversa curta, natural e cordial (nunca robótica ou de formulário) para descobrir quem é essa pessoa antes de qualificá-la como lead.
 
 Classifique CADA mensagem em uma destas categorias:
 - "lead_anuncio": a pessoa demonstra interesse genuíno em comprar ou alugar um imóvel (cliente em potencial).
@@ -416,11 +428,12 @@ Responda SEMPRE em JSON válido, exatamente neste formato:
 Regras:
 - Fale como uma pessoa real e atenciosa, nunca como um robô ou formulário.
 - Nunca invente disponibilidade de imóveis, preços, prazos ou dados que você não tem.
-- Se classificar como "lead_anuncio", a resposta deve confirmar de forma calorosa que um corretor vai continuar o atendimento.
+${regraLeadAnuncio}
 - Se classificar como "corretor_parceiro" ou "outro", a resposta deve ser educada, breve, e encerrar a conversa sem prometer atendimento comercial.
 - Se "indefinido", a resposta deve ser uma pergunta natural (não repetitiva) que ajude a entender se a pessoa busca um imóvel.`;
+}
 
-async function classificarViaIA(historico) {
+async function classificarViaIA(historico, qualificacaoAutomatica = false) {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     console.warn('[agente] OPENAI_API_KEY não configurada — triagem tratando mensagem como indefinida');
@@ -432,7 +445,7 @@ async function classificarViaIA(historico) {
       'https://api.openai.com/v1/chat/completions',
       {
         model: 'gpt-4o-mini',
-        messages: [{ role: 'system', content: SYSTEM_PROMPT_TRIAGEM }, ...historico],
+        messages: [{ role: 'system', content: buildSystemPromptTriagem(qualificacaoAutomatica) }, ...historico],
         response_format: { type: 'json_object' },
         max_tokens: 300,
         temperature: 0.6,
@@ -539,7 +552,12 @@ async function processarTriagem(req, res) {
   const numeroMensagens = (sessao?.etapaAtual || 0) + 1;
   const noLimite = numeroMensagens >= LIMITE_MENSAGENS_TRIAGEM;
 
-  const { classificacao, resposta } = await classificarViaIA(historico);
+  const configAgente = await prisma.configAgente.findUnique({
+    where: { imobiliariaId },
+    select: { qualificacaoAutomatica: true },
+  });
+
+  const { classificacao, resposta } = await classificarViaIA(historico, !!configAgente?.qualificacaoAutomatica);
   const historicoFinal = [...historico, { role: 'assistant', content: resposta }];
 
   const salvarComum = (status, motivoDescarte) => salvarSessaoTriagem({
@@ -573,4 +591,292 @@ async function processarTriagem(req, res) {
   return res.json({ ok: true, acao: 'pergunta', mensagemResposta: resposta });
 }
 
-module.exports = { receberMensagem, processarTriagem };
+// ─── Qualificação automática (ConfigAgente.qualificacaoAutomatica) ────────────
+//
+// Usado pelo manager Baileys quando o lead já foi criado (direto ou via triagem
+// confirmada) e a imobiliária ligou o toggle: em vez de notificar o corretor na
+// hora, a Lia conduz o roteiro de ConfigAgente.perguntas como guia de conversa
+// (não um formulário lido em ordem) até uma das quatro saídas abaixo. Só então o
+// corretor é notificado, com o que foi coletado gravado em Lead.respostasFormulario
+// (mesmo campo/formato que leads de Meta Ads já usam, para reaproveitar a UI existente).
+//
+// Igual à triagem, este controller nunca fala com o WhatsApp diretamente — só
+// decide o texto; quem envia é o manager, dono do socket Baileys.
+
+const LIMITE_MENSAGENS_QUALIFICACAO = 20; // roteiro padrão tem ~8 perguntas; até 2 idas-e-voltas cada + folga — rede de segurança, não o caminho comum (mesmo espírito do limite da triagem)
+
+const MENSAGEM_QUALIFICACAO_FALLBACK =
+  'Desculpa, pode repetir? Não consegui entender direito 🙂';
+
+const CLASSIFICACOES_QUALIFICACAO_VALIDAS = ['andamento', 'concluido', 'transferir_humano'];
+
+function buildSystemPromptQualificacao(perguntas, coletadoAtual) {
+  const roteiro = (Array.isArray(perguntas) && perguntas.length ? perguntas : [
+    'Nome', 'Motivação para buscar um imóvel', 'Região de interesse', 'Renda familiar aproximada',
+  ]).map((p, i) => `${i + 1}. ${p}`).join('\n');
+
+  const coletadoTexto = coletadoAtual && Object.keys(coletadoAtual).length
+    ? JSON.stringify(coletadoAtual)
+    : '(nada coletado ainda)';
+
+  return `Você é a assistente de qualificação de uma imobiliária, conversando pelo WhatsApp com uma pessoa que ACABOU de confirmar interesse em um imóvel — já é um lead no CRM. Sua tarefa é conduzir uma conversa curta, natural e cordial para descobrir as informações do roteiro abaixo, usando-o como guia do que precisa saber — nunca como um formulário lido pergunta por pergunta.
+
+Roteiro do que você precisa descobrir:
+${roteiro}
+
+O que já foi coletado até agora (não pergunte de novo o que já está aqui):
+${coletadoTexto}
+
+Responda SEMPRE em JSON válido, exatamente neste formato:
+{"classificacao": "andamento" | "concluido" | "transferir_humano", "resposta": "texto curto e natural para responder ao contato", "coletado": {"<pergunta do roteiro>": "<o que foi entendido, resumido>"}}
+
+Regras:
+- "coletado" deve trazer o estado ATUALIZADO e COMPLETO de tudo que você já sabe (o que já estava + o que esta mensagem acrescentou), usando o texto de cada pergunta do roteiro como chave.
+- Fale como uma pessoa real e atenciosa, nunca como um robô ou formulário. Uma pergunta por vez, natural, sem repetir o que já foi respondido.
+- Nunca invente disponibilidade de imóveis, preços, prazos ou dados que você não tem.
+- Se a pessoa pedir para falar com um humano/corretor/atendente, ou insistir em algo que só um corretor pode responder, classifique como "transferir_humano" e responda confirmando que vai transferir, sem insistir nas perguntas.
+- Classifique como "concluido" quando já tiver o essencial do roteiro (não precisa 100% se a pessoa já demonstrou impaciência) — a resposta deve agradecer e avisar que um corretor vai continuar o atendimento a partir daqui.
+- Caso contrário, classifique como "andamento" e siga com a próxima pergunta natural do roteiro.`;
+}
+
+async function classificarQualificacaoViaIA(historico, perguntas, coletadoAtual) {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    console.warn('[agente] OPENAI_API_KEY não configurada — qualificação automática transferindo para humano');
+    return { classificacao: 'transferir_humano', resposta: MENSAGEM_QUALIFICACAO_FALLBACK, coletado: coletadoAtual || {} };
+  }
+
+  try {
+    const response = await axios.post(
+      'https://api.openai.com/v1/chat/completions',
+      {
+        model: 'gpt-4o-mini',
+        messages: [{ role: 'system', content: buildSystemPromptQualificacao(perguntas, coletadoAtual) }, ...historico],
+        response_format: { type: 'json_object' },
+        max_tokens: 500,
+        temperature: 0.6,
+      },
+      {
+        headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+        timeout: 10000,
+      },
+    );
+
+    const bruto = response.data.choices[0]?.message?.content || '{}';
+    const parsed = JSON.parse(bruto);
+
+    const classificacao = CLASSIFICACOES_QUALIFICACAO_VALIDAS.includes(parsed.classificacao)
+      ? parsed.classificacao
+      : 'andamento';
+    const resposta = typeof parsed.resposta === 'string' && parsed.resposta.trim()
+      ? parsed.resposta.trim()
+      : MENSAGEM_QUALIFICACAO_FALLBACK;
+    const coletado = (parsed.coletado && typeof parsed.coletado === 'object' && !Array.isArray(parsed.coletado))
+      ? parsed.coletado
+      : (coletadoAtual || {});
+
+    return { classificacao, resposta, coletado };
+  } catch (err) {
+    console.warn('[agente] Falha na qualificação via IA — mantendo em andamento:', err.message);
+    return { classificacao: 'andamento', resposta: MENSAGEM_QUALIFICACAO_FALLBACK, coletado: coletadoAtual || {} };
+  }
+}
+
+const MOTIVO_LABEL_QUALIFICACAO = {
+  concluido: 'Qualificação automática concluída pela Lia',
+  transferencia_humana: 'Lead pediu para falar com um atendente — transferido pela Lia',
+  timeout: 'Lead não respondeu por 30 minutos — qualificação encerrada pela Lia',
+  limite_mensagens: 'Qualificação atingiu o limite de mensagens — encerrada pela Lia',
+};
+
+// Encerra a qualificação e só AQUI o corretor entra em cena — chamada tanto pelo
+// fim natural da conversa (processarQualificacao abaixo) quanto pelo cron de
+// timeout (cron.service.js:verificarQualificacoesInativas). O updateMany com
+// where emQualificacaoAutomatica:true funciona como trava atômica: se as duas
+// chamadas colidirem (IA concluindo bem na hora em que o cron dispara), só uma
+// delas consegue flipar o campo e seguir com a distribuição.
+async function finalizarQualificacao(leadId, imobiliariaId, { perguntas, coletado, motivo }) {
+  const guard = await prisma.lead.updateMany({
+    where: { id: leadId, emQualificacaoAutomatica: true },
+    data: { emQualificacaoAutomatica: false },
+  });
+  if (guard.count === 0) return; // já finalizada por outro caminho
+
+  const lead = await prisma.lead.findUnique({ where: { id: leadId } });
+  if (!lead) return;
+
+  const roteiro = Array.isArray(perguntas) && perguntas.length ? perguntas : Object.keys(coletado || {});
+  const respostasFormulario = roteiro
+    .map((pergunta) => ({ pergunta, resposta: (coletado && coletado[pergunta]) || null }))
+    .filter((r) => r.resposta);
+
+  const configAgente = await prisma.configAgente.findUnique({
+    where: { imobiliariaId },
+    select: { distribuicaoManual: true },
+  });
+  const modoManual = configAgente?.distribuicaoManual ?? false;
+
+  const corretor = modoManual ? null : await proximoCorretor(imobiliariaId);
+  const label = MOTIVO_LABEL_QUALIFICACAO[motivo] || 'Qualificação automática encerrada';
+
+  await prisma.$transaction(async (tx) => {
+    await tx.lead.update({
+      where: { id: leadId },
+      data: {
+        ...(respostasFormulario.length && { respostasFormulario }),
+        ...(corretor && { corretorId: corretor.id }),
+      },
+    });
+
+    if (corretor) {
+      await tx.historicoLead.create({
+        data: {
+          leadId,
+          acao: `${label} — lead atribuído`,
+          detalhes: `Corretor: ${corretor.nome}`,
+        },
+      });
+      await tx.historicoDistribuicao.create({
+        data: {
+          leadId,
+          leadNome: lead.nome,
+          leadTelefone: lead.telefone,
+          corretorId: corretor.id,
+          corretorNome: corretor.nome,
+          distribuidoPor: 'automatico',
+          imobiliariaId,
+        },
+      });
+    } else {
+      await tx.historicoLead.create({
+        data: {
+          leadId,
+          acao: `${label} — ${modoManual ? 'aguardando distribuição manual' : 'sem corretor disponível'}`,
+        },
+      });
+    }
+  });
+
+  if (corretor) {
+    const leadAtualizado = await prisma.lead.findUnique({ where: { id: leadId } });
+    notificarCorretorCloudApi(corretor, leadAtualizado).catch(() => {});
+    enviarPushCorretor(
+      corretor.id,
+      '🏠 Novo lead qualificado!',
+      `Nome: ${leadAtualizado.nome} | Tel: ${leadAtualizado.telefone}`,
+    ).catch(() => {});
+  }
+}
+
+// POST /api/agente/qualificacao
+// Grava uma mensagem "ao vivo" da qualificação no chat do lead (diferente do
+// backfill de triagem em webhook.controller.js, que é retroativo) — dedup por
+// whatsappMsgId no lado do lead evita duplicar em caso de retry do manager.
+async function registrarMensagemQualificacao({ leadId, imobiliariaId, remetenteTipo, remetenteNome, conteudo, whatsappMsgId }) {
+  if (!conteudo) return;
+
+  if (whatsappMsgId) {
+    const existe = await prisma.mensagemLead.findFirst({ where: { whatsappMsgId }, select: { id: true } });
+    if (existe) return;
+  }
+
+  const mensagem = await prisma.mensagemLead.create({
+    data: {
+      leadId,
+      remetenteTipo,
+      remetenteNome,
+      conteudo,
+      tipoMidia: 'texto',
+      whatsappMsgId: whatsappMsgId || null,
+      lida: remetenteTipo !== 'lead', // saída da Lia já "lida"; do lead fica pendente pro corretor ver
+      imobiliariaId,
+    },
+  });
+  emitirMensagem(leadId, mensagem);
+}
+
+async function processarQualificacao(req, res) {
+  const { telefone, mensagem, instancia, pushName, whatsappMsgId } = req.body;
+  const imobiliariaId = req.imobiliariaId;
+
+  if (!telefone || !mensagem || !instancia) {
+    return res.status(400).json({ error: 'Campos obrigatórios: telefone, mensagem, instancia' });
+  }
+
+  const telefoneLimpo = String(telefone).replace(/\D/g, '');
+  if (!telefoneLimpo || telefoneLimpo.length < 10) {
+    return res.status(400).json({ error: 'Telefone inválido' });
+  }
+
+  const sessao = await prisma.sessaoAgente.findUnique({
+    where: { telefone_imobiliariaId_tipo: { telefone: telefoneLimpo, imobiliariaId, tipo: 'qualificacao_ia' } },
+  });
+
+  // Sem sessão ativa (já finalizada, ou esse telefone nunca entrou em qualificação
+  // automática) — nada a fazer. O manager só chama esta rota quando o lead ainda
+  // está com emQualificacaoAutomatica=true, mas a checagem aqui é redundante de propósito.
+  if (!sessao || sessao.status !== 'em_andamento') {
+    return res.json({ ok: true, acao: 'ignorado' });
+  }
+
+  const leadId = sessao.respostas?.leadId;
+  if (!leadId) {
+    return res.json({ ok: true, acao: 'ignorado' });
+  }
+
+  // Retry do manager pra uma mensagem já processada — não reprocessa nem chama a IA de novo.
+  if (whatsappMsgId) {
+    const jaProcessada = await prisma.mensagemLead.findFirst({ where: { whatsappMsgId }, select: { id: true } });
+    if (jaProcessada) return res.json({ ok: true, acao: 'ignorado', dedup: true });
+  }
+
+  const configAgente = await prisma.configAgente.findUnique({
+    where: { imobiliariaId },
+    select: { perguntas: true, nomeAgente: true },
+  });
+  const perguntas = Array.isArray(configAgente?.perguntas) ? configAgente.perguntas : [];
+  const nomeAgente = configAgente?.nomeAgente || 'Lia';
+
+  await registrarMensagemQualificacao({
+    leadId, imobiliariaId, remetenteTipo: 'lead',
+    remetenteNome: sessao.nome || pushName || 'Lead',
+    conteudo: mensagem.trim(), whatsappMsgId,
+  });
+
+  const historicoAnterior = Array.isArray(sessao.respostas?.historico) ? sessao.respostas.historico : [];
+  const historico = [...historicoAnterior, { role: 'user', content: mensagem.trim() }];
+  const numeroMensagens = (sessao.etapaAtual || 0) + 1;
+  const coletadoAnterior = sessao.respostas?.coletado || {};
+  const noLimite = numeroMensagens >= LIMITE_MENSAGENS_QUALIFICACAO;
+
+  const { classificacao, resposta, coletado } = await classificarQualificacaoViaIA(historico, perguntas, coletadoAnterior);
+  const historicoFinal = [...historico, { role: 'assistant', content: resposta }];
+
+  await registrarMensagemQualificacao({
+    leadId, imobiliariaId, remetenteTipo: 'assistente', remetenteNome: nomeAgente, conteudo: resposta,
+  });
+
+  const salvarSessao = (status) => prisma.sessaoAgente.update({
+    where: { id: sessao.id },
+    data: { etapaAtual: numeroMensagens, respostas: { leadId, historico: historicoFinal, coletado }, status },
+  });
+
+  if (classificacao === 'transferir_humano') {
+    await salvarSessao('finalizado');
+    await finalizarQualificacao(leadId, imobiliariaId, { perguntas, coletado, motivo: 'transferencia_humana' });
+    return res.json({ ok: true, acao: 'transferido', mensagemResposta: resposta });
+  }
+
+  if (classificacao === 'concluido' || noLimite) {
+    await salvarSessao('finalizado');
+    const motivo = classificacao === 'concluido' ? 'concluido' : 'limite_mensagens';
+    await finalizarQualificacao(leadId, imobiliariaId, { perguntas, coletado, motivo });
+    return res.json({ ok: true, acao: 'concluido', mensagemResposta: resposta });
+  }
+
+  // Caminho comum: ainda em andamento, dentro do limite — segue a conversa
+  await salvarSessao('em_andamento');
+  return res.json({ ok: true, acao: 'pergunta', mensagemResposta: resposta });
+}
+
+module.exports = { receberMensagem, processarTriagem, processarQualificacao, finalizarQualificacao };

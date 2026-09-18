@@ -5,6 +5,7 @@ const { sincronizarGastoAnuncios } = require('./adSpend.service');
 const { enviarPushCorretor } = require('../controllers/push.controller');
 const { buscarPagamentoPendente, buscarPixCopiaECola } = require('./asaas.service');
 const { resolverValorCobranca, obterTelefoneGestorParaCobranca, elegivelParaCobranca } = require('./cobranca.service');
+const { finalizarQualificacao } = require('../controllers/agente.controller');
 
 const prisma = require('../lib/prisma');
 
@@ -633,6 +634,57 @@ async function verificarFollowUpsPendentes() {
   }
 }
 
+// ── Job 7: encerrar qualificação automática sem resposta do lead há 30min ────
+//
+// A saída "lead não responde" da qualificação automática (ConfigAgente.qualificacaoAutomatica)
+// não tem como ser detectada no momento de uma mensagem — precisa de um relógio
+// rodando à parte. Esse job é esse relógio: acha sessões paradas e finaliza pelo
+// mesmo caminho usado pela IA (finalizarQualificacao), só que com motivo "timeout".
+
+const TIMEOUT_QUALIFICACAO_MIN = 30;
+
+async function verificarQualificacoesInativas() {
+  console.log('[cron] Verificando qualificações automáticas inativas...');
+
+  const limite = new Date(Date.now() - TIMEOUT_QUALIFICACAO_MIN * 60 * 1000);
+
+  const sessoes = await prisma.sessaoAgente.findMany({
+    where: { tipo: 'qualificacao_ia', status: 'em_andamento', atualizadoEm: { lt: limite } },
+  });
+
+  if (sessoes.length === 0) {
+    console.log('[cron] Nenhuma qualificação inativa encontrada.');
+    return;
+  }
+
+  for (const sessao of sessoes) {
+    try {
+      const leadId = sessao.respostas?.leadId;
+
+      // Sessão sem leadId nunca deveria existir (é sempre criada junto com o lead
+      // em receberLead) — se acontecer, só encerra a sessão pra não ficar reprocessando.
+      if (!leadId) {
+        await prisma.sessaoAgente.update({ where: { id: sessao.id }, data: { status: 'descartado' } });
+        continue;
+      }
+
+      await prisma.sessaoAgente.update({ where: { id: sessao.id }, data: { status: 'finalizado' } });
+
+      const configAgente = await prisma.configAgente.findUnique({
+        where: { imobiliariaId: sessao.imobiliariaId },
+        select: { perguntas: true },
+      });
+      const perguntas = Array.isArray(configAgente?.perguntas) ? configAgente.perguntas : [];
+      const coletado = sessao.respostas?.coletado || {};
+
+      await finalizarQualificacao(leadId, sessao.imobiliariaId, { perguntas, coletado, motivo: 'timeout' });
+      console.log(`[cron] Qualificação sem resposta há ${TIMEOUT_QUALIFICACAO_MIN}min finalizada — lead ${leadId}`);
+    } catch (err) {
+      console.error(`[cron] Erro ao finalizar qualificação inativa (sessão ${sessao.id}):`, err.message);
+    }
+  }
+}
+
 // ── Inicialização ─────────────────────────────────────────────────────────────
 
 function iniciarCrons() {
@@ -698,7 +750,16 @@ function iniciarCrons() {
     }
   });
 
-  console.log('[cron] Jobs iniciados: relatorio-semanal (dom 8h) | plano-vencimento (diário 9h) | ad-spend (20min) | leads-sem-tratativa (15min) | leads-aguardando-distribuicao (diário 8h BRT) | followups-pendentes (5min)');
+  // Job 7: qualificação automática sem resposta do lead há 30min — a cada 5 minutos
+  cron.schedule('*/5 * * * *', async () => {
+    try {
+      await verificarQualificacoesInativas();
+    } catch (err) {
+      console.error('[cron] Erro no job qualificacoes-inativas:', err.message);
+    }
+  });
+
+  console.log('[cron] Jobs iniciados: relatorio-semanal (dom 8h) | plano-vencimento (diário 9h) | ad-spend (20min) | leads-sem-tratativa (15min) | leads-aguardando-distribuicao (diário 8h BRT) | followups-pendentes (5min) | qualificacoes-inativas (5min)');
 }
 
 module.exports = { iniciarCrons, enviarLembretesCobranca };

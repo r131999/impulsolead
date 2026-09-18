@@ -142,6 +142,7 @@ model Lead {
   historicoConversa String?
   temConversa       Boolean @default(false)
   temperatura       String?
+  emQualificacaoAutomatica Boolean @default(false) // true enquanto a Lia conduz a qualificação; corretor só é notificado quando volta a false
 
   corretorId String?
   corretor   Corretor? @relation(fields: [corretorId], references: [id])
@@ -329,7 +330,7 @@ model SessaoAgente {
   id            String      @id @default(uuid())
   telefone      String
   nome          String?
-  tipo          String      @default("qualificacao") // "qualificacao" | "triagem"
+  tipo          String      @default("qualificacao") // "qualificacao" (órfão, sem chamador) | "triagem" | "qualificacao_ia"
   etapaAtual    Int         @default(0)
   respostas     Json        @default("{}")
   status        String      @default("em_andamento") // "em_andamento" | "finalizado" | "descartado"
@@ -648,6 +649,7 @@ model ConfigAgente {
   atenderNumeroDesconhecido Boolean @default(false)
   horarioAtendimentoInicio String @default("00:00") // "HH:MM", Brasília
   horarioAtendimentoFim    String @default("23:59") // "HH:MM", Brasília — 00:00–23:59 = 24/7
+  qualificacaoAutomatica   Boolean @default(false) // liga a Lia conduzindo o roteiro de "perguntas" após a criação do lead, antes de notificar o corretor
   criadoEm           DateTime @default(now())
   atualizadoEm       DateTime @updatedAt
 

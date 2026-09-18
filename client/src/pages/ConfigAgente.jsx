@@ -217,6 +217,7 @@ export default function ConfigAgente() {
         atenderNumeroDesconhecido: form.atenderNumeroDesconhecido,
         horarioAtendimentoInicio: form.horarioAtendimentoInicio,
         horarioAtendimentoFim: form.horarioAtendimentoFim,
+        qualificacaoAutomatica: form.qualificacaoAutomatica,
       })
       setConfig(res.data.config)
       setSucesso(true)
@@ -578,6 +579,34 @@ export default function ConfigAgente() {
             >
               Adicionar
             </button>
+          </div>
+        </div>
+
+        {/* Qualificação automática */}
+        <div className="card">
+          <div className="flex items-center justify-between gap-4">
+            <div className="min-w-0">
+              <h2 className="font-semibold" style={{ color: '#F1F5F9' }}>Qualificação automática</h2>
+              <p className="text-xs mt-1" style={{ color: '#94A3B8' }}>
+                {form.qualificacaoAutomatica
+                  ? 'Ligado: assim que um lead é criado, a Lia conduz a conversa usando as perguntas acima como roteiro. O corretor só é avisado quando a qualificação termina (ou se o lead pedir para falar com alguém, ficar 30min sem responder, ou a conversa passar do limite de mensagens).'
+                  : 'Desligado (padrão): o corretor é notificado assim que o lead é criado, como hoje. As perguntas acima ficam salvas mas não são usadas em conversa automática.'}
+              </p>
+            </div>
+            <div
+              onClick={() => setForm((f) => ({ ...f, qualificacaoAutomatica: !f.qualificacaoAutomatica }))}
+              className="relative flex-shrink-0 rounded-full transition-colors cursor-pointer"
+              style={{ width: 44, height: 24, backgroundColor: form.qualificacaoAutomatica ? '#4f46e5' : '#1E293B' }}
+              title={form.qualificacaoAutomatica ? 'Desligar' : 'Ligar'}
+            >
+              <span
+                className="absolute top-1 rounded-full bg-white shadow transition-transform"
+                style={{
+                  width: 16, height: 16, left: 4,
+                  transform: form.qualificacaoAutomatica ? 'translateX(20px)' : 'translateX(0)',
+                }}
+              />
+            </div>
           </div>
         </div>
 
