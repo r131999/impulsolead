@@ -55,6 +55,7 @@ services:
       BAILEYS_URL: http://impulsolead-whatsapp:3010
       INTERNAL_KEY: ${INTERNAL_KEY}
       MANAGER_KEY: ${MANAGER_KEY}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
     depends_on:
       postgres:
         condition: service_healthy

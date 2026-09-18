@@ -650,6 +650,7 @@ model ConfigAgente {
   horarioAtendimentoInicio String @default("00:00") // "HH:MM", Brasília
   horarioAtendimentoFim    String @default("23:59") // "HH:MM", Brasília — 00:00–23:59 = 24/7
   qualificacaoAutomatica   Boolean @default(false) // liga a Lia conduzindo o roteiro de "perguntas" após a criação do lead, antes de notificar o corretor
+  timeoutQualificacaoMinutos Int   @default(180) // lead sem responder por esse tempo → cron encerra e notifica o corretor com o que foi coletado
   criadoEm           DateTime @default(now())
   atualizadoEm       DateTime @updatedAt
 

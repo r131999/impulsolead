@@ -206,6 +206,10 @@ export default function ConfigAgente() {
       setErro('Adicione ao menos uma pergunta para o agente.')
       return
     }
+    if (form.qualificacaoAutomatica && (!form.timeoutQualificacaoMinutos || form.timeoutQualificacaoMinutos < 1)) {
+      setErro('Informe um tempo de timeout válido (mínimo 1 minuto) para a qualificação automática.')
+      return
+    }
     setSalvando(true)
     try {
       const res = await atualizarConfig({
@@ -218,6 +222,7 @@ export default function ConfigAgente() {
         horarioAtendimentoInicio: form.horarioAtendimentoInicio,
         horarioAtendimentoFim: form.horarioAtendimentoFim,
         qualificacaoAutomatica: form.qualificacaoAutomatica,
+        timeoutQualificacaoMinutos: form.timeoutQualificacaoMinutos,
       })
       setConfig(res.data.config)
       setSucesso(true)
@@ -589,7 +594,7 @@ export default function ConfigAgente() {
               <h2 className="font-semibold" style={{ color: '#F1F5F9' }}>Qualificação automática</h2>
               <p className="text-xs mt-1" style={{ color: '#94A3B8' }}>
                 {form.qualificacaoAutomatica
-                  ? 'Ligado: assim que um lead é criado, a Lia conduz a conversa usando as perguntas acima como roteiro. O corretor só é avisado quando a qualificação termina (ou se o lead pedir para falar com alguém, ficar 30min sem responder, ou a conversa passar do limite de mensagens).'
+                  ? `Ligado: assim que um lead é criado, a Lia conduz a conversa usando as perguntas acima como roteiro. O corretor só é avisado quando a qualificação termina (ou se o lead pedir para falar com alguém, ficar ${form.timeoutQualificacaoMinutos || 180}min sem responder, ou a conversa passar do limite de mensagens).`
                   : 'Desligado (padrão): o corretor é notificado assim que o lead é criado, como hoje. As perguntas acima ficam salvas mas não são usadas em conversa automática.'}
               </p>
             </div>
@@ -608,6 +613,23 @@ export default function ConfigAgente() {
               />
             </div>
           </div>
+
+          {form.qualificacaoAutomatica && (
+            <div className="mt-4 pt-4" style={{ borderTop: '1px solid #1E293B' }}>
+              <label className="label">Encerrar e avisar corretor após (minutos sem resposta do lead)</label>
+              <input
+                type="number"
+                min={1}
+                className="input"
+                style={{ maxWidth: 160 }}
+                value={form.timeoutQualificacaoMinutos ?? 180}
+                onChange={(e) => setForm((f) => ({ ...f, timeoutQualificacaoMinutos: parseInt(e.target.value, 10) || '' }))}
+              />
+              <p className="text-xs mt-1" style={{ color: '#64748B' }}>
+                Padrão: 180 minutos (3 horas). Ajuste conforme o ritmo de resposta da sua operação.
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Modelos de mensagem */}

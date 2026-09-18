@@ -685,7 +685,7 @@ async function classificarQualificacaoViaIA(historico, perguntas, coletadoAtual)
 const MOTIVO_LABEL_QUALIFICACAO = {
   concluido: 'Qualificação automática concluída pela Lia',
   transferencia_humana: 'Lead pediu para falar com um atendente — transferido pela Lia',
-  timeout: 'Lead não respondeu por 30 minutos — qualificação encerrada pela Lia',
+  timeout: 'Lead não respondeu dentro do tempo configurado — qualificação encerrada pela Lia',
   limite_mensagens: 'Qualificação atingiu o limite de mensagens — encerrada pela Lia',
 };
 
@@ -700,7 +700,11 @@ async function finalizarQualificacao(leadId, imobiliariaId, { perguntas, coletad
     where: { id: leadId, emQualificacaoAutomatica: true },
     data: { emQualificacaoAutomatica: false },
   });
-  if (guard.count === 0) return; // já finalizada por outro caminho
+  if (guard.count === 0) {
+    console.log(`[agente] finalizarQualificacao (${leadId}) — ignorado, já não estava em qualificação (motivo tentado: ${motivo})`);
+    return; // já finalizada por outro caminho
+  }
+  console.log(`[agente] finalizarQualificacao (${leadId}) — motivo=${motivo}`);
 
   const lead = await prisma.lead.findUnique({ where: { id: leadId } });
   if (!lead) return;
@@ -758,6 +762,7 @@ async function finalizarQualificacao(leadId, imobiliariaId, { perguntas, coletad
   });
 
   if (corretor) {
+    console.log(`[agente] finalizarQualificacao (${leadId}) — atribuído a ${corretor.nome}, notificando`);
     const leadAtualizado = await prisma.lead.findUnique({ where: { id: leadId } });
     notificarCorretorCloudApi(corretor, leadAtualizado).catch(() => {});
     enviarPushCorretor(
@@ -765,6 +770,8 @@ async function finalizarQualificacao(leadId, imobiliariaId, { perguntas, coletad
       '🏠 Novo lead qualificado!',
       `Nome: ${leadAtualizado.nome} | Tel: ${leadAtualizado.telefone}`,
     ).catch(() => {});
+  } else {
+    console.log(`[agente] finalizarQualificacao (${leadId}) — sem corretor (modo manual ou fila vazia)`);
   }
 }
 
@@ -798,6 +805,7 @@ async function registrarMensagemQualificacao({ leadId, imobiliariaId, remetenteT
 async function processarQualificacao(req, res) {
   const { telefone, mensagem, instancia, pushName, whatsappMsgId } = req.body;
   const imobiliariaId = req.imobiliariaId;
+  console.log(`[agente] POST /qualificacao recebido — telefone=${telefone} imobiliaria=${imobiliariaId}`);
 
   if (!telefone || !mensagem || !instancia) {
     return res.status(400).json({ error: 'Campos obrigatórios: telefone, mensagem, instancia' });
@@ -816,11 +824,13 @@ async function processarQualificacao(req, res) {
   // automática) — nada a fazer. O manager só chama esta rota quando o lead ainda
   // está com emQualificacaoAutomatica=true, mas a checagem aqui é redundante de propósito.
   if (!sessao || sessao.status !== 'em_andamento') {
+    console.log(`[agente] qualificação ignorada (${telefoneLimpo}) — sessão ${sessao ? `status=${sessao.status}` : 'inexistente'}`);
     return res.json({ ok: true, acao: 'ignorado' });
   }
 
   const leadId = sessao.respostas?.leadId;
   if (!leadId) {
+    console.log(`[agente] qualificação ignorada (${telefoneLimpo}) — sessão sem leadId em respostas`);
     return res.json({ ok: true, acao: 'ignorado' });
   }
 
@@ -851,6 +861,7 @@ async function processarQualificacao(req, res) {
 
   const { classificacao, resposta, coletado } = await classificarQualificacaoViaIA(historico, perguntas, coletadoAnterior);
   const historicoFinal = [...historico, { role: 'assistant', content: resposta }];
+  console.log(`[agente] qualificação (${telefoneLimpo}) — msg ${numeroMensagens}/${LIMITE_MENSAGENS_QUALIFICACAO} — classificacao=${classificacao}`);
 
   await registrarMensagemQualificacao({
     leadId, imobiliariaId, remetenteTipo: 'assistente', remetenteNome: nomeAgente, conteudo: resposta,

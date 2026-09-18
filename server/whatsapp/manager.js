@@ -112,6 +112,7 @@ function createTenant(imobiliariaId, apiKey) {
     authDir: path.join(SESSIONS_DIR, imobiliariaId),
     reconnectTimer: null,
     blockedTimer: null,
+    filaProcessamento: Promise.resolve(),
   };
 }
 
@@ -336,7 +337,7 @@ async function handleMessage(tenant, msg) {
     // ── CAMINHO 1: Lead existente ─────────────────────────────────────────────
     tag(`Verificando lead — phone: ${phone}, jid: ${realJid}`, tenant.imobiliariaId);
     const leadAtivo = await verificarLeadAtivo(tenant, phone, realJid);
-    tag(`Lead ativo: ${leadAtivo.existe} | leadId: ${leadAtivo.leadId}`, tenant.imobiliariaId);
+    tag(`Lead ativo: ${leadAtivo.existe} | leadId: ${leadAtivo.leadId} | emQualificacaoAutomatica: ${leadAtivo.emQualificacaoAutomatica}`, tenant.imobiliariaId);
     if (leadAtivo.existe && leadAtivo.leadId) {
       if (leadAtivo.emQualificacaoAutomatica) {
         tag(`Lead em qualificação automática — repassando pra Lia`, tenant.imobiliariaId);
@@ -617,12 +618,21 @@ async function connectTenant(tenant) {
       }
     });
 
-    sock.ev.on('messages.upsert', async ({ messages, type }) => {
+    // Encadeia cada evento na fila do tenant em vez de deixar o EventEmitter disparar
+    // handlers async em paralelo — sem isso, dois "messages.upsert" próximos no tempo
+    // (comum quando o lead manda mensagens em sequência rápida) rodam handleMessage
+    // concorrentemente pro mesmo telefone, e o segundo pode consultar leadAtivo antes
+    // do primeiro terminar de criar o lead/gravar a sessão de qualificação.
+    sock.ev.on('messages.upsert', ({ messages, type }) => {
       if (tenant.imobiliariaId === process.env.NOTIF_INSTANCE_ID) return;
       if (type !== 'notify') return;
-      for (const msg of messages) {
-        await handleMessage(tenant, msg);
-      }
+      tenant.filaProcessamento = tenant.filaProcessamento
+        .then(async () => {
+          for (const msg of messages) {
+            await handleMessage(tenant, msg);
+          }
+        })
+        .catch((err) => tag(`Erro na fila de processamento: ${err.message}`, tenant.imobiliariaId));
     });
   } catch (err) {
     tenant.connecting = false;

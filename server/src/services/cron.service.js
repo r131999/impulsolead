@@ -634,30 +634,63 @@ async function verificarFollowUpsPendentes() {
   }
 }
 
-// ── Job 7: encerrar qualificação automática sem resposta do lead há 30min ────
+// ── Job 7: encerrar qualificação automática sem resposta do lead ─────────────
 //
 // A saída "lead não responde" da qualificação automática (ConfigAgente.qualificacaoAutomatica)
 // não tem como ser detectada no momento de uma mensagem — precisa de um relógio
 // rodando à parte. Esse job é esse relógio: acha sessões paradas e finaliza pelo
 // mesmo caminho usado pela IA (finalizarQualificacao), só que com motivo "timeout".
+//
+// O tempo de inatividade é configurável por imobiliária (ConfigAgente.timeoutQualificacaoMinutos,
+// default 180min/3h) — por isso a query não filtra atualizadoEm em SQL (cada sessão tem seu
+// próprio corte, dependendo da imobiliária dona dela); o job traz todas as sessões em
+// andamento e decide sessão a sessão.
 
-const TIMEOUT_QUALIFICACAO_MIN = 30;
+const TIMEOUT_QUALIFICACAO_MIN_PADRAO = 180;
+
+function minutosDesde(data) {
+  return ((Date.now() - new Date(data).getTime()) / 60000).toFixed(1);
+}
 
 async function verificarQualificacoesInativas() {
-  console.log('[cron] Verificando qualificações automáticas inativas...');
-
-  const limite = new Date(Date.now() - TIMEOUT_QUALIFICACAO_MIN * 60 * 1000);
+  const agora = new Date();
+  console.log(`[cron] Verificando qualificações automáticas inativas — agora=${agora.toISOString()}`);
 
   const sessoes = await prisma.sessaoAgente.findMany({
-    where: { tipo: 'qualificacao_ia', status: 'em_andamento', atualizadoEm: { lt: limite } },
+    where: { tipo: 'qualificacao_ia', status: 'em_andamento' },
   });
 
   if (sessoes.length === 0) {
-    console.log('[cron] Nenhuma qualificação inativa encontrada.');
+    console.log('[cron] Nenhuma sessão de qualificação em andamento.');
     return;
   }
 
+  // Timeout e perguntas são por imobiliária — carrega uma vez por imobiliária presente
+  // no lote, não uma query por sessão.
+  const imobiliariaIds = [...new Set(sessoes.map((s) => s.imobiliariaId))];
+  const configs = await prisma.configAgente.findMany({
+    where: { imobiliariaId: { in: imobiliariaIds } },
+    select: { imobiliariaId: true, perguntas: true, timeoutQualificacaoMinutos: true },
+  });
+  const configPorImobiliaria = new Map(configs.map((c) => [c.imobiliariaId, c]));
+
   for (const sessao of sessoes) {
+    const config = configPorImobiliaria.get(sessao.imobiliariaId);
+    const timeoutMin = config?.timeoutQualificacaoMinutos ?? TIMEOUT_QUALIFICACAO_MIN_PADRAO;
+    const limite = new Date(agora.getTime() - timeoutMin * 60 * 1000);
+
+    if (new Date(sessao.atualizadoEm) >= limite) continue; // ainda dentro do prazo configurado dessa imobiliária
+
+    // Log ANTES de qualquer escrita — se algo no meio falhar, ainda temos o motivo
+    // e os timestamps exatos que levaram à decisão, em vez de precisar deduzir depois.
+    console.log(
+      `[cron] Qualificação candidata a timeout — sessao=${sessao.id} telefone=${sessao.telefone} `
+      + `leadId=${sessao.respostas?.leadId || 'null'} timeoutConfigurado=${timeoutMin}min `
+      + `criadoEm=${new Date(sessao.criadoEm).toISOString()} (há ${minutosDesde(sessao.criadoEm)}min) `
+      + `atualizadoEm=${new Date(sessao.atualizadoEm).toISOString()} (há ${minutosDesde(sessao.atualizadoEm)}min) `
+      + `etapaAtual=${sessao.etapaAtual}`,
+    );
+
     try {
       const leadId = sessao.respostas?.leadId;
 
@@ -665,20 +698,17 @@ async function verificarQualificacoesInativas() {
       // em receberLead) — se acontecer, só encerra a sessão pra não ficar reprocessando.
       if (!leadId) {
         await prisma.sessaoAgente.update({ where: { id: sessao.id }, data: { status: 'descartado' } });
+        console.log(`[cron] Qualificação (sessao=${sessao.id}) descartada — sem leadId em respostas`);
         continue;
       }
 
       await prisma.sessaoAgente.update({ where: { id: sessao.id }, data: { status: 'finalizado' } });
 
-      const configAgente = await prisma.configAgente.findUnique({
-        where: { imobiliariaId: sessao.imobiliariaId },
-        select: { perguntas: true },
-      });
-      const perguntas = Array.isArray(configAgente?.perguntas) ? configAgente.perguntas : [];
+      const perguntas = Array.isArray(config?.perguntas) ? config.perguntas : [];
       const coletado = sessao.respostas?.coletado || {};
 
       await finalizarQualificacao(leadId, sessao.imobiliariaId, { perguntas, coletado, motivo: 'timeout' });
-      console.log(`[cron] Qualificação sem resposta há ${TIMEOUT_QUALIFICACAO_MIN}min finalizada — lead ${leadId}`);
+      console.log(`[cron] Qualificação sem resposta há ${minutosDesde(sessao.atualizadoEm)}min (limite ${timeoutMin}min) finalizada (motivo=timeout) — lead ${leadId}`);
     } catch (err) {
       console.error(`[cron] Erro ao finalizar qualificação inativa (sessão ${sessao.id}):`, err.message);
     }
@@ -750,7 +780,7 @@ function iniciarCrons() {
     }
   });
 
-  // Job 7: qualificação automática sem resposta do lead há 30min — a cada 5 minutos
+  // Job 7: qualificação automática sem resposta do lead (timeout configurável por imobiliária) — a cada 5 minutos
   cron.schedule('*/5 * * * *', async () => {
     try {
       await verificarQualificacoesInativas();

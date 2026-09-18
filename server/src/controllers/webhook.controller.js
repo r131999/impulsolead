@@ -386,6 +386,7 @@ async function leadAtivo(req, res) {
   });
 
   if (lead) {
+    console.log(`[webhook] lead-ativo telefone=${digitos} — leadId=${lead.id} emQualificacaoAutomatica=${lead.emQualificacaoAutomatica}`);
     return res.json({ existe: true, leadId: lead.id, emQualificacaoAutomatica: lead.emQualificacaoAutomatica });
   }
 

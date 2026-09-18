@@ -106,7 +106,7 @@ async function atualizarConfigAgente(req, res) {
   try {
     const {
       mensagemBoasVindas, perguntas, nomeAgente, tomAgente, ativo, atenderNumeroDesconhecido,
-      horarioAtendimentoInicio, horarioAtendimentoFim, qualificacaoAutomatica,
+      horarioAtendimentoInicio, horarioAtendimentoFim, qualificacaoAutomatica, timeoutQualificacaoMinutos,
     } = req.body;
 
     if (perguntas !== undefined) {
@@ -124,6 +124,13 @@ async function atualizarConfigAgente(req, res) {
 
     if (qualificacaoAutomatica !== undefined && typeof qualificacaoAutomatica !== 'boolean') {
       return res.status(400).json({ error: 'qualificacaoAutomatica deve ser boolean' });
+    }
+
+    if (
+      timeoutQualificacaoMinutos !== undefined
+      && (!Number.isInteger(timeoutQualificacaoMinutos) || timeoutQualificacaoMinutos < 1)
+    ) {
+      return res.status(400).json({ error: 'timeoutQualificacaoMinutos deve ser um número inteiro maior ou igual a 1' });
     }
 
     if (horarioAtendimentoInicio !== undefined && !REGEX_HORARIO.test(horarioAtendimentoInicio)) {
@@ -146,6 +153,7 @@ async function atualizarConfigAgente(req, res) {
         ...(horarioAtendimentoInicio !== undefined && { horarioAtendimentoInicio }),
         ...(horarioAtendimentoFim !== undefined && { horarioAtendimentoFim }),
         ...(qualificacaoAutomatica !== undefined && { qualificacaoAutomatica }),
+        ...(timeoutQualificacaoMinutos !== undefined && { timeoutQualificacaoMinutos }),
       },
       create: {
         imobiliariaId: req.imobiliariaId,
@@ -158,6 +166,7 @@ async function atualizarConfigAgente(req, res) {
         horarioAtendimentoInicio: horarioAtendimentoInicio || '00:00',
         horarioAtendimentoFim: horarioAtendimentoFim || '23:59',
         qualificacaoAutomatica: qualificacaoAutomatica !== undefined ? qualificacaoAutomatica : false,
+        timeoutQualificacaoMinutos: timeoutQualificacaoMinutos !== undefined ? timeoutQualificacaoMinutos : 180,
       },
     });
 
