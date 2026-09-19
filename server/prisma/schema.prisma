@@ -641,6 +641,7 @@ model ConfigAgente {
   perguntas          Json
   nomeAgente         String   @default("Lia")
   tomAgente          String   @default("profissional mas leve")
+  instrucoesPersonalizadas String? // texto livre do gestor, entra no system prompt complementando (não substituindo) o fluxo
   ativo              Boolean  @default(true)
   distribuicaoManual Boolean  @default(false)
   distribuicaoPorEquipeAtiva  Boolean @default(false)

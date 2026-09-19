@@ -405,7 +405,18 @@ const MENSAGEM_TRIAGEM_FALLBACK =
 
 const CLASSIFICACOES_VALIDAS = ['lead_anuncio', 'corretor_parceiro', 'outro', 'indefinido'];
 
-function buildSystemPromptTriagem(qualificacaoAutomatica, nomeAgente, tomAgente) {
+// Bloco de texto livre que o gestor escreve na tela do Agente de IA — vale para
+// os dois prompts (triagem e qualificação). Fica no fim do prompt, de propósito:
+// tem peso real sobre tom/ênfase/conteúdo, mas a moldura deixa explícito que ele
+// complementa o fluxo, não o substitui — o gestor pode escrever algo tipo "não
+// faça perguntas" ou "sempre transfira na hora" sem quebrar a classificação e o
+// formato JSON definidos acima, que são a parte que o resto do sistema depende.
+function buildBlocoInstrucoesPersonalizadas(instrucoesPersonalizadas) {
+  if (!instrucoesPersonalizadas || !instrucoesPersonalizadas.trim()) return '';
+  return `\n\nInstruções específicas desta imobiliária (escritas pelo gestor — siga-as em tom, ênfase e conteúdo sempre que possível):\n${instrucoesPersonalizadas.trim()}\n\nEssas instruções complementam a conversa, mas NUNCA substituem o formato de resposta em JSON nem as regras de classificação definidas acima. Se alguma instrução conflitar diretamente com elas (ex.: pedir para não classificar, pular etapas do formato ou nunca perguntar nada), siga o fluxo estrutural mesmo assim e aplique a instrução do gestor só no que for compatível (tom, ênfase, o que mencionar ou evitar).`;
+}
+
+function buildSystemPromptTriagem(qualificacaoAutomatica, nomeAgente, tomAgente, instrucoesPersonalizadas) {
   // A regra do "lead_anuncio" muda conforme o que acontece depois da confirmação:
   // sem qualificação automática, o corretor assume na hora (promessa correta);
   // com ela ligada, é a própria Lia quem continua a conversa — prometer um
@@ -435,10 +446,10 @@ Regras:
 - Nunca invente disponibilidade de imóveis, preços, prazos ou dados que você não tem.
 ${regraLeadAnuncio}
 - Se classificar como "corretor_parceiro" ou "outro", a resposta deve ser educada, breve, e encerrar a conversa sem prometer atendimento comercial.
-- Se "indefinido", a resposta deve ser uma pergunta natural (não repetitiva) que ajude a entender se a pessoa busca um imóvel.`;
+- Se "indefinido", a resposta deve ser uma pergunta natural (não repetitiva) que ajude a entender se a pessoa busca um imóvel.${buildBlocoInstrucoesPersonalizadas(instrucoesPersonalizadas)}`;
 }
 
-async function classificarViaIA(historico, qualificacaoAutomatica = false, nomeAgente = 'Lia', tomAgente = 'profissional mas leve') {
+async function classificarViaIA(historico, qualificacaoAutomatica = false, nomeAgente = 'Lia', tomAgente = 'profissional mas leve', instrucoesPersonalizadas = null) {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     console.warn('[agente] OPENAI_API_KEY não configurada — triagem tratando mensagem como indefinida');
@@ -450,7 +461,7 @@ async function classificarViaIA(historico, qualificacaoAutomatica = false, nomeA
       'https://api.openai.com/v1/chat/completions',
       {
         model: 'gpt-4o-mini',
-        messages: [{ role: 'system', content: buildSystemPromptTriagem(qualificacaoAutomatica, nomeAgente, tomAgente) }, ...historico],
+        messages: [{ role: 'system', content: buildSystemPromptTriagem(qualificacaoAutomatica, nomeAgente, tomAgente, instrucoesPersonalizadas) }, ...historico],
         response_format: { type: 'json_object' },
         max_tokens: 300,
         temperature: 0.6,
@@ -559,7 +570,7 @@ async function processarTriagem(req, res) {
 
   const configAgente = await prisma.configAgente.findUnique({
     where: { imobiliariaId },
-    select: { qualificacaoAutomatica: true, nomeAgente: true, tomAgente: true },
+    select: { qualificacaoAutomatica: true, nomeAgente: true, tomAgente: true, instrucoesPersonalizadas: true },
   });
 
   const { classificacao, resposta } = await classificarViaIA(
@@ -567,6 +578,7 @@ async function processarTriagem(req, res) {
     !!configAgente?.qualificacaoAutomatica,
     configAgente?.nomeAgente || 'Lia',
     configAgente?.tomAgente || 'profissional mas leve',
+    configAgente?.instrucoesPersonalizadas || null,
   );
   const historicoFinal = [...historico, { role: 'assistant', content: resposta }];
 
@@ -620,7 +632,7 @@ const MENSAGEM_QUALIFICACAO_FALLBACK =
 
 const CLASSIFICACOES_QUALIFICACAO_VALIDAS = ['andamento', 'concluido', 'transferir_humano'];
 
-function buildSystemPromptQualificacao(perguntas, coletadoAtual, nomeAgente, tomAgente) {
+function buildSystemPromptQualificacao(perguntas, coletadoAtual, nomeAgente, tomAgente, instrucoesPersonalizadas) {
   const roteiro = (Array.isArray(perguntas) && perguntas.length ? perguntas : [
     'Nome', 'Motivação para buscar um imóvel', 'Região de interesse', 'Renda familiar aproximada',
   ]).map((p, i) => `${i + 1}. ${p}`).join('\n');
@@ -652,10 +664,10 @@ Regras:
 - Nunca invente disponibilidade de imóveis, preços, prazos ou dados que você não tem.
 - Se a pessoa pedir para falar com um humano/corretor/atendente, ou insistir em algo que só um corretor pode responder, classifique como "transferir_humano" e responda confirmando que vai transferir, sem insistir nas perguntas.
 - Classifique como "concluido" quando já tiver o essencial do roteiro (não precisa 100% se a pessoa já demonstrou impaciência) — a resposta deve agradecer e avisar que um corretor vai continuar o atendimento a partir daqui.
-- Caso contrário, classifique como "andamento" e siga com a próxima pergunta natural do roteiro.`;
+- Caso contrário, classifique como "andamento" e siga com a próxima pergunta natural do roteiro.${buildBlocoInstrucoesPersonalizadas(instrucoesPersonalizadas)}`;
 }
 
-async function classificarQualificacaoViaIA(historico, perguntas, coletadoAtual, nomeAgente = 'Lia', tomAgente = 'profissional mas leve') {
+async function classificarQualificacaoViaIA(historico, perguntas, coletadoAtual, nomeAgente = 'Lia', tomAgente = 'profissional mas leve', instrucoesPersonalizadas = null) {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     console.warn('[agente] OPENAI_API_KEY não configurada — qualificação automática transferindo para humano');
@@ -667,7 +679,7 @@ async function classificarQualificacaoViaIA(historico, perguntas, coletadoAtual,
       'https://api.openai.com/v1/chat/completions',
       {
         model: 'gpt-4o-mini',
-        messages: [{ role: 'system', content: buildSystemPromptQualificacao(perguntas, coletadoAtual, nomeAgente, tomAgente) }, ...historico],
+        messages: [{ role: 'system', content: buildSystemPromptQualificacao(perguntas, coletadoAtual, nomeAgente, tomAgente, instrucoesPersonalizadas) }, ...historico],
         response_format: { type: 'json_object' },
         max_tokens: 500,
         temperature: 0.6,
@@ -862,11 +874,12 @@ async function processarQualificacao(req, res) {
 
   const configAgente = await prisma.configAgente.findUnique({
     where: { imobiliariaId },
-    select: { perguntas: true, nomeAgente: true, tomAgente: true },
+    select: { perguntas: true, nomeAgente: true, tomAgente: true, instrucoesPersonalizadas: true },
   });
   const perguntas = Array.isArray(configAgente?.perguntas) ? configAgente.perguntas : [];
   const nomeAgente = configAgente?.nomeAgente || 'Lia';
   const tomAgente = configAgente?.tomAgente || 'profissional mas leve';
+  const instrucoesPersonalizadas = configAgente?.instrucoesPersonalizadas || null;
 
   await registrarMensagemQualificacao({
     leadId, imobiliariaId, remetenteTipo: 'lead',
@@ -880,7 +893,7 @@ async function processarQualificacao(req, res) {
   const coletadoAnterior = sessao.respostas?.coletado || {};
   const noLimite = numeroMensagens >= LIMITE_MENSAGENS_QUALIFICACAO;
 
-  const { classificacao, resposta, coletado } = await classificarQualificacaoViaIA(historico, perguntas, coletadoAnterior, nomeAgente, tomAgente);
+  const { classificacao, resposta, coletado } = await classificarQualificacaoViaIA(historico, perguntas, coletadoAnterior, nomeAgente, tomAgente, instrucoesPersonalizadas);
   const historicoFinal = [...historico, { role: 'assistant', content: resposta }];
   console.log(`[agente] qualificação (${telefoneLimpo}) — msg ${numeroMensagens}/${LIMITE_MENSAGENS_QUALIFICACAO} — classificacao=${classificacao}`);
 

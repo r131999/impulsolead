@@ -105,7 +105,7 @@ const REGEX_HORARIO = /^([01]\d|2[0-3]):[0-5]\d$/; // "HH:MM", 00:00–23:59
 async function atualizarConfigAgente(req, res) {
   try {
     const {
-      mensagemBoasVindas, perguntas, nomeAgente, tomAgente, ativo, atenderNumeroDesconhecido,
+      mensagemBoasVindas, perguntas, nomeAgente, tomAgente, instrucoesPersonalizadas, ativo, atenderNumeroDesconhecido,
       horarioAtendimentoInicio, horarioAtendimentoFim, qualificacaoAutomatica, timeoutQualificacaoMinutos,
     } = req.body;
 
@@ -116,6 +116,17 @@ async function atualizarConfigAgente(req, res) {
       if (perguntas.some((p) => typeof p !== 'string' || !p.trim())) {
         return res.status(400).json({ error: 'Todas as perguntas devem ser strings não vazias' });
       }
+    }
+
+    if (
+      instrucoesPersonalizadas !== undefined && instrucoesPersonalizadas !== null
+      && typeof instrucoesPersonalizadas !== 'string'
+    ) {
+      return res.status(400).json({ error: 'instrucoesPersonalizadas deve ser texto' });
+    }
+
+    if (typeof instrucoesPersonalizadas === 'string' && instrucoesPersonalizadas.length > 3000) {
+      return res.status(400).json({ error: 'instrucoesPersonalizadas deve ter no máximo 3000 caracteres' });
     }
 
     if (atenderNumeroDesconhecido !== undefined && typeof atenderNumeroDesconhecido !== 'boolean') {
@@ -148,6 +159,9 @@ async function atualizarConfigAgente(req, res) {
         ...(perguntas !== undefined && { perguntas }),
         ...(nomeAgente !== undefined && { nomeAgente }),
         ...(tomAgente !== undefined && { tomAgente }),
+        ...(instrucoesPersonalizadas !== undefined && {
+          instrucoesPersonalizadas: instrucoesPersonalizadas?.trim() || null,
+        }),
         ...(ativo !== undefined && { ativo }),
         ...(atenderNumeroDesconhecido !== undefined && { atenderNumeroDesconhecido }),
         ...(horarioAtendimentoInicio !== undefined && { horarioAtendimentoInicio }),
@@ -161,6 +175,7 @@ async function atualizarConfigAgente(req, res) {
         perguntas: perguntas || [],
         nomeAgente: nomeAgente || 'Lia',
         tomAgente: tomAgente || 'profissional mas leve',
+        instrucoesPersonalizadas: instrucoesPersonalizadas?.trim() || null,
         ativo: ativo !== undefined ? ativo : true,
         atenderNumeroDesconhecido: atenderNumeroDesconhecido !== undefined ? atenderNumeroDesconhecido : false,
         horarioAtendimentoInicio: horarioAtendimentoInicio || '00:00',

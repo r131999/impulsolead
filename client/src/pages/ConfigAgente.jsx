@@ -215,6 +215,7 @@ export default function ConfigAgente() {
       const res = await atualizarConfig({
         nomeAgente: form.nomeAgente,
         tomAgente: form.tomAgente,
+        instrucoesPersonalizadas: form.instrucoesPersonalizadas,
         mensagemBoasVindas: form.mensagemBoasVindas,
         perguntas: form.perguntas,
         ativo: form.ativo,
@@ -422,6 +423,21 @@ export default function ConfigAgente() {
                 <option value="empático">Empático</option>
               </select>
             </div>
+          </div>
+
+          <div className="mt-4">
+            <label className="label">Instruções personalizadas</label>
+            <textarea
+              className="input resize-none"
+              rows={4}
+              maxLength={3000}
+              value={form.instrucoesPersonalizadas || ''}
+              onChange={set('instrucoesPersonalizadas')}
+              placeholder="Ex.: Mencione que temos plantão aos sábados. Nunca fale de valores — diga que o consultor explica. Se a pessoa falar de financiamento, tranquilize dizendo que ajudamos com a documentação."
+            />
+            <p className="text-xs mt-1" style={{ color: '#94A3B8' }}>
+              Em linguagem natural, o que o agente deve enfatizar, evitar ou saber sobre a sua operação. Complementa o roteiro de perguntas e o tom de voz — não os substitui.
+            </p>
           </div>
         </div>
 
