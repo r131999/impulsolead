@@ -665,12 +665,12 @@ async function verificarQualificacoesInativas() {
     return;
   }
 
-  // Timeout e perguntas são por imobiliária — carrega uma vez por imobiliária presente
-  // no lote, não uma query por sessão.
+  // Timeout é por imobiliária — carrega uma vez por imobiliária presente no lote,
+  // não uma query por sessão.
   const imobiliariaIds = [...new Set(sessoes.map((s) => s.imobiliariaId))];
   const configs = await prisma.configAgente.findMany({
     where: { imobiliariaId: { in: imobiliariaIds } },
-    select: { imobiliariaId: true, perguntas: true, timeoutQualificacaoMinutos: true },
+    select: { imobiliariaId: true, timeoutQualificacaoMinutos: true },
   });
   const configPorImobiliaria = new Map(configs.map((c) => [c.imobiliariaId, c]));
 
@@ -704,10 +704,9 @@ async function verificarQualificacoesInativas() {
 
       await prisma.sessaoAgente.update({ where: { id: sessao.id }, data: { status: 'finalizado' } });
 
-      const perguntas = Array.isArray(config?.perguntas) ? config.perguntas : [];
       const coletado = sessao.respostas?.coletado || {};
 
-      await finalizarQualificacao(leadId, sessao.imobiliariaId, { perguntas, coletado, motivo: 'timeout' });
+      await finalizarQualificacao(leadId, sessao.imobiliariaId, { coletado, motivo: 'timeout' });
       console.log(`[cron] Qualificação sem resposta há ${minutosDesde(sessao.atualizadoEm)}min (limite ${timeoutMin}min) finalizada (motivo=timeout) — lead ${leadId}`);
     } catch (err) {
       console.error(`[cron] Erro ao finalizar qualificação inativa (sessão ${sessao.id}):`, err.message);

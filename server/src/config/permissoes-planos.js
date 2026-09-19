@@ -9,8 +9,8 @@ const PERMISSOES_POR_PLANO = {
       painelCampanhas:           true,
       relatorios:                true,
       followUpAutomatico:        true,
-      agenteIA:                  false,
-      chatLead:                  false,
+      agenteIA:                  true,
+      chatLead:                  true,
       multiplosWhatsapp:         false,
       educacional:               true,
     },
@@ -45,7 +45,7 @@ const PERMISSOES_POR_PLANO = {
       relatorios:                true,
       followUpAutomatico:        true,
       agenteIA:                  false,
-      chatLead:                  false,
+      chatLead:                  true,
       multiplosWhatsapp:         false,
       educacional:               true,
     },
@@ -62,8 +62,8 @@ const PERMISSOES_POR_PLANO = {
       painelCampanhas:           true,
       relatorios:                true,
       followUpAutomatico:        true,
-      agenteIA:                  false,
-      chatLead:                  false,
+      agenteIA:                  true,
+      chatLead:                  true,
       multiplosWhatsapp:         false,
       educacional:               true,
     },
@@ -80,8 +80,8 @@ const PERMISSOES_POR_PLANO = {
       painelCampanhas:           true,
       relatorios:                true,
       followUpAutomatico:        true,
-      agenteIA:                  false,
-      chatLead:                  false,
+      agenteIA:                  true,
+      chatLead:                  true,
       multiplosWhatsapp:         false,
       educacional:               true,
     },
@@ -89,6 +89,6 @@ const PERMISSOES_POR_PLANO = {
   },
 };
 
-const PERMISSOES_FUTURAS = ['agenteIA', 'chatLead', 'multiplosWhatsapp'];
+const PERMISSOES_FUTURAS = ['multiplosWhatsapp'];
 
 module.exports = { PERMISSOES_POR_PLANO, PERMISSOES_FUTURAS };

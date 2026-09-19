@@ -695,7 +695,7 @@ const MOTIVO_LABEL_QUALIFICACAO = {
 // where emQualificacaoAutomatica:true funciona como trava atômica: se as duas
 // chamadas colidirem (IA concluindo bem na hora em que o cron dispara), só uma
 // delas consegue flipar o campo e seguir com a distribuição.
-async function finalizarQualificacao(leadId, imobiliariaId, { perguntas, coletado, motivo }) {
+async function finalizarQualificacao(leadId, imobiliariaId, { coletado, motivo }) {
   const guard = await prisma.lead.updateMany({
     where: { id: leadId, emQualificacaoAutomatica: true },
     data: { emQualificacaoAutomatica: false },
@@ -709,10 +709,14 @@ async function finalizarQualificacao(leadId, imobiliariaId, { perguntas, coletad
   const lead = await prisma.lead.findUnique({ where: { id: leadId } });
   if (!lead) return;
 
-  const roteiro = Array.isArray(perguntas) && perguntas.length ? perguntas : Object.keys(coletado || {});
-  const respostasFormulario = roteiro
-    .map((pergunta) => ({ pergunta, resposta: (coletado && coletado[pergunta]) || null }))
-    .filter((r) => r.resposta);
+  // As chaves de "coletado" são o texto da pergunta como a IA de fato o formulou
+  // na resposta (buildSystemPromptQualificacao só entrega o roteiro como guia —
+  // na prática ela parafraseia/encurta), então não dá pra casar contra o array
+  // `perguntas` (config, literal) por igualdade de string — nunca bate e o campo
+  // fica sempre vazio. Usa direto as chaves reais de `coletado`.
+  const respostasFormulario = Object.entries(coletado || {})
+    .filter(([, resposta]) => resposta)
+    .map(([pergunta, resposta]) => ({ pergunta, resposta }));
 
   const configAgente = await prisma.configAgente.findUnique({
     where: { imobiliariaId },
@@ -874,14 +878,14 @@ async function processarQualificacao(req, res) {
 
   if (classificacao === 'transferir_humano') {
     await salvarSessao('finalizado');
-    await finalizarQualificacao(leadId, imobiliariaId, { perguntas, coletado, motivo: 'transferencia_humana' });
+    await finalizarQualificacao(leadId, imobiliariaId, { coletado, motivo: 'transferencia_humana' });
     return res.json({ ok: true, acao: 'transferido', mensagemResposta: resposta });
   }
 
   if (classificacao === 'concluido' || noLimite) {
     await salvarSessao('finalizado');
     const motivo = classificacao === 'concluido' ? 'concluido' : 'limite_mensagens';
-    await finalizarQualificacao(leadId, imobiliariaId, { perguntas, coletado, motivo });
+    await finalizarQualificacao(leadId, imobiliariaId, { coletado, motivo });
     return res.json({ ok: true, acao: 'concluido', mensagemResposta: resposta });
   }
 

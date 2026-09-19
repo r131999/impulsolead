@@ -77,11 +77,11 @@ const PERMISSOES_ATUAIS = [
   { key: 'painelCampanhas',           label: 'Painel de campanhas (ROI)' },
   { key: 'relatorios',                label: 'Relatórios' },
   { key: 'followUpAutomatico',        label: 'Follow-up automático' },
+  { key: 'agenteIA',                  label: 'Agente IA (Lia)' },
+  { key: 'chatLead',                  label: 'Chat com lead' },
 ]
 
 const PERMISSOES_FUTURAS = [
-  { key: 'agenteIA',          label: 'Agente IA (Lia) — Em breve' },
-  { key: 'chatLead',          label: 'Chat com lead — Em breve' },
   { key: 'multiplosWhatsapp', label: 'Múltiplos WhatsApp — Em breve' },
 ]
 
