@@ -405,7 +405,7 @@ const MENSAGEM_TRIAGEM_FALLBACK =
 
 const CLASSIFICACOES_VALIDAS = ['lead_anuncio', 'corretor_parceiro', 'outro', 'indefinido'];
 
-function buildSystemPromptTriagem(qualificacaoAutomatica) {
+function buildSystemPromptTriagem(qualificacaoAutomatica, nomeAgente, tomAgente) {
   // A regra do "lead_anuncio" muda conforme o que acontece depois da confirmação:
   // sem qualificação automática, o corretor assume na hora (promessa correta);
   // com ela ligada, é a própria Lia quem continua a conversa — prometer um
@@ -414,7 +414,9 @@ function buildSystemPromptTriagem(qualificacaoAutomatica) {
     ? '- Se classificar como "lead_anuncio", a resposta deve confirmar de forma calorosa o interesse, sem prometer um corretor — apenas diga que você vai continuar te ajudando a entender melhor o que a pessoa procura.'
     : '- Se classificar como "lead_anuncio", a resposta deve confirmar de forma calorosa que um corretor vai continuar o atendimento.';
 
-  return `Você é a assistente de triagem de uma imobiliária, respondendo pelo WhatsApp. A pessoa que está te escrevendo ainda não é um lead cadastrado no CRM. Sua tarefa é conduzir uma conversa curta, natural e cordial (nunca robótica ou de formulário) para descobrir quem é essa pessoa antes de qualificá-la como lead.
+  return `Você é ${nomeAgente}, assistente de triagem de uma imobiliária, respondendo pelo WhatsApp. A pessoa que está te escrevendo ainda não é um lead cadastrado no CRM. Sua tarefa é conduzir uma conversa curta, natural e cordial (nunca robótica ou de formulário) para descobrir quem é essa pessoa antes de qualificá-la como lead.
+
+Tom de voz: ${tomAgente}. Mantenha esse tom em todas as respostas, sem perder a naturalidade.
 
 Classifique CADA mensagem em uma destas categorias:
 - "lead_anuncio": a pessoa demonstra interesse genuíno em comprar ou alugar um imóvel (cliente em potencial).
@@ -426,14 +428,17 @@ Responda SEMPRE em JSON válido, exatamente neste formato:
 {"classificacao": "lead_anuncio" | "corretor_parceiro" | "outro" | "indefinido", "resposta": "texto curto e natural para responder ao contato"}
 
 Regras:
-- Fale como uma pessoa real e atenciosa, nunca como um robô ou formulário.
+- Fale como uma pessoa real e atenciosa, nunca como um robô ou formulário. Se perguntarem seu nome, ou for natural se apresentar, diga que é ${nomeAgente} — nunca "assistente da imobiliária" ou qualquer coisa genérica.
+- Antes de emendar a próxima pergunta ou frase, reconheça o que a pessoa acabou de dizer — responda ao conteúdo, não só busque a próxima informação. Se a pessoa deu uma resposta longa, curiosa ou emocional, acolha antes de seguir; não dispare pergunta atrás de pergunta.
+- Se souber o nome da pessoa, use-o com naturalidade — não em toda frase, só quando soar como uma pessoa de verdade falaria.
+- Se a pessoa corrigir algo que já disse ("na verdade não", "quis dizer X", "me confundi"), trate como correção da informação anterior — nunca como resposta a uma pergunta diferente.
 - Nunca invente disponibilidade de imóveis, preços, prazos ou dados que você não tem.
 ${regraLeadAnuncio}
 - Se classificar como "corretor_parceiro" ou "outro", a resposta deve ser educada, breve, e encerrar a conversa sem prometer atendimento comercial.
 - Se "indefinido", a resposta deve ser uma pergunta natural (não repetitiva) que ajude a entender se a pessoa busca um imóvel.`;
 }
 
-async function classificarViaIA(historico, qualificacaoAutomatica = false) {
+async function classificarViaIA(historico, qualificacaoAutomatica = false, nomeAgente = 'Lia', tomAgente = 'profissional mas leve') {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     console.warn('[agente] OPENAI_API_KEY não configurada — triagem tratando mensagem como indefinida');
@@ -445,7 +450,7 @@ async function classificarViaIA(historico, qualificacaoAutomatica = false) {
       'https://api.openai.com/v1/chat/completions',
       {
         model: 'gpt-4o-mini',
-        messages: [{ role: 'system', content: buildSystemPromptTriagem(qualificacaoAutomatica) }, ...historico],
+        messages: [{ role: 'system', content: buildSystemPromptTriagem(qualificacaoAutomatica, nomeAgente, tomAgente) }, ...historico],
         response_format: { type: 'json_object' },
         max_tokens: 300,
         temperature: 0.6,
@@ -554,10 +559,15 @@ async function processarTriagem(req, res) {
 
   const configAgente = await prisma.configAgente.findUnique({
     where: { imobiliariaId },
-    select: { qualificacaoAutomatica: true },
+    select: { qualificacaoAutomatica: true, nomeAgente: true, tomAgente: true },
   });
 
-  const { classificacao, resposta } = await classificarViaIA(historico, !!configAgente?.qualificacaoAutomatica);
+  const { classificacao, resposta } = await classificarViaIA(
+    historico,
+    !!configAgente?.qualificacaoAutomatica,
+    configAgente?.nomeAgente || 'Lia',
+    configAgente?.tomAgente || 'profissional mas leve',
+  );
   const historicoFinal = [...historico, { role: 'assistant', content: resposta }];
 
   const salvarComum = (status, motivoDescarte) => salvarSessaoTriagem({
@@ -610,7 +620,7 @@ const MENSAGEM_QUALIFICACAO_FALLBACK =
 
 const CLASSIFICACOES_QUALIFICACAO_VALIDAS = ['andamento', 'concluido', 'transferir_humano'];
 
-function buildSystemPromptQualificacao(perguntas, coletadoAtual) {
+function buildSystemPromptQualificacao(perguntas, coletadoAtual, nomeAgente, tomAgente) {
   const roteiro = (Array.isArray(perguntas) && perguntas.length ? perguntas : [
     'Nome', 'Motivação para buscar um imóvel', 'Região de interesse', 'Renda familiar aproximada',
   ]).map((p, i) => `${i + 1}. ${p}`).join('\n');
@@ -619,7 +629,9 @@ function buildSystemPromptQualificacao(perguntas, coletadoAtual) {
     ? JSON.stringify(coletadoAtual)
     : '(nada coletado ainda)';
 
-  return `Você é a assistente de qualificação de uma imobiliária, conversando pelo WhatsApp com uma pessoa que ACABOU de confirmar interesse em um imóvel — já é um lead no CRM. Sua tarefa é conduzir uma conversa curta, natural e cordial para descobrir as informações do roteiro abaixo, usando-o como guia do que precisa saber — nunca como um formulário lido pergunta por pergunta.
+  return `Você é ${nomeAgente}, assistente de qualificação de uma imobiliária, conversando pelo WhatsApp com uma pessoa que ACABOU de confirmar interesse em um imóvel — já é um lead no CRM. Sua tarefa é conduzir uma conversa curta, natural e cordial para descobrir as informações do roteiro abaixo, usando-o como guia do que precisa saber — nunca como um formulário lido pergunta por pergunta.
+
+Tom de voz: ${tomAgente}. Mantenha esse tom em todas as respostas, sem perder a naturalidade.
 
 Roteiro do que você precisa descobrir:
 ${roteiro}
@@ -632,14 +644,18 @@ Responda SEMPRE em JSON válido, exatamente neste formato:
 
 Regras:
 - "coletado" deve trazer o estado ATUALIZADO e COMPLETO de tudo que você já sabe (o que já estava + o que esta mensagem acrescentou), usando o texto de cada pergunta do roteiro como chave.
-- Fale como uma pessoa real e atenciosa, nunca como um robô ou formulário. Uma pergunta por vez, natural, sem repetir o que já foi respondido.
+- Se perguntarem seu nome, ou for natural se apresentar, diga que é ${nomeAgente} — nunca "assistente da imobiliária" ou qualquer coisa genérica.
+- Fale como uma pessoa real e atenciosa, nunca como um robô ou formulário. Antes de emendar a próxima pergunta, reconheça o que a pessoa acabou de responder — um comentário curto, genuíno, sobre o que ela disse — em vez de só coletar o dado e seguir para a próxima pergunta do roteiro.
+- Uma pergunta por vez, sem repetir o que já foi respondido. Adapte o ritmo: se a resposta veio curta e direta, siga; se veio longa ou revelou algo importante (ex: dificuldade financeira, urgência, motivo pessoal), acolha antes de continuar — não dispare pergunta atrás de pergunta.
+- Se souber o nome da pessoa, use-o com naturalidade — não em toda frase, só quando soar como uma pessoa de verdade falaria, não um script.
+- Se a pessoa corrigir uma resposta que já deu (ex: "tenho" → "não tenho", "na verdade é X", "me confundi, é Y"), trate como correção do dado JÁ coletado: atualize a chave correspondente em "coletado" com o valor corrigido, sobrescrevendo o anterior. NUNCA aplique a correção como resposta a uma pergunta diferente ou nova — se a mensagem só contém a correção, não avance o roteiro nessa resposta.
 - Nunca invente disponibilidade de imóveis, preços, prazos ou dados que você não tem.
 - Se a pessoa pedir para falar com um humano/corretor/atendente, ou insistir em algo que só um corretor pode responder, classifique como "transferir_humano" e responda confirmando que vai transferir, sem insistir nas perguntas.
 - Classifique como "concluido" quando já tiver o essencial do roteiro (não precisa 100% se a pessoa já demonstrou impaciência) — a resposta deve agradecer e avisar que um corretor vai continuar o atendimento a partir daqui.
 - Caso contrário, classifique como "andamento" e siga com a próxima pergunta natural do roteiro.`;
 }
 
-async function classificarQualificacaoViaIA(historico, perguntas, coletadoAtual) {
+async function classificarQualificacaoViaIA(historico, perguntas, coletadoAtual, nomeAgente = 'Lia', tomAgente = 'profissional mas leve') {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     console.warn('[agente] OPENAI_API_KEY não configurada — qualificação automática transferindo para humano');
@@ -651,7 +667,7 @@ async function classificarQualificacaoViaIA(historico, perguntas, coletadoAtual)
       'https://api.openai.com/v1/chat/completions',
       {
         model: 'gpt-4o-mini',
-        messages: [{ role: 'system', content: buildSystemPromptQualificacao(perguntas, coletadoAtual) }, ...historico],
+        messages: [{ role: 'system', content: buildSystemPromptQualificacao(perguntas, coletadoAtual, nomeAgente, tomAgente) }, ...historico],
         response_format: { type: 'json_object' },
         max_tokens: 500,
         temperature: 0.6,
@@ -846,10 +862,11 @@ async function processarQualificacao(req, res) {
 
   const configAgente = await prisma.configAgente.findUnique({
     where: { imobiliariaId },
-    select: { perguntas: true, nomeAgente: true },
+    select: { perguntas: true, nomeAgente: true, tomAgente: true },
   });
   const perguntas = Array.isArray(configAgente?.perguntas) ? configAgente.perguntas : [];
   const nomeAgente = configAgente?.nomeAgente || 'Lia';
+  const tomAgente = configAgente?.tomAgente || 'profissional mas leve';
 
   await registrarMensagemQualificacao({
     leadId, imobiliariaId, remetenteTipo: 'lead',
@@ -863,7 +880,7 @@ async function processarQualificacao(req, res) {
   const coletadoAnterior = sessao.respostas?.coletado || {};
   const noLimite = numeroMensagens >= LIMITE_MENSAGENS_QUALIFICACAO;
 
-  const { classificacao, resposta, coletado } = await classificarQualificacaoViaIA(historico, perguntas, coletadoAnterior);
+  const { classificacao, resposta, coletado } = await classificarQualificacaoViaIA(historico, perguntas, coletadoAnterior, nomeAgente, tomAgente);
   const historicoFinal = [...historico, { role: 'assistant', content: resposta }];
   console.log(`[agente] qualificação (${telefoneLimpo}) — msg ${numeroMensagens}/${LIMITE_MENSAGENS_QUALIFICACAO} — classificacao=${classificacao}`);
 
