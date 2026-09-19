@@ -216,6 +216,7 @@ export default function ConfigAgente() {
         nomeAgente: form.nomeAgente,
         tomAgente: form.tomAgente,
         instrucoesPersonalizadas: form.instrucoesPersonalizadas,
+        velocidadeResposta: form.velocidadeResposta,
         mensagemBoasVindas: form.mensagemBoasVindas,
         perguntas: form.perguntas,
         ativo: form.ativo,
@@ -404,7 +405,7 @@ export default function ConfigAgente() {
             </label>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-3 gap-4">
             <div>
               <label className="label">Nome do agente</label>
               <input
@@ -423,7 +424,18 @@ export default function ConfigAgente() {
                 <option value="empático">Empático</option>
               </select>
             </div>
+            <div>
+              <label className="label">Velocidade de resposta</label>
+              <select className="input" value={form.velocidadeResposta || 'natural'} onChange={set('velocidadeResposta')}>
+                <option value="rapido">Rápido</option>
+                <option value="natural">Natural</option>
+                <option value="pausado">Pausado</option>
+              </select>
+            </div>
           </div>
+          <p className="text-xs mt-2" style={{ color: '#94A3B8' }}>
+            Controla o tempo de "digitando..." antes de cada resposta do agente no WhatsApp — natural é o ritmo de uma pessoa digitando de verdade.
+          </p>
 
           <div className="mt-4">
             <label className="label">Instruções personalizadas</label>

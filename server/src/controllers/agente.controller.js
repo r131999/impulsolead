@@ -8,6 +8,25 @@ const { proximoCorretor } = require('../services/fila.service');
 const { enviarPushCorretor } = require('./push.controller');
 const { emitirMensagem } = require('../services/socketio.service');
 
+// ─── Delay natural de "digitando" (triagem e qualificação) ────────────────────
+// Sem isso a resposta sai instantânea, o que denuncia bot. O delay é proporcional
+// ao tamanho da resposta (como alguém digitando de verdade), ajustado pelo
+// ConfigAgente.velocidadeResposta da imobiliária, e sempre dentro de limites de
+// segurança — nunca instantâneo, nunca longo demais mesmo pra resposta enorme.
+// Quem efetivamente segura o envio e mostra "digitando..." é o manager (Baileys);
+// este controller só calcula quanto tempo esperar.
+const VELOCIDADE_RESPOSTA_MULTIPLICADOR = { rapido: 0.5, natural: 1, pausado: 1.7 };
+const DELAY_DIGITACAO_BASE_MS = 600; // tempo de "ler a mensagem e começar a digitar"
+const DELAY_DIGITACAO_MS_POR_CARACTERE = 30; // ritmo de digitação (~33 caracteres/s)
+const DELAY_DIGITACAO_MIN_MS = 1200; // piso — mesmo "ok" de 1 palavra não sai instantâneo
+const DELAY_DIGITACAO_MAX_MS = 9000; // teto — resposta longa não deixa o lead esperando demais
+
+function calcularDelayDigitacao(texto, velocidadeResposta) {
+  const multiplicador = VELOCIDADE_RESPOSTA_MULTIPLICADOR[velocidadeResposta] ?? 1;
+  const bruto = (DELAY_DIGITACAO_BASE_MS + (texto?.length || 0) * DELAY_DIGITACAO_MS_POR_CARACTERE) * multiplicador;
+  return Math.min(DELAY_DIGITACAO_MAX_MS, Math.max(DELAY_DIGITACAO_MIN_MS, Math.round(bruto)));
+}
+
 // ─── Mensagens fixas por etapa ────────────────────────────────────────────────
 
 const MENSAGENS = [
@@ -572,7 +591,7 @@ async function processarTriagem(req, res) {
 
   const configAgente = await prisma.configAgente.findUnique({
     where: { imobiliariaId },
-    select: { qualificacaoAutomatica: true, nomeAgente: true, tomAgente: true, instrucoesPersonalizadas: true },
+    select: { qualificacaoAutomatica: true, nomeAgente: true, tomAgente: true, instrucoesPersonalizadas: true, velocidadeResposta: true },
   });
 
   const { classificacao, resposta } = await classificarViaIA(
@@ -583,6 +602,7 @@ async function processarTriagem(req, res) {
     configAgente?.instrucoesPersonalizadas || null,
   );
   const historicoFinal = [...historico, { role: 'assistant', content: resposta }];
+  const delayMs = calcularDelayDigitacao(resposta, configAgente?.velocidadeResposta || 'natural');
 
   const salvarComum = (status, motivoDescarte) => salvarSessaoTriagem({
     telefoneLimpo, pushName, instancia, imobiliariaId, numeroMensagens, historico: historicoFinal, status, motivoDescarte,
@@ -590,7 +610,7 @@ async function processarTriagem(req, res) {
 
   if (classificacao === 'lead_anuncio') {
     await salvarComum('finalizado');
-    return res.json({ ok: true, acao: 'lead_confirmado', mensagemResposta: resposta });
+    return res.json({ ok: true, acao: 'lead_confirmado', mensagemResposta: resposta, delayMs });
   }
 
   if (classificacao === 'corretor_parceiro' || classificacao === 'outro') {
@@ -598,7 +618,7 @@ async function processarTriagem(req, res) {
     notificarGestorTriagem(imobiliariaId, telefoneLimpo, classificacao).catch((err) => {
       console.error('[agente] Falha ao notificar gestor (triagem):', err.message);
     });
-    return res.json({ ok: true, acao: 'descartado', mensagemResposta: resposta });
+    return res.json({ ok: true, acao: 'descartado', mensagemResposta: resposta, delayMs });
   }
 
   // "indefinido": no limite de mensagens é exceção — desiste em vez de insistir pra sempre
@@ -612,7 +632,7 @@ async function processarTriagem(req, res) {
 
   // Caminho comum: ainda indefinido, dentro do limite — segue a conversa
   await salvarComum('em_andamento');
-  return res.json({ ok: true, acao: 'pergunta', mensagemResposta: resposta });
+  return res.json({ ok: true, acao: 'pergunta', mensagemResposta: resposta, delayMs });
 }
 
 // ─── Qualificação automática (ConfigAgente.qualificacaoAutomatica) ────────────
@@ -880,12 +900,13 @@ async function processarQualificacao(req, res) {
 
   const configAgente = await prisma.configAgente.findUnique({
     where: { imobiliariaId },
-    select: { perguntas: true, nomeAgente: true, tomAgente: true, instrucoesPersonalizadas: true },
+    select: { perguntas: true, nomeAgente: true, tomAgente: true, instrucoesPersonalizadas: true, velocidadeResposta: true },
   });
   const perguntas = Array.isArray(configAgente?.perguntas) ? configAgente.perguntas : [];
   const nomeAgente = configAgente?.nomeAgente || 'Lia';
   const tomAgente = configAgente?.tomAgente || 'profissional mas leve';
   const instrucoesPersonalizadas = configAgente?.instrucoesPersonalizadas || null;
+  const velocidadeResposta = configAgente?.velocidadeResposta || 'natural';
 
   await registrarMensagemQualificacao({
     leadId, imobiliariaId, remetenteTipo: 'lead',
@@ -901,6 +922,7 @@ async function processarQualificacao(req, res) {
 
   const { classificacao, resposta, coletado } = await classificarQualificacaoViaIA(historico, perguntas, coletadoAnterior, nomeAgente, tomAgente, instrucoesPersonalizadas);
   const historicoFinal = [...historico, { role: 'assistant', content: resposta }];
+  const delayMs = calcularDelayDigitacao(resposta, velocidadeResposta);
   console.log(`[agente] qualificação (${telefoneLimpo}) — msg ${numeroMensagens}/${LIMITE_MENSAGENS_QUALIFICACAO} — classificacao=${classificacao}`);
 
   await registrarMensagemQualificacao({
@@ -915,19 +937,19 @@ async function processarQualificacao(req, res) {
   if (classificacao === 'transferir_humano') {
     await salvarSessao('finalizado');
     await finalizarQualificacao(leadId, imobiliariaId, { coletado, motivo: 'transferencia_humana' });
-    return res.json({ ok: true, acao: 'transferido', mensagemResposta: resposta });
+    return res.json({ ok: true, acao: 'transferido', mensagemResposta: resposta, delayMs });
   }
 
   if (classificacao === 'concluido' || noLimite) {
     await salvarSessao('finalizado');
     const motivo = classificacao === 'concluido' ? 'concluido' : 'limite_mensagens';
     await finalizarQualificacao(leadId, imobiliariaId, { coletado, motivo });
-    return res.json({ ok: true, acao: 'concluido', mensagemResposta: resposta });
+    return res.json({ ok: true, acao: 'concluido', mensagemResposta: resposta, delayMs });
   }
 
   // Caminho comum: ainda em andamento, dentro do limite — segue a conversa
   await salvarSessao('em_andamento');
-  return res.json({ ok: true, acao: 'pergunta', mensagemResposta: resposta });
+  return res.json({ ok: true, acao: 'pergunta', mensagemResposta: resposta, delayMs });
 }
 
 module.exports = { receberMensagem, processarTriagem, processarQualificacao, finalizarQualificacao };

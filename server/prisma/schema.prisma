@@ -642,6 +642,7 @@ model ConfigAgente {
   nomeAgente         String   @default("Lia")
   tomAgente          String   @default("profissional mas leve")
   instrucoesPersonalizadas String? // texto livre do gestor, entra no system prompt complementando (não substituindo) o fluxo
+  velocidadeResposta String   @default("natural") // "rapido" | "natural" | "pausado" — multiplicador do delay de "digitando" nas respostas do agente
   ativo              Boolean  @default(true)
   distribuicaoManual Boolean  @default(false)
   distribuicaoPorEquipeAtiva  Boolean @default(false)

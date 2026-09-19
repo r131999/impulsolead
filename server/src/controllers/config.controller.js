@@ -101,11 +101,12 @@ async function getConfigAgente(req, res) {
 }
 
 const REGEX_HORARIO = /^([01]\d|2[0-3]):[0-5]\d$/; // "HH:MM", 00:00–23:59
+const VELOCIDADES_RESPOSTA_VALIDAS = ['rapido', 'natural', 'pausado'];
 
 async function atualizarConfigAgente(req, res) {
   try {
     const {
-      mensagemBoasVindas, perguntas, nomeAgente, tomAgente, instrucoesPersonalizadas, ativo, atenderNumeroDesconhecido,
+      mensagemBoasVindas, perguntas, nomeAgente, tomAgente, instrucoesPersonalizadas, velocidadeResposta, ativo, atenderNumeroDesconhecido,
       horarioAtendimentoInicio, horarioAtendimentoFim, qualificacaoAutomatica, timeoutQualificacaoMinutos,
     } = req.body;
 
@@ -127,6 +128,10 @@ async function atualizarConfigAgente(req, res) {
 
     if (typeof instrucoesPersonalizadas === 'string' && instrucoesPersonalizadas.length > 3000) {
       return res.status(400).json({ error: 'instrucoesPersonalizadas deve ter no máximo 3000 caracteres' });
+    }
+
+    if (velocidadeResposta !== undefined && !VELOCIDADES_RESPOSTA_VALIDAS.includes(velocidadeResposta)) {
+      return res.status(400).json({ error: `velocidadeResposta deve ser uma de: ${VELOCIDADES_RESPOSTA_VALIDAS.join(', ')}` });
     }
 
     if (atenderNumeroDesconhecido !== undefined && typeof atenderNumeroDesconhecido !== 'boolean') {
@@ -162,6 +167,7 @@ async function atualizarConfigAgente(req, res) {
         ...(instrucoesPersonalizadas !== undefined && {
           instrucoesPersonalizadas: instrucoesPersonalizadas?.trim() || null,
         }),
+        ...(velocidadeResposta !== undefined && { velocidadeResposta }),
         ...(ativo !== undefined && { ativo }),
         ...(atenderNumeroDesconhecido !== undefined && { atenderNumeroDesconhecido }),
         ...(horarioAtendimentoInicio !== undefined && { horarioAtendimentoInicio }),
@@ -176,6 +182,7 @@ async function atualizarConfigAgente(req, res) {
         nomeAgente: nomeAgente || 'Lia',
         tomAgente: tomAgente || 'profissional mas leve',
         instrucoesPersonalizadas: instrucoesPersonalizadas?.trim() || null,
+        velocidadeResposta: velocidadeResposta || 'natural',
         ativo: ativo !== undefined ? ativo : true,
         atenderNumeroDesconhecido: atenderNumeroDesconhecido !== undefined ? atenderNumeroDesconhecido : false,
         horarioAtendimentoInicio: horarioAtendimentoInicio || '00:00',

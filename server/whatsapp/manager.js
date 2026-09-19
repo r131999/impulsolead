@@ -207,6 +207,21 @@ async function processarTriagem(tenant, { telefone, mensagem, pushName }) {
   return { ok: false, acao: 'ignorado' };
 }
 
+// ── Envio com indicador de "digitando..." (triagem e qualificação) ────────────
+// O backend já calculou `delayMs` (proporcional ao tamanho da resposta, ajustado
+// pela velocidade configurada) — aqui só mostra "digitando" durante a espera e
+// envia a mensagem real em seguida, que naturalmente encerra o indicador no
+// WhatsApp do lead. Falha ao mostrar presença não pode impedir o envio da mensagem.
+async function enviarComDigitacao(tenant, jid, texto, delayMs) {
+  try {
+    await tenant.sock.sendPresenceUpdate('composing', jid);
+  } catch (err) {
+    tag(`Erro ao enviar presença "digitando": ${err.message}`, tenant.imobiliariaId);
+  }
+  await new Promise((r) => setTimeout(r, delayMs || 1200));
+  await tenant.sock.sendMessage(jid, { text: texto });
+}
+
 // ── Qualificação automática (ConfigAgente.qualificacaoAutomatica) ──────────────
 // Chamada quando um lead já criado (leadAtivo.emQualificacaoAutomatica) manda
 // mensagem — a Lia conduz o roteiro configurado até concluir, ser transferida
@@ -346,7 +361,7 @@ async function handleMessage(tenant, msg) {
         });
         if (resultado.mensagemResposta) {
           try {
-            await tenant.sock.sendMessage(realJid, { text: resultado.mensagemResposta });
+            await enviarComDigitacao(tenant, realJid, resultado.mensagemResposta, resultado.delayMs);
           } catch (err) {
             tag(`Erro ao enviar mensagem de qualificação: ${err.message}`, tenant.imobiliariaId);
           }
@@ -417,7 +432,7 @@ async function handleMessage(tenant, msg) {
 
     if (resultado.mensagemResposta) {
       try {
-        await tenant.sock.sendMessage(realJid, { text: resultado.mensagemResposta });
+        await enviarComDigitacao(tenant, realJid, resultado.mensagemResposta, resultado.delayMs);
       } catch (err) {
         tag(`Erro ao enviar mensagem de triagem: ${err.message}`, tenant.imobiliariaId);
       }
