@@ -52,4 +52,75 @@ async function enviarTemplate(telefone, templateName, parametros) {
   }
 }
 
-module.exports = { enviarTemplate };
+// ─── Envio por imobiliária (WhatsappCloudApiInstancia) ────────────────────────
+// Diferente de enviarTemplate acima (WABA global do ImpulsoLead, usado só pra
+// notificar corretor/gestor), estas funções falam com o WABA DA IMOBILIÁRIA —
+// por isso recebem phoneNumberId/accessToken como parâmetro em vez de ler de env.
+
+// Texto livre — só é aceito pela Cloud API dentro da janela de 24h após a última
+// mensagem do lead (é sempre o caso aqui: quem inicia a conversa é o lead).
+async function enviarTextoLivre(telefone, texto, { phoneNumberId, accessToken }) {
+  const numero = formatarNumero(telefone);
+  const url = `https://graph.facebook.com/${CLOUD_API_VERSION}/${phoneNumberId}/messages`;
+
+  const body = {
+    messaging_product: 'whatsapp',
+    to: numero,
+    type: 'text',
+    text: { body: texto },
+  };
+
+  try {
+    const resp = await fetch(url, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    });
+    const json = await resp.json();
+    if (!resp.ok) throw new Error(json?.error?.message || `HTTP ${resp.status}`);
+    return { enviado: true, whatsappMsgId: json.messages?.[0]?.id };
+  } catch (err) {
+    console.error(`[whatsappCloudApi] Falha ao enviar texto livre para ${telefone}:`, err.message);
+    return { enviado: false, motivo: err.message };
+  }
+}
+
+// Marca a mensagem recebida como lida e pede o indicador "digitando..." — equivalente
+// da Cloud API pro sendPresenceUpdate('composing') do Baileys. Fica visível por até
+// ~25s ou até a próxima mensagem ser enviada, o que cobre com folga o teto de delay
+// que já usamos (DELAY_DIGITACAO_MAX_MS = 9s). Falha aqui nunca deve impedir o envio
+// da mensagem real — quem chama trata o delay como válido de qualquer forma.
+async function marcarLidoComDigitando(msgId, { phoneNumberId, accessToken }) {
+  const url = `https://graph.facebook.com/${CLOUD_API_VERSION}/${phoneNumberId}/messages`;
+
+  const body = {
+    messaging_product: 'whatsapp',
+    status: 'read',
+    message_id: msgId,
+    typing_indicator: { type: 'text' },
+  };
+
+  try {
+    const resp = await fetch(url, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    });
+    if (!resp.ok) {
+      const json = await resp.json().catch(() => ({}));
+      throw new Error(json?.error?.message || `HTTP ${resp.status}`);
+    }
+    return { enviado: true };
+  } catch (err) {
+    console.warn(`[whatsappCloudApi] Falha ao marcar lido/digitando (${msgId}):`, err.message);
+    return { enviado: false, motivo: err.message };
+  }
+}
+
+module.exports = { enviarTemplate, enviarTextoLivre, marcarLidoComDigitando };

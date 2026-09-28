@@ -417,7 +417,7 @@ async function receberMensagem(req, res) {
 // reconhecimento de palavras-chave. O limite de mensagens é só rede de segurança
 // para a IA não ficar pedindo esclarecimento pra sempre; não é o caminho comum.
 
-const LIMITE_MENSAGENS_TRIAGEM = 4; // troca esse tanto de mensagens sem confirmação → desiste
+const LIMITE_MENSAGENS_TRIAGEM_PADRAO = 8; // troca esse tanto de mensagens sem confirmação → desiste (configurável por imobiliária, ConfigAgente.limiteMensagensTriagem)
 
 const MENSAGEM_TRIAGEM_FALLBACK =
   'Desculpa, pode repetir? Não consegui entender direito 🙂';
@@ -449,10 +449,10 @@ function buildSystemPromptTriagem(qualificacaoAutomatica, nomeAgente, tomAgente,
 Tom de voz: ${tomAgente}. Mantenha esse tom em todas as respostas, sem perder a naturalidade.
 
 Classifique CADA mensagem em uma destas categorias:
-- "lead_anuncio": a pessoa demonstra interesse genuíno em comprar ou alugar um imóvel (cliente em potencial).
+- "lead_anuncio": a pessoa demonstra interesse em comprar ou alugar um imóvel (cliente em potencial). Isso inclui QUALQUER pergunta sobre um imóvel, empreendimento, condomínio, região, valores, condições de pagamento etc. — perguntar já é demonstrar interesse, a pessoa não precisa dizer "quero comprar" com essas palavras. Esse é o caso mais comum: lead real chega perguntando, não anunciando.
 - "corretor_parceiro": a pessoa se identifica como corretor(a), representante de outra imobiliária, ou propõe parceria/indicação comercial — não é cliente final.
-- "outro": qualquer assunto que não seja interesse em imóvel nem parceria (número errado, spam, cobrança, suporte, reclamação, etc.).
-- "indefinido": ainda não dá para saber com confiança — a conversa deve continuar.
+- "outro": SÓ quando ficar claro que não é sobre imóvel — spam, número errado, cobrança, suporte, reclamação, assunto sem relação nenhuma com o negócio.
+- "indefinido": a mensagem é vaga demais pra saber se é sobre imóvel ou não (ex.: só um cumprimento, "oi", uma mensagem incompreensível) — a conversa deve continuar com uma pergunta que ajude a entender a intenção. Não use "indefinido" quando já houver qualquer menção a imóvel, empreendimento, região ou condições — isso já é "lead_anuncio".
 
 Responda SEMPRE em JSON válido, exatamente neste formato:
 {"classificacao": "lead_anuncio" | "corretor_parceiro" | "outro" | "indefinido", "resposta": "texto curto e natural para responder ao contato"}
@@ -561,18 +561,19 @@ function salvarSessaoTriagem({ telefoneLimpo, pushName, instancia, imobiliariaId
   });
 }
 
-// POST /api/agente/triagem
-async function processarTriagem(req, res) {
-  const { telefone, mensagem, instancia, pushName } = req.body;
-  const imobiliariaId = req.imobiliariaId;
-
+// Núcleo puro da triagem — recebe parâmetros já validados pelo formato do canal
+// (rota HTTP com x-api-key para o Baileys, chamada direta em processo para a Cloud
+// API) e devolve {status, body} em vez de escrever na resposta, pra não acoplar a
+// nenhum dos dois. processarTriagem (wrapper HTTP) e o handler do webhook da Cloud
+// API chamam esta função e só decidem o que fazer com o resultado.
+async function processarTriagemCore({ telefone, mensagem, instancia, pushName, imobiliariaId }) {
   if (!telefone || !mensagem || !instancia) {
-    return res.status(400).json({ error: 'Campos obrigatórios: telefone, mensagem, instancia' });
+    return { status: 400, body: { error: 'Campos obrigatórios: telefone, mensagem, instancia' } };
   }
 
   const telefoneLimpo = String(telefone).replace(/\D/g, '');
   if (!telefoneLimpo || telefoneLimpo.length < 10) {
-    return res.status(400).json({ error: 'Telefone inválido' });
+    return { status: 400, body: { error: 'Telefone inválido' } };
   }
 
   const sessao = await prisma.sessaoAgente.findUnique({
@@ -581,18 +582,34 @@ async function processarTriagem(req, res) {
 
   // Sessão já concluída (virou lead, foi descartada ou bateu o limite) — não responde mais.
   if (sessao && sessao.status !== 'em_andamento') {
-    return res.json({ ok: true, acao: 'ignorado' });
+    return { status: 200, body: { ok: true, acao: 'ignorado' } };
+  }
+
+  const configAgente = await prisma.configAgente.findUnique({
+    where: { imobiliariaId },
+    select: {
+      qualificacaoAutomatica: true, nomeAgente: true, tomAgente: true, instrucoesPersonalizadas: true,
+      velocidadeResposta: true, limiteMensagensTriagem: true, fraseOrigemAnuncio: true,
+    },
+  });
+
+  // Filtro por frase de origem (ConfigAgente.fraseOrigemAnuncio) — só se aplica na
+  // 1ª mensagem do número (sem sessão ainda), pra não cortar quem já está no meio
+  // de uma triagem. Campo vazio = comportamento atual (atende todo número
+  // desconhecido, conforme o toggle atenderNumeroDesconhecido). Não cria sessão
+  // nem registra nada — se a pessoa mandar a frase certa depois, tenta de novo do zero.
+  if (!sessao) {
+    const frase = configAgente?.fraseOrigemAnuncio?.trim();
+    if (frase && !mensagem.toLowerCase().includes(frase.toLowerCase())) {
+      return { status: 200, body: { ok: true, acao: 'ignorado_sem_frase' } };
+    }
   }
 
   const historicoAnterior = sessao?.respostas?.historico || [];
   const historico = [...historicoAnterior, { role: 'user', content: mensagem.trim() }];
   const numeroMensagens = (sessao?.etapaAtual || 0) + 1;
-  const noLimite = numeroMensagens >= LIMITE_MENSAGENS_TRIAGEM;
 
-  const configAgente = await prisma.configAgente.findUnique({
-    where: { imobiliariaId },
-    select: { qualificacaoAutomatica: true, nomeAgente: true, tomAgente: true, instrucoesPersonalizadas: true, velocidadeResposta: true },
-  });
+  const noLimite = numeroMensagens >= (configAgente?.limiteMensagensTriagem || LIMITE_MENSAGENS_TRIAGEM_PADRAO);
 
   const { classificacao, resposta } = await classificarViaIA(
     historico,
@@ -610,7 +627,7 @@ async function processarTriagem(req, res) {
 
   if (classificacao === 'lead_anuncio') {
     await salvarComum('finalizado');
-    return res.json({ ok: true, acao: 'lead_confirmado', mensagemResposta: resposta, delayMs });
+    return { status: 200, body: { ok: true, acao: 'lead_confirmado', mensagemResposta: resposta, delayMs } };
   }
 
   if (classificacao === 'corretor_parceiro' || classificacao === 'outro') {
@@ -618,7 +635,7 @@ async function processarTriagem(req, res) {
     notificarGestorTriagem(imobiliariaId, telefoneLimpo, classificacao).catch((err) => {
       console.error('[agente] Falha ao notificar gestor (triagem):', err.message);
     });
-    return res.json({ ok: true, acao: 'descartado', mensagemResposta: resposta, delayMs });
+    return { status: 200, body: { ok: true, acao: 'descartado', mensagemResposta: resposta, delayMs } };
   }
 
   // "indefinido": no limite de mensagens é exceção — desiste em vez de insistir pra sempre
@@ -627,12 +644,19 @@ async function processarTriagem(req, res) {
     notificarGestorTriagem(imobiliariaId, telefoneLimpo, 'limite_mensagens').catch((err) => {
       console.error('[agente] Falha ao notificar gestor (triagem):', err.message);
     });
-    return res.json({ ok: true, acao: 'descartado' });
+    return { status: 200, body: { ok: true, acao: 'descartado' } };
   }
 
   // Caminho comum: ainda indefinido, dentro do limite — segue a conversa
   await salvarComum('em_andamento');
-  return res.json({ ok: true, acao: 'pergunta', mensagemResposta: resposta, delayMs });
+  return { status: 200, body: { ok: true, acao: 'pergunta', mensagemResposta: resposta, delayMs } };
+}
+
+// POST /api/agente/triagem — wrapper fino chamado via HTTP pelo manager Baileys
+async function processarTriagem(req, res) {
+  const { telefone, mensagem, instancia, pushName } = req.body;
+  const resultado = await processarTriagemCore({ telefone, mensagem, instancia, pushName, imobiliariaId: req.imobiliariaId });
+  return res.status(resultado.status).json(resultado.body);
 }
 
 // ─── Qualificação automática (ConfigAgente.qualificacaoAutomatica) ────────────
@@ -860,18 +884,19 @@ async function registrarMensagemQualificacao({ leadId, imobiliariaId, remetenteT
   emitirMensagem(leadId, mensagem);
 }
 
-async function processarQualificacao(req, res) {
-  const { telefone, mensagem, instancia, pushName, whatsappMsgId } = req.body;
-  const imobiliariaId = req.imobiliariaId;
-  console.log(`[agente] POST /qualificacao recebido — telefone=${telefone} imobiliaria=${imobiliariaId}`);
+// Núcleo puro da qualificação — mesma ideia de processarTriagemCore acima: devolve
+// {status, body}, sem tocar em req/res, reaproveitável pela rota HTTP (Baileys) e
+// pelo handler da Cloud API.
+async function processarQualificacaoCore({ telefone, mensagem, instancia, pushName, whatsappMsgId, imobiliariaId }) {
+  console.log(`[agente] processarQualificacao — telefone=${telefone} imobiliaria=${imobiliariaId}`);
 
   if (!telefone || !mensagem || !instancia) {
-    return res.status(400).json({ error: 'Campos obrigatórios: telefone, mensagem, instancia' });
+    return { status: 400, body: { error: 'Campos obrigatórios: telefone, mensagem, instancia' } };
   }
 
   const telefoneLimpo = String(telefone).replace(/\D/g, '');
   if (!telefoneLimpo || telefoneLimpo.length < 10) {
-    return res.status(400).json({ error: 'Telefone inválido' });
+    return { status: 400, body: { error: 'Telefone inválido' } };
   }
 
   const sessao = await prisma.sessaoAgente.findUnique({
@@ -879,23 +904,23 @@ async function processarQualificacao(req, res) {
   });
 
   // Sem sessão ativa (já finalizada, ou esse telefone nunca entrou em qualificação
-  // automática) — nada a fazer. O manager só chama esta rota quando o lead ainda
+  // automática) — nada a fazer. O chamador só invoca esta função quando o lead ainda
   // está com emQualificacaoAutomatica=true, mas a checagem aqui é redundante de propósito.
   if (!sessao || sessao.status !== 'em_andamento') {
     console.log(`[agente] qualificação ignorada (${telefoneLimpo}) — sessão ${sessao ? `status=${sessao.status}` : 'inexistente'}`);
-    return res.json({ ok: true, acao: 'ignorado' });
+    return { status: 200, body: { ok: true, acao: 'ignorado' } };
   }
 
   const leadId = sessao.respostas?.leadId;
   if (!leadId) {
     console.log(`[agente] qualificação ignorada (${telefoneLimpo}) — sessão sem leadId em respostas`);
-    return res.json({ ok: true, acao: 'ignorado' });
+    return { status: 200, body: { ok: true, acao: 'ignorado' } };
   }
 
-  // Retry do manager pra uma mensagem já processada — não reprocessa nem chama a IA de novo.
+  // Retry do canal pra uma mensagem já processada — não reprocessa nem chama a IA de novo.
   if (whatsappMsgId) {
     const jaProcessada = await prisma.mensagemLead.findFirst({ where: { whatsappMsgId }, select: { id: true } });
-    if (jaProcessada) return res.json({ ok: true, acao: 'ignorado', dedup: true });
+    if (jaProcessada) return { status: 200, body: { ok: true, acao: 'ignorado', dedup: true } };
   }
 
   const configAgente = await prisma.configAgente.findUnique({
@@ -937,19 +962,31 @@ async function processarQualificacao(req, res) {
   if (classificacao === 'transferir_humano') {
     await salvarSessao('finalizado');
     await finalizarQualificacao(leadId, imobiliariaId, { coletado, motivo: 'transferencia_humana' });
-    return res.json({ ok: true, acao: 'transferido', mensagemResposta: resposta, delayMs });
+    return { status: 200, body: { ok: true, acao: 'transferido', mensagemResposta: resposta, delayMs } };
   }
 
   if (classificacao === 'concluido' || noLimite) {
     await salvarSessao('finalizado');
     const motivo = classificacao === 'concluido' ? 'concluido' : 'limite_mensagens';
     await finalizarQualificacao(leadId, imobiliariaId, { coletado, motivo });
-    return res.json({ ok: true, acao: 'concluido', mensagemResposta: resposta, delayMs });
+    return { status: 200, body: { ok: true, acao: 'concluido', mensagemResposta: resposta, delayMs } };
   }
 
   // Caminho comum: ainda em andamento, dentro do limite — segue a conversa
   await salvarSessao('em_andamento');
-  return res.json({ ok: true, acao: 'pergunta', mensagemResposta: resposta, delayMs });
+  return { status: 200, body: { ok: true, acao: 'pergunta', mensagemResposta: resposta, delayMs } };
 }
 
-module.exports = { receberMensagem, processarTriagem, processarQualificacao, finalizarQualificacao };
+// POST /api/agente/qualificacao — wrapper fino chamado via HTTP pelo manager Baileys
+async function processarQualificacao(req, res) {
+  const { telefone, mensagem, instancia, pushName, whatsappMsgId } = req.body;
+  const resultado = await processarQualificacaoCore({
+    telefone, mensagem, instancia, pushName, whatsappMsgId, imobiliariaId: req.imobiliariaId,
+  });
+  return res.status(resultado.status).json(resultado.body);
+}
+
+module.exports = {
+  receberMensagem, processarTriagem, processarQualificacao, finalizarQualificacao,
+  processarTriagemCore, processarQualificacaoCore, calcularDelayDigitacao,
+};

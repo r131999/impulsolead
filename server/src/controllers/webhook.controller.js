@@ -49,24 +49,28 @@ async function backfillHistoricoNoChat(tx, { leadId, imobiliariaId, historico, n
   }
 }
 
-async function receberLead(req, res) {
+// Núcleo puro da criação de lead a partir de uma conversa de WhatsApp — devolve
+// {status, body} em vez de escrever na resposta, pra ser reaproveitado tanto pela
+// rota HTTP (POST /api/webhook/lead, usada pelo manager Baileys) quanto pelo
+// handler da Cloud API, que roda no mesmo processo e chama isso direto.
+async function receberLeadCore(dados, imobiliariaId) {
   const {
     nome, telefone, whatsappJid,
     primeiroImovel, tipoRenda, rendaMensal, restricaoCpf,
     valorEntrada, urgencia, regiao, faixaValor,
     historico, campanha, viaAgenteQualificacao, mensagemInicial,
-  } = req.body;
+  } = dados;
 
   if (!nome || !String(nome).trim()) {
-    return res.status(400).json({ error: 'Campos obrigatórios: nome, telefone' });
+    return { status: 400, body: { error: 'Campos obrigatórios: nome, telefone' } };
   }
   if (!telefone) {
-    return res.status(400).json({ error: 'Campos obrigatórios: nome, telefone' });
+    return { status: 400, body: { error: 'Campos obrigatórios: nome, telefone' } };
   }
 
   const digitos = String(telefone).replace(/\D/g, '');
   if (digitos.length < 10 || digitos.length > 15) {
-    return res.status(400).json({ error: 'Telefone deve ter entre 10 e 15 dígitos numéricos' });
+    return { status: 400, body: { error: 'Telefone deve ter entre 10 e 15 dígitos numéricos' } };
   }
 
   const historicoProcessado  = processarHistorico(historico);
@@ -83,7 +87,7 @@ async function receberLead(req, res) {
   const campanhasSan         = sanitizarTexto(campanha);
 
   const configAgente = await prisma.configAgente.findUnique({
-    where: { imobiliariaId: req.imobiliariaId },
+    where: { imobiliariaId },
     select: { distribuicaoManual: true, qualificacaoAutomatica: true, mensagemBoasVindas: true, nomeAgente: true },
   });
   const modoManual = configAgente?.distribuicaoManual ?? false;
@@ -112,7 +116,7 @@ async function receberLead(req, res) {
         historicoConversa: historicoProcessado,
         temConversa: !!historicoProcessado,
         campanha: campanhasSan || null,
-        imobiliariaId: req.imobiliariaId,
+        imobiliariaId,
         emQualificacaoAutomatica: qualificacaoAtiva,
       },
     });
@@ -122,13 +126,13 @@ async function receberLead(req, res) {
     // conversado antes de o lead existir, senão repete pergunta. Vale independente
     // de qualificação automática estar ligada (é sobre a triagem, não sobre ela).
     const sessaoTriagem = await tx.sessaoAgente.findUnique({
-      where: { telefone_imobiliariaId_tipo: { telefone: telefoneSanitizado, imobiliariaId: req.imobiliariaId, tipo: 'triagem' } },
+      where: { telefone_imobiliariaId_tipo: { telefone: telefoneSanitizado, imobiliariaId, tipo: 'triagem' } },
     });
     const historicoTriagem = Array.isArray(sessaoTriagem?.respostas?.historico) ? sessaoTriagem.respostas.historico : [];
     if (historicoTriagem.length > 0) {
       await backfillHistoricoNoChat(tx, {
         leadId: lead.id,
-        imobiliariaId: req.imobiliariaId,
+        imobiliariaId,
         historico: historicoTriagem,
         nomeLead: nomeSanitizado,
         nomeAgente: configAgente?.nomeAgente,
@@ -162,7 +166,7 @@ async function receberLead(req, res) {
       }
 
       await tx.sessaoAgente.upsert({
-        where: { telefone_imobiliariaId_tipo: { telefone: telefoneSanitizado, imobiliariaId: req.imobiliariaId, tipo: 'qualificacao_ia' } },
+        where: { telefone_imobiliariaId_tipo: { telefone: telefoneSanitizado, imobiliariaId, tipo: 'qualificacao_ia' } },
         update: {
           status: 'em_andamento',
           etapaAtual: 0,
@@ -176,8 +180,8 @@ async function receberLead(req, res) {
           etapaAtual: 0,
           respostas: { leadId: lead.id, historico: historicoSeed, coletado: {} },
           status: 'em_andamento',
-          instancia: req.imobiliariaId,
-          imobiliariaId: req.imobiliariaId,
+          instancia: imobiliariaId,
+          imobiliariaId,
         },
       });
 
@@ -198,7 +202,7 @@ async function receberLead(req, res) {
 
     // 5. Busca próximo corretor via round-robin (dentro da transação)
     const corretores = await tx.corretor.findMany({
-      where: { imobiliariaId: req.imobiliariaId, ativo: true, disponivel: true },
+      where: { imobiliariaId, ativo: true, disponivel: true },
       orderBy: { posicaoFila: 'asc' },
     });
 
@@ -241,7 +245,7 @@ async function receberLead(req, res) {
           corretorId: proximo.id,
           corretorNome: proximo.nome,
           distribuidoPor: 'automatico',
-          imobiliariaId: req.imobiliariaId,
+          imobiliariaId,
         },
       });
     } else {
@@ -273,24 +277,34 @@ async function receberLead(req, res) {
     include: { corretor: { select: { id: true, nome: true, whatsapp: true } } },
   });
 
-  res.status(201).json({
-    success: true,
-    lead: {
-      id: leadCompleto.id,
-      nome: leadCompleto.nome,
-      status: leadCompleto.status,
-      corretor: leadCompleto.corretor || null,
+  return {
+    status: 201,
+    body: {
+      success: true,
+      lead: {
+        id: leadCompleto.id,
+        nome: leadCompleto.nome,
+        status: leadCompleto.status,
+        corretor: leadCompleto.corretor || null,
+      },
+      semCorretor: !result.corretor,
+      aguardandoDistribuicao: modoManual,
+      aguardandoQualificacao: qualificacaoAtiva,
+      historicoBackfilled: result.historicoBackfilled,
     },
-    semCorretor: !result.corretor,
-    aguardandoDistribuicao: modoManual,
-    aguardandoQualificacao: qualificacaoAtiva,
-    historicoBackfilled: result.historicoBackfilled,
-  });
+  };
 }
 
-async function numerosBloqueados(req, res) {
-  const { imobiliariaId } = req;
+// POST /api/webhook/lead — wrapper fino chamado via HTTP pelo manager Baileys (e N8N)
+async function receberLead(req, res) {
+  const resultado = await receberLeadCore(req.body, req.imobiliariaId);
+  return res.status(resultado.status).json(resultado.body);
+}
 
+// Telefones de corretores/gestores da imobiliária — usado tanto pra alimentar o
+// endpoint abaixo (consumido pelo manager Baileys, que refaz esse fetch a cada 10min
+// e guarda em memória) quanto pelo handler da Cloud API, que consulta direto.
+async function buscarTelefonesBloqueados(imobiliariaId) {
   const [corretores, usuarios] = await Promise.all([
     prisma.corretor.findMany({
       where: { imobiliariaId },
@@ -307,27 +321,26 @@ async function numerosBloqueados(req, res) {
     ...usuarios.map((u) => u.telefone),
   ];
 
-  const telefones = [...new Set(
+  return [...new Set(
     todos
       .filter(Boolean)
       .map((t) => String(t).replace(/\D/g, ''))
       .filter((t) => t.length >= 10),
   )];
+}
 
+async function numerosBloqueados(req, res) {
+  const telefones = await buscarTelefonesBloqueados(req.imobiliariaId);
   res.json({ telefones });
 }
 
-async function leadAtivo(req, res) {
-  const { telefone, jid } = req.query;
-
-  if (!telefone && !jid) {
-    return res.status(400).json({ error: 'Parâmetro obrigatório: telefone ou jid' });
-  }
-
+// Núcleo puro de "existe lead ativo pra esse telefone/jid" — usado pelo endpoint
+// HTTP (manager Baileys) e direto pelo handler da Cloud API.
+async function buscarLeadAtivoCore({ imobiliariaId, telefone, jid }) {
   if (jid) {
     const leadPorJid = await prisma.lead.findFirst({
       where: {
-        imobiliariaId: req.imobiliariaId,
+        imobiliariaId,
         whatsappJid: jid,
         status: { notIn: ['perdido'] },
       },
@@ -336,7 +349,7 @@ async function leadAtivo(req, res) {
     });
 
     if (leadPorJid) {
-      return res.json({ existe: true, leadId: leadPorJid.id, emQualificacaoAutomatica: leadPorJid.emQualificacaoAutomatica });
+      return { existe: true, leadId: leadPorJid.id, emQualificacaoAutomatica: leadPorJid.emQualificacaoAutomatica };
     }
 
     // Busca por sufixo numérico quando o JID é @lid e não houve match exato
@@ -346,7 +359,7 @@ async function leadAtivo(req, res) {
       if (sufixo.length >= 8) {
         const leadPorSufixo = await prisma.lead.findFirst({
           where: {
-            imobiliariaId: req.imobiliariaId,
+            imobiliariaId,
             telefone: { endsWith: sufixo },
             status: { notIn: ['perdido'] },
           },
@@ -355,14 +368,14 @@ async function leadAtivo(req, res) {
         });
 
         if (leadPorSufixo) {
-          return res.json({ existe: true, leadId: leadPorSufixo.id, emQualificacaoAutomatica: leadPorSufixo.emQualificacaoAutomatica });
+          return { existe: true, leadId: leadPorSufixo.id, emQualificacaoAutomatica: leadPorSufixo.emQualificacaoAutomatica };
         }
       }
     }
   }
 
   if (!telefone) {
-    return res.json({ existe: false, leadId: null });
+    return { existe: false, leadId: null };
   }
 
   const digitos = String(telefone).replace(/\D/g, '');
@@ -377,7 +390,7 @@ async function leadAtivo(req, res) {
 
   const lead = await prisma.lead.findFirst({
     where: {
-      imobiliariaId: req.imobiliariaId,
+      imobiliariaId,
       telefone: { in: variantes },
       status: { notIn: ['perdido'] },
     },
@@ -387,37 +400,56 @@ async function leadAtivo(req, res) {
 
   if (lead) {
     console.log(`[webhook] lead-ativo telefone=${digitos} — leadId=${lead.id} emQualificacaoAutomatica=${lead.emQualificacaoAutomatica}`);
-    return res.json({ existe: true, leadId: lead.id, emQualificacaoAutomatica: lead.emQualificacaoAutomatica });
+    return { existe: true, leadId: lead.id, emQualificacaoAutomatica: lead.emQualificacaoAutomatica };
   }
 
-  res.json({ existe: false, leadId: null });
+  return { existe: false, leadId: null };
+}
+
+async function leadAtivo(req, res) {
+  const { telefone, jid } = req.query;
+
+  if (!telefone && !jid) {
+    return res.status(400).json({ error: 'Parâmetro obrigatório: telefone ou jid' });
+  }
+
+  const resultado = await buscarLeadAtivoCore({ imobiliariaId: req.imobiliariaId, telefone, jid });
+  res.json(resultado);
+}
+
+// Configuração de atendimento (boas-vindas, horário, triagem) — usada pelo endpoint
+// HTTP (manager Baileys) e direto pelo handler da Cloud API.
+async function buscarConfigAtendimento(imobiliariaId) {
+  const config = await prisma.configAgente.findUnique({
+    where: { imobiliariaId },
+    select: {
+      mensagemBoasVindas: true,
+      atenderNumeroDesconhecido: true,
+      horarioAtendimentoInicio: true,
+      horarioAtendimentoFim: true,
+      qualificacaoAutomatica: true,
+    },
+  });
+  return {
+    mensagem: config?.mensagemBoasVindas || 'Em breve um de nossos consultores entrará em contato com você.',
+    atenderNumeroDesconhecido: !!config?.atenderNumeroDesconhecido,
+    horarioAtendimentoInicio: config?.horarioAtendimentoInicio || '00:00',
+    horarioAtendimentoFim: config?.horarioAtendimentoFim || '23:59',
+    qualificacaoAutomatica: !!config?.qualificacaoAutomatica,
+  };
 }
 
 async function mensagemBoasVindas(req, res) {
   try {
-    const config = await prisma.configAgente.findUnique({
-      where: { imobiliariaId: req.imobiliariaId },
-      select: {
-        mensagemBoasVindas: true,
-        atenderNumeroDesconhecido: true,
-        horarioAtendimentoInicio: true,
-        horarioAtendimentoFim: true,
-        qualificacaoAutomatica: true,
-      },
-    });
-    const mensagem = config?.mensagemBoasVindas
-      || 'Em breve um de nossos consultores entrará em contato com você.';
-    res.json({
-      mensagem,
-      atenderNumeroDesconhecido: !!config?.atenderNumeroDesconhecido,
-      horarioAtendimentoInicio: config?.horarioAtendimentoInicio || '00:00',
-      horarioAtendimentoFim: config?.horarioAtendimentoFim || '23:59',
-      qualificacaoAutomatica: !!config?.qualificacaoAutomatica,
-    });
+    const config = await buscarConfigAtendimento(req.imobiliariaId);
+    res.json(config);
   } catch (err) {
     console.error('[webhook] mensagemBoasVindas:', err.message);
     res.status(500).json({ error: 'Erro ao buscar mensagem' });
   }
 }
 
-module.exports = { receberLead, numerosBloqueados, leadAtivo, mensagemBoasVindas };
+module.exports = {
+  receberLead, numerosBloqueados, leadAtivo, mensagemBoasVindas,
+  receberLeadCore, buscarTelefonesBloqueados, buscarLeadAtivoCore, buscarConfigAtendimento,
+};

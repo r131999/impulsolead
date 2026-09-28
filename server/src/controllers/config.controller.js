@@ -107,7 +107,7 @@ async function atualizarConfigAgente(req, res) {
   try {
     const {
       mensagemBoasVindas, perguntas, nomeAgente, tomAgente, instrucoesPersonalizadas, velocidadeResposta, ativo, atenderNumeroDesconhecido,
-      horarioAtendimentoInicio, horarioAtendimentoFim, qualificacaoAutomatica, timeoutQualificacaoMinutos,
+      horarioAtendimentoInicio, horarioAtendimentoFim, qualificacaoAutomatica, timeoutQualificacaoMinutos, limiteMensagensTriagem,
     } = req.body;
 
     if (perguntas !== undefined) {
@@ -149,6 +149,13 @@ async function atualizarConfigAgente(req, res) {
       return res.status(400).json({ error: 'timeoutQualificacaoMinutos deve ser um número inteiro maior ou igual a 1' });
     }
 
+    if (
+      limiteMensagensTriagem !== undefined
+      && (!Number.isInteger(limiteMensagensTriagem) || limiteMensagensTriagem < 1 || limiteMensagensTriagem > 30)
+    ) {
+      return res.status(400).json({ error: 'limiteMensagensTriagem deve ser um número inteiro entre 1 e 30' });
+    }
+
     if (horarioAtendimentoInicio !== undefined && !REGEX_HORARIO.test(horarioAtendimentoInicio)) {
       return res.status(400).json({ error: 'horarioAtendimentoInicio deve estar no formato HH:MM' });
     }
@@ -174,6 +181,7 @@ async function atualizarConfigAgente(req, res) {
         ...(horarioAtendimentoFim !== undefined && { horarioAtendimentoFim }),
         ...(qualificacaoAutomatica !== undefined && { qualificacaoAutomatica }),
         ...(timeoutQualificacaoMinutos !== undefined && { timeoutQualificacaoMinutos }),
+        ...(limiteMensagensTriagem !== undefined && { limiteMensagensTriagem }),
       },
       create: {
         imobiliariaId: req.imobiliariaId,
@@ -189,6 +197,7 @@ async function atualizarConfigAgente(req, res) {
         horarioAtendimentoFim: horarioAtendimentoFim || '23:59',
         qualificacaoAutomatica: qualificacaoAutomatica !== undefined ? qualificacaoAutomatica : false,
         timeoutQualificacaoMinutos: timeoutQualificacaoMinutos !== undefined ? timeoutQualificacaoMinutos : 180,
+        limiteMensagensTriagem: limiteMensagensTriagem !== undefined ? limiteMensagensTriagem : 8,
       },
     });
 

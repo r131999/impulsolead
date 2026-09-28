@@ -49,7 +49,13 @@ app.use(cors({
   origin: process.env.CLIENT_URL || '*',
   credentials: true,
 }));
-app.use(express.json({ limit: '1mb' }));
+// verify captura o corpo bruto em req.rawBody — necessário pra validar a
+// assinatura X-Hub-Signature-256 dos webhooks da Meta (verificarAssinaturaMeta),
+// que precisa do payload exato, não do JSON já reserializado.
+app.use(express.json({
+  limit: '1mb',
+  verify: (req, res, buf) => { req.rawBody = buf; },
+}));
 
 const UPLOAD_DIR_IMOVEIS = process.env.UPLOAD_DIR_IMOVEIS || '/opt/uploads/imoveis';
 app.use('/uploads/imoveis', express.static(UPLOAD_DIR_IMOVEIS));

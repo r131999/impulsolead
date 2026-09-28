@@ -210,6 +210,10 @@ export default function ConfigAgente() {
       setErro('Informe um tempo de timeout válido (mínimo 1 minuto) para a qualificação automática.')
       return
     }
+    if (form.atenderNumeroDesconhecido && (!form.limiteMensagensTriagem || form.limiteMensagensTriagem < 1 || form.limiteMensagensTriagem > 30)) {
+      setErro('Informe um limite de mensagens válido (entre 1 e 30) para a triagem.')
+      return
+    }
     setSalvando(true)
     try {
       const res = await atualizarConfig({
@@ -221,6 +225,7 @@ export default function ConfigAgente() {
         perguntas: form.perguntas,
         ativo: form.ativo,
         atenderNumeroDesconhecido: form.atenderNumeroDesconhecido,
+        limiteMensagensTriagem: form.limiteMensagensTriagem,
         horarioAtendimentoInicio: form.horarioAtendimentoInicio,
         horarioAtendimentoFim: form.horarioAtendimentoFim,
         qualificacaoAutomatica: form.qualificacaoAutomatica,
@@ -479,6 +484,24 @@ export default function ConfigAgente() {
               />
             </div>
           </div>
+
+          {form.atenderNumeroDesconhecido && (
+            <div className="mt-4 pt-4" style={{ borderTop: '1px solid #1E293B' }}>
+              <label className="label">Desistir após (mensagens sem confirmar interesse)</label>
+              <input
+                type="number"
+                min={1}
+                max={30}
+                className="input"
+                style={{ maxWidth: 160 }}
+                value={form.limiteMensagensTriagem ?? 8}
+                onChange={(e) => setForm((f) => ({ ...f, limiteMensagensTriagem: parseInt(e.target.value, 10) || '' }))}
+              />
+              <p className="text-xs mt-1" style={{ color: '#64748B' }}>
+                Padrão: 8 mensagens. Se a conversa passar disso sem o agente confirmar que é um lead de verdade, ela é descartada.
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Horário de atendimento */}

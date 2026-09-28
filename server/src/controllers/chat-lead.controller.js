@@ -200,50 +200,61 @@ async function marcarLidas(req, res) {
 
 // ── Receber mensagem do Baileys (rota interna, x-api-key) ──────────────────────
 
+// Núcleo puro — devolve {status, body}, reaproveitado pela rota HTTP (manager
+// Baileys) e direto pelo handler da Cloud API, que roda no mesmo processo.
+async function salvarMensagemRecebidaCore({ leadId, imobiliariaId, conteudo, whatsappMsgId, remetenteNome, tipoMidia }) {
+  if (!conteudo && !tipoMidia) {
+    return { status: 400, body: { error: 'conteudo ou tipoMidia é obrigatório' } };
+  }
+
+  const lead = await prisma.lead.findFirst({
+    where: { id: leadId, imobiliariaId },
+    select: { id: true },
+  });
+  if (!lead) return { status: 404, body: { error: 'Lead não encontrado' } };
+
+  // Deduplicação por whatsappMsgId
+  if (whatsappMsgId) {
+    const existe = await prisma.mensagemLead.findFirst({
+      where: { whatsappMsgId },
+      select: { id: true },
+    });
+    if (existe) return { status: 200, body: { ok: true, dedup: true } };
+  }
+
+  const mensagem = await prisma.mensagemLead.create({
+    data: {
+      leadId,
+      remetenteTipo: 'lead',
+      remetenteNome: remetenteNome || 'Lead',
+      conteudo: conteudo || null,
+      tipoMidia: tipoMidia || 'texto',
+      whatsappMsgId: whatsappMsgId || null,
+      lida: false,
+      imobiliariaId,
+    },
+  });
+
+  emitirMensagem(leadId, mensagem);
+
+  return { status: 201, body: { mensagem } };
+}
+
 async function receberMensagem(req, res) {
   try {
     const { leadId } = req.params;
     const { conteudo, whatsappMsgId, remetenteNome, tipoMidia } = req.body;
-
-    if (!conteudo && !tipoMidia) {
-      return res.status(400).json({ error: 'conteudo ou tipoMidia é obrigatório' });
-    }
-
-    const lead = await prisma.lead.findFirst({
-      where: { id: leadId, imobiliariaId: req.imobiliariaId },
-      select: { id: true },
+    const resultado = await salvarMensagemRecebidaCore({
+      leadId, imobiliariaId: req.imobiliariaId, conteudo, whatsappMsgId, remetenteNome, tipoMidia,
     });
-    if (!lead) return res.status(404).json({ error: 'Lead não encontrado' });
-
-    // Deduplicação por whatsappMsgId
-    if (whatsappMsgId) {
-      const existe = await prisma.mensagemLead.findFirst({
-        where: { whatsappMsgId },
-        select: { id: true },
-      });
-      if (existe) return res.json({ ok: true, dedup: true });
-    }
-
-    const mensagem = await prisma.mensagemLead.create({
-      data: {
-        leadId,
-        remetenteTipo: 'lead',
-        remetenteNome: remetenteNome || 'Lead',
-        conteudo: conteudo || null,
-        tipoMidia: tipoMidia || 'texto',
-        whatsappMsgId: whatsappMsgId || null,
-        lida: false,
-        imobiliariaId: req.imobiliariaId,
-      },
-    });
-
-    emitirMensagem(leadId, mensagem);
-
-    res.status(201).json({ mensagem });
+    res.status(resultado.status).json(resultado.body);
   } catch (err) {
     console.error('[chat-lead] receberMensagem:', err.message);
     res.status(500).json({ error: 'Erro ao receber mensagem' });
   }
 }
 
-module.exports = { listarMensagens, enviarMensagem, enviarArquivo, marcarLidas, receberMensagem };
+module.exports = {
+  listarMensagens, enviarMensagem, enviarArquivo, marcarLidas, receberMensagem,
+  salvarMensagemRecebidaCore,
+};

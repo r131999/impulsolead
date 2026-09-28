@@ -1,4 +1,6 @@
 const { Router } = require('express');
+const { verificarAssinaturaMeta } = require('../middleware/webhook.middleware');
+const { receberWebhookMensagens } = require('../controllers/whatsapp-cloud-api-webhook.controller');
 
 const router = Router();
 
@@ -14,10 +16,13 @@ router.get('/whatsapp', (req, res) => {
   res.sendStatus(403);
 });
 
-// POST /api/webhook/whatsapp — recebe status/eventos de mensagem (sent/delivered/read/failed)
-router.post('/whatsapp', (req, res) => {
-  res.sendStatus(200); // responde rápido, sempre, antes de processar
+// POST /api/webhook/whatsapp — recebe status de entrega (sent/delivered/read/failed) e
+// mensagens recebidas (changes[].value.messages[]) da Cloud API. Endpoint público —
+// verificarAssinaturaMeta confere X-Hub-Signature-256 antes de confiar no payload,
+// já que mensagens agora criam lead e acionam a IA (antes só logava status).
+router.post('/whatsapp', verificarAssinaturaMeta, (req, res) => {
   console.log('[whatsapp-webhook]', JSON.stringify(req.body));
+  return receberWebhookMensagens(req, res);
 });
 
 module.exports = router;

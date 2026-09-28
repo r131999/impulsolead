@@ -48,6 +48,7 @@ model Imobiliaria {
   empreendimentos           Empreendimento[]
   mensagensLead             MensagemLead[]
   whatsappInstancia         WhatsappInstancia?
+  whatsappCloudApiInstancia WhatsappCloudApiInstancia?
   metaIntegracoes           MetaIntegracao[]
   makeIntegracao            MakeIntegracao?
   tours                     TourVirtual[]
@@ -462,6 +463,19 @@ model WhatsappInstancia {
   atualizadoEm  DateTime    @updatedAt
 }
 
+model WhatsappCloudApiInstancia {
+  id                String      @id @default(uuid())
+  imobiliariaId     String      @unique
+  imobiliaria       Imobiliaria @relation(fields: [imobiliariaId], references: [id])
+  phoneNumberId     String      @unique // metadata.phone_number_id do payload do webhook — chave de lookup da imobiliária
+  businessAccountId String?
+  accessToken       String
+  numeroExibicao    String?
+  ativo             Boolean     @default(true)
+  criadoEm          DateTime    @default(now())
+  atualizadoEm      DateTime    @updatedAt
+}
+
 model MetaIntegracao {
   id               String      @id @default(uuid())
   imobiliariaId    String
@@ -653,6 +667,9 @@ model ConfigAgente {
   horarioAtendimentoFim    String @default("23:59") // "HH:MM", Brasília — 00:00–23:59 = 24/7
   qualificacaoAutomatica   Boolean @default(false) // liga a Lia conduzindo o roteiro de "perguntas" após a criação do lead, antes de notificar o corretor
   timeoutQualificacaoMinutos Int   @default(180) // lead sem responder por esse tempo → cron encerra e notifica o corretor com o que foi coletado
+  limiteMensagensTriagem  Int     @default(8) // troca esse tanto de mensagens sem confirmar interesse → triagem desiste (ConfigAgente.atenderNumeroDesconhecido)
+  canalWhatsapp      String   @default("baileys") // "baileys" | "cloud_api" — fonte de verdade de qual canal está ativo pra essa imobiliária
+  fraseOrigemAnuncio String? // se preenchido, a triagem só responde número desconhecido cuja 1ª mensagem contenha essa frase (case-insensitive); vazio = comportamento atual (atende todo número desconhecido, conforme atenderNumeroDesconhecido)
   criadoEm           DateTime @default(now())
   atualizadoEm       DateTime @updatedAt
 
