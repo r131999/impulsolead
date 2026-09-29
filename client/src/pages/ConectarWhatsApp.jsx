@@ -1,8 +1,33 @@
 import { useEffect, useRef, useState } from 'react'
 import QRCode from 'react-qr-code'
 import { getStatusWhatsapp, conectarWhatsapp, deletarSessaoWhats } from '../api/whatsapp'
+import { getStatusCloudApi, conectarCloudApi } from '../api/whatsappCloudApi'
 import { getConfig, atualizarConfig, getAlertaLead, atualizarAlertaLead } from '../api/config'
 import { useAuth } from '../context/AuthContext'
+
+// SDK JS da Meta pro Embedded Signup — carregado só quando a aba Cloud API é usada
+// pela primeira vez (evita puxar script de terceiro pra quem usa só Baileys).
+function carregarSdkMeta(appId) {
+  return new Promise((resolve, reject) => {
+    if (window.FB) {
+      window.FB.init({ appId, version: 'v21.0', xfbml: false })
+      return resolve()
+    }
+    window.fbAsyncInit = () => {
+      window.FB.init({ appId, version: 'v21.0', xfbml: false })
+      resolve()
+    }
+    if (document.getElementById('facebook-jssdk')) return // script já injetado, fbAsyncInit acima cobre
+    const script = document.createElement('script')
+    script.id = 'facebook-jssdk'
+    script.src = 'https://connect.facebook.net/en_US/sdk.js'
+    script.async = true
+    script.defer = true
+    script.crossOrigin = 'anonymous'
+    script.onerror = () => reject(new Error('Falha ao carregar o SDK da Meta.'))
+    document.body.appendChild(script)
+  })
+}
 
 const STATUS_LABEL = {
   conectado:     { txt: 'Conectado',        cor: '#10B981' },
@@ -30,6 +55,17 @@ export default function ConectarWhatsApp() {
   const [salvoOk, setSalvoOk]       = useState(false)
   const pollingRef                  = useRef(null)
 
+  // ── Canal ativo (Baileys x Cloud API) ─────────────────────────────────────
+  // Só controla qual card é exibido — a persistência de canalWhatsapp acontece
+  // como efeito colateral de uma conexão de fato concluída, nunca de simplesmente trocar de aba.
+  const [canal, setCanal] = useState('baileys')
+
+  // ── Cloud API (Embedded Signup) ───────────────────────────────────────────
+  const [statusCloudApi, setStatusCloudApi]         = useState(null)
+  const [conectandoCloudApi, setConectandoCloudApi] = useState(false)
+  const [erroCloudApi, setErroCloudApi]             = useState(null)
+  const codeRef = useRef(null) // code de 30s do FB.login, lido quando o postMessage FINISH chega
+
   // ── Alertas de lead sem atendimento ───────────────────────────────────────
   const [alerta, setAlerta]               = useState(ALERTA_PADRAO)
   const [alertaCarregado, setAlertaCarregado] = useState(false)
@@ -42,9 +78,102 @@ export default function ConectarWhatsApp() {
     carregarStatus()
     getConfig().then(({ data }) => {
       setMensagemBV(data.config?.mensagemBoasVindas || '')
+      setCanal(data.config?.canalWhatsapp === 'cloud_api' ? 'cloud_api' : 'baileys')
     }).catch(() => {})
+    carregarStatusCloudApi()
     return () => pararPolling()
   }, [])
+
+  // ── Cloud API: status (appId/configId pro SDK + se já tem instância conectada) ─
+  async function carregarStatusCloudApi() {
+    try {
+      const { data } = await getStatusCloudApi()
+      setStatusCloudApi(data)
+    } catch {
+      setStatusCloudApi(null)
+    }
+  }
+
+  // ── Cloud API: listener do postMessage que o popup do Embedded Signup dispara ──
+  useEffect(() => {
+    function onMessage(event) {
+      if (!event.origin || !event.origin.endsWith('facebook.com')) return
+
+      let data
+      try {
+        data = JSON.parse(event.data)
+      } catch {
+        return // mensagem de outra origem/formato — ignora
+      }
+      if (data?.type !== 'WA_EMBEDDED_SIGNUP') return
+
+      if (data.event === 'FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING') {
+        finalizarConexaoMeta(data.data)
+      } else if (data.event === 'CANCEL') {
+        setConectandoCloudApi(false)
+      } else if (data.event === 'ERROR') {
+        setConectandoCloudApi(false)
+        setErroCloudApi('A Meta retornou um erro durante a conexão. Tente novamente.')
+      }
+    }
+    window.addEventListener('message', onMessage)
+    return () => window.removeEventListener('message', onMessage)
+  }, [])
+
+  // ── Cloud API: abre o popup da Meta ───────────────────────────────────────
+  async function handleConectarMeta() {
+    setErroCloudApi(null)
+    if (!statusCloudApi?.appId || !statusCloudApi?.configId) {
+      setErroCloudApi('Conexão via Meta ainda não configurada — fale com o suporte.')
+      return
+    }
+    setConectandoCloudApi(true)
+    try {
+      await carregarSdkMeta(statusCloudApi.appId)
+      window.FB.login((response) => {
+        if (response.authResponse?.code) {
+          codeRef.current = response.authResponse.code
+        } else {
+          // popup fechado sem autorizar — não é erro, só cancelamento silencioso
+          setConectandoCloudApi(false)
+        }
+      }, {
+        config_id: statusCloudApi.configId,
+        response_type: 'code',
+        override_default_response_type: true,
+        extras: { setup: {}, featureType: 'whatsapp_business_app_onboarding' },
+      })
+    } catch (e) {
+      setErroCloudApi(e.message || 'Erro ao abrir a conexão com a Meta.')
+      setConectandoCloudApi(false)
+    }
+  }
+
+  // ── Cloud API: troca code + waba/phone number id pela conexão de fato ────────
+  async function finalizarConexaoMeta(dadosSignup) {
+    const code = codeRef.current
+    if (!code || !dadosSignup?.waba_id || !dadosSignup?.phone_number_id) {
+      setErroCloudApi('Conexão incompleta — tente novamente.')
+      setConectandoCloudApi(false)
+      return
+    }
+    try {
+      const { data } = await conectarCloudApi({
+        code,
+        wabaId: dadosSignup.waba_id,
+        phoneNumberId: dadosSignup.phone_number_id,
+        businessId: dadosSignup.business_id,
+      })
+      setStatusCloudApi((s) => ({
+        ...s, conectado: true, phoneNumberId: data.phoneNumberId, numeroExibicao: data.numeroExibicao,
+      }))
+    } catch (e) {
+      setErroCloudApi(e.response?.data?.error || 'Erro ao concluir a conexão.')
+    } finally {
+      codeRef.current = null
+      setConectandoCloudApi(false)
+    }
+  }
 
   useEffect(() => {
     if (!isGestor) return
@@ -219,6 +348,29 @@ export default function ConectarWhatsApp() {
         </p>
       </div>
 
+      {/* Seletor de canal */}
+      <div className="flex gap-2 mb-4">
+        {[
+          { valor: 'baileys', label: 'WhatsApp (QR Code)' },
+          { valor: 'cloud_api', label: 'WhatsApp Cloud API (Meta)' },
+        ].map((opcao) => (
+          <button
+            key={opcao.valor}
+            onClick={() => setCanal(opcao.valor)}
+            className="flex-1 text-sm font-medium rounded-lg px-3 py-2 transition-colors"
+            style={{
+              backgroundColor: canal === opcao.valor ? 'rgba(99,102,241,0.15)' : 'rgba(255,255,255,0.05)',
+              color: canal === opcao.valor ? '#818cf8' : '#94A3B8',
+              border: `1px solid ${canal === opcao.valor ? 'rgba(99,102,241,0.4)' : 'rgba(255,255,255,0.1)'}`,
+            }}
+          >
+            {opcao.label}
+          </button>
+        ))}
+      </div>
+
+      {canal === 'baileys' && (
+      <>
       {/* Card: status + ações */}
       <div className="card mb-4">
         <div className="flex items-center justify-between">
@@ -301,6 +453,93 @@ export default function ConectarWhatsApp() {
             O código é atualizado automaticamente. Aguarde após escanear.
           </p>
         </div>
+      )}
+      </>
+      )}
+
+      {canal === 'cloud_api' && (
+      <>
+      {/* Card: Cloud API — status + conectar via Meta */}
+      <div className="card mb-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-xs font-medium mb-1" style={{ color: '#64748B' }}>STATUS</p>
+            <div className="flex items-center gap-2">
+              <span
+                className="inline-block rounded-full"
+                style={{ width: 8, height: 8, backgroundColor: statusCloudApi?.conectado ? '#10B981' : '#EF4444', flexShrink: 0 }}
+              />
+              <span className="text-sm font-semibold" style={{ color: statusCloudApi?.conectado ? '#10B981' : '#EF4444' }}>
+                {statusCloudApi?.conectado ? 'Conectado' : 'Desconectado'}
+              </span>
+            </div>
+          </div>
+
+          <button
+            onClick={handleConectarMeta}
+            disabled={conectandoCloudApi}
+            className="btn-primary text-sm"
+          >
+            {conectandoCloudApi
+              ? 'Conectando…'
+              : (statusCloudApi?.conectado ? 'Reconectar via Meta' : 'Conectar via Meta')}
+          </button>
+        </div>
+
+        {statusCloudApi?.conectado && (
+          <div
+            className="mt-4 flex items-center gap-2 rounded-lg px-3 py-2 text-sm"
+            style={{ backgroundColor: 'rgba(16,185,129,0.08)', color: '#10B981' }}
+          >
+            <CheckIcon />
+            {statusCloudApi.numeroExibicao
+              ? `Conectado como ${statusCloudApi.numeroExibicao}.`
+              : 'WhatsApp conectado via Meta.'}
+            {' '}Mensagens e leads estão sendo recebidos normalmente.
+          </div>
+        )}
+
+        {erroCloudApi && (
+          <div
+            className="mt-4 rounded-lg px-3 py-2 text-sm"
+            style={{ backgroundColor: 'rgba(239,68,68,0.1)', color: '#FCA5A5', border: '1px solid rgba(239,68,68,0.2)' }}
+          >
+            {erroCloudApi}
+          </div>
+        )}
+      </div>
+
+      {/* Card: instruções — Cloud API (Coexistência) */}
+      {!statusCloudApi?.conectado && (
+        <div className="card mb-4">
+          <p className="text-sm font-semibold mb-3" style={{ color: '#F1F5F9' }}>
+            Como conectar
+          </p>
+          <ol className="space-y-2">
+            {[
+              'Clique em "Conectar via Meta" acima.',
+              'Faça login com a conta Meta administradora do WhatsApp Business da imobiliária.',
+              'Escolha "Conectar meu WhatsApp Business existente" e informe o número já usado no app do celular.',
+              'No próprio WhatsApp Business do celular, toque em Connect → Connect to the Business Platform → Confirm, e cole o código de verificação recebido.',
+              'Mantenha o WhatsApp Business aberto no celular até a sincronização terminar.',
+            ].map((step, i) => (
+              <li key={i} className="flex items-start gap-2.5 text-sm" style={{ color: '#94A3B8' }}>
+                <span
+                  className="flex-shrink-0 rounded-full flex items-center justify-center text-xs font-bold"
+                  style={{ width: 20, height: 20, backgroundColor: 'rgba(99,102,241,0.2)', color: '#818cf8' }}
+                >
+                  {i + 1}
+                </span>
+                {step}
+              </li>
+            ))}
+          </ol>
+          <p className="text-xs mt-4" style={{ color: '#64748B' }}>
+            O app do celular continua funcionando normalmente — os dois ficam sincronizados.
+          </p>
+        </div>
+      )}
+      </>
       )}
 
       {/* Card: mensagem de boas-vindas */}
@@ -449,8 +688,8 @@ export default function ConectarWhatsApp() {
         </div>
       )}
 
-      {/* Card: instruções quando desconectado */}
-      {status === 'desconectado' && (
+      {/* Card: instruções quando desconectado (Baileys) */}
+      {canal === 'baileys' && status === 'desconectado' && (
         <div className="card">
           <p className="text-sm font-semibold mb-3" style={{ color: '#F1F5F9' }}>
             Como conectar
@@ -476,8 +715,8 @@ export default function ConectarWhatsApp() {
         </div>
       )}
 
-      {/* Erro */}
-      {erro && (
+      {/* Erro (Baileys) */}
+      {canal === 'baileys' && erro && (
         <div
           className="mt-4 rounded-lg px-4 py-3 text-sm"
           style={{ backgroundColor: 'rgba(239,68,68,0.1)', color: '#FCA5A5', border: '1px solid rgba(239,68,68,0.2)' }}

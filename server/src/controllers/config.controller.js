@@ -102,12 +102,14 @@ async function getConfigAgente(req, res) {
 
 const REGEX_HORARIO = /^([01]\d|2[0-3]):[0-5]\d$/; // "HH:MM", 00:00–23:59
 const VELOCIDADES_RESPOSTA_VALIDAS = ['rapido', 'natural', 'pausado'];
+const CANAIS_WHATSAPP_VALIDOS = ['baileys', 'cloud_api'];
 
 async function atualizarConfigAgente(req, res) {
   try {
     const {
       mensagemBoasVindas, perguntas, nomeAgente, tomAgente, instrucoesPersonalizadas, velocidadeResposta, ativo, atenderNumeroDesconhecido,
       horarioAtendimentoInicio, horarioAtendimentoFim, qualificacaoAutomatica, timeoutQualificacaoMinutos, limiteMensagensTriagem,
+      canalWhatsapp, fraseOrigemAnuncio,
     } = req.body;
 
     if (perguntas !== undefined) {
@@ -164,6 +166,17 @@ async function atualizarConfigAgente(req, res) {
       return res.status(400).json({ error: 'horarioAtendimentoFim deve estar no formato HH:MM' });
     }
 
+    if (canalWhatsapp !== undefined && !CANAIS_WHATSAPP_VALIDOS.includes(canalWhatsapp)) {
+      return res.status(400).json({ error: `canalWhatsapp deve ser um de: ${CANAIS_WHATSAPP_VALIDOS.join(', ')}` });
+    }
+
+    if (
+      fraseOrigemAnuncio !== undefined && fraseOrigemAnuncio !== null
+      && typeof fraseOrigemAnuncio !== 'string'
+    ) {
+      return res.status(400).json({ error: 'fraseOrigemAnuncio deve ser texto' });
+    }
+
     const config = await prisma.configAgente.upsert({
       where: { imobiliariaId: req.imobiliariaId },
       update: {
@@ -182,6 +195,8 @@ async function atualizarConfigAgente(req, res) {
         ...(qualificacaoAutomatica !== undefined && { qualificacaoAutomatica }),
         ...(timeoutQualificacaoMinutos !== undefined && { timeoutQualificacaoMinutos }),
         ...(limiteMensagensTriagem !== undefined && { limiteMensagensTriagem }),
+        ...(canalWhatsapp !== undefined && { canalWhatsapp }),
+        ...(fraseOrigemAnuncio !== undefined && { fraseOrigemAnuncio: fraseOrigemAnuncio?.trim() || null }),
       },
       create: {
         imobiliariaId: req.imobiliariaId,
@@ -198,6 +213,8 @@ async function atualizarConfigAgente(req, res) {
         qualificacaoAutomatica: qualificacaoAutomatica !== undefined ? qualificacaoAutomatica : false,
         timeoutQualificacaoMinutos: timeoutQualificacaoMinutos !== undefined ? timeoutQualificacaoMinutos : 180,
         limiteMensagensTriagem: limiteMensagensTriagem !== undefined ? limiteMensagensTriagem : 8,
+        canalWhatsapp: canalWhatsapp || 'baileys',
+        fraseOrigemAnuncio: fraseOrigemAnuncio?.trim() || null,
       },
     });
 

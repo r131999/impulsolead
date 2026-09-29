@@ -123,4 +123,4 @@ async function marcarLidoComDigitando(msgId, { phoneNumberId, accessToken }) {
   }
 }
 
-module.exports = { enviarTemplate, enviarTextoLivre, marcarLidoComDigitando };
+module.exports = { enviarTemplate, enviarTextoLivre, marcarLidoComDigitando, CLOUD_API_VERSION };
