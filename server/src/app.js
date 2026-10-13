@@ -53,10 +53,11 @@ app.use(cors({
 // verify captura o corpo bruto em req.rawBody — necessário pra validar a
 // assinatura X-Hub-Signature-256 dos webhooks da Meta (verificarAssinaturaMeta),
 // que precisa do payload exato, não do JSON já reserializado.
-app.use(express.json({
-  limit: '1mb',
-  verify: (req, res, buf) => { req.rawBody = buf; },
-}));
+const capturarRawBody = (req, res, buf) => { req.rawBody = buf; };
+// Webhook da Cloud API recebe lotes grandes (ex: history da Coexistência) — 10mb só
+// nessa rota. Registrado antes do parser global, que pula corpo já parseado.
+app.use('/api/webhook/whatsapp', express.json({ limit: '10mb', verify: capturarRawBody }));
+app.use(express.json({ limit: '1mb', verify: capturarRawBody }));
 
 const UPLOAD_DIR_IMOVEIS = process.env.UPLOAD_DIR_IMOVEIS || '/opt/uploads/imoveis';
 app.use('/uploads/imoveis', express.static(UPLOAD_DIR_IMOVEIS));
@@ -124,6 +125,10 @@ app.use((req, res) => {
 });
 
 app.use((err, req, res, next) => {
+  if (err.status === 413 || err.type === 'entity.too.large') {
+    console.warn(`[app] payload acima do limite em ${req.method} ${req.originalUrl} (${err.length ?? '?'} bytes, limite ${err.limit ?? '?'})`);
+    return res.status(413).json({ error: 'Payload muito grande' });
+  }
   console.error(err.stack);
   res.status(500).json({ error: 'Erro interno do servidor' });
 });
