@@ -128,6 +128,7 @@ model Lead {
   adId         String?
   adsetId      String?
   campaignId   String?
+  ctwaClid     String? // referral.ctwa_clid do Click-to-WhatsApp — id do clique, pra reportar conversão à Meta
   formId       String?
   leadgenId    String? @unique
   email        String?

@@ -19,6 +19,7 @@ const { receberLeadCore, buscarTelefonesBloqueados, buscarLeadAtivoCore, buscarC
 const { salvarMensagemRecebidaCore } = require('./chat-lead.controller');
 const { enviarTextoLivre, marcarLidoComDigitando } = require('../services/whatsappCloudApi.service');
 const { emitirMensagem } = require('../services/socketio.service');
+const { registrarReferral, aplicarAtribuicaoCtwa, registrarRetornoPorAnuncio } = require('../services/ctwaAtribuicao.service');
 
 // ── Estado em memória (melhor esforço — não sobrevive a restart/múltiplas instâncias,
 // mesma limitação que o manager.js já tem hoje como processo único) ────────────
@@ -140,6 +141,8 @@ async function criarLeadEEnviarMsgInicial({ imobiliariaId, phone, jid, text, msg
   }
 
   const leadId = resultado.body?.lead?.id;
+  if (leadId) await aplicarAtribuicaoCtwa(leadId, imobiliariaId, phone); // nunca lança — ver ctwaAtribuicao.service.js
+
   // historicoBackfilled === true: a mensagem já entrou no chat via o histórico de
   // triagem gravado retroativamente — logar de novo aqui duplicaria a mensagem.
   if (leadId && text && !resultado.body?.historicoBackfilled) {
@@ -172,6 +175,8 @@ async function processarMensagem({ imobiliariaId, phoneNumberId, accessToken }, 
   const leadAtivo = await buscarLeadAtivoCore({ imobiliariaId, telefone: phone, jid });
 
   if (leadAtivo.existe && leadAtivo.leadId) {
+    if (msg.referral) await registrarRetornoPorAnuncio(leadAtivo.leadId, msg); // só histórico; nunca lança
+
     if (leadAtivo.emQualificacaoAutomatica) {
       const resultado = await processarQualificacaoCore({
         telefone: phone, mensagem: text, instancia: imobiliariaId, pushName: nome, whatsappMsgId: msgId, imobiliariaId,
@@ -191,6 +196,10 @@ async function processarMensagem({ imobiliariaId, phoneNumberId, accessToken }, 
   }
 
   // ── CAMINHO 2/3: número desconhecido ────────────────────────────────────────
+  // Referral do anúncio CTWA (só na 1ª mensagem) fica guardado até o lead nascer —
+  // aqui ou depois da triagem. Nunca lança.
+  registrarReferral(imobiliariaId, phone, msg);
+
   const configAtendimento = await buscarConfigAtendimento(imobiliariaId);
 
   if (!dentroDoHorarioAtendimento(configAtendimento)) return;
