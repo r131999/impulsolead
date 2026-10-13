@@ -472,6 +472,12 @@ model WhatsappCloudApiInstancia {
   accessToken       String
   numeroExibicao    String?
   ativo             Boolean     @default(true)
+  // Coexistência: sync de contatos/histórico só pode rodar 1x cada, em até 24h do onboarding
+  coexistenciaOnboardingEm DateTime?
+  syncContatosRequestId    String?
+  syncContatosEm           DateTime?
+  syncHistoricoRequestId   String?
+  syncHistoricoEm          DateTime?
   criadoEm          DateTime    @default(now())
   atualizadoEm      DateTime    @updatedAt
 }

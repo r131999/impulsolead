@@ -64,7 +64,13 @@ export default function ConectarWhatsApp() {
   const [statusCloudApi, setStatusCloudApi]         = useState(null)
   const [conectandoCloudApi, setConectandoCloudApi] = useState(false)
   const [erroCloudApi, setErroCloudApi]             = useState(null)
-  const codeRef = useRef(null) // code de 30s do FB.login, lido quando o postMessage FINISH chega
+  // O code (callback do FB.login, vale 30s) e o waba_id/phone_number_id (postMessage
+  // WA_EMBEDDED_SIGNUP) chegam por canais separados e em ORDEM NÃO GARANTIDA — quem
+  // chegar por último dispara a finalização.
+  const codeRef = useRef(null)
+  const signupRef = useRef(null)
+  const enviandoRef = useRef(false)
+  const esperaRef = useRef(null)
 
   // ── Alertas de lead sem atendimento ───────────────────────────────────────
   const [alerta, setAlerta]               = useState(ALERTA_PADRAO)
@@ -101,24 +107,64 @@ export default function ConectarWhatsApp() {
 
       let data
       try {
-        data = JSON.parse(event.data)
+        data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data
       } catch {
         return // mensagem de outra origem/formato — ignora
       }
       if (data?.type !== 'WA_EMBEDDED_SIGNUP') return
+      console.info('[embedded-signup] evento', data.event, data.data)
 
       if (data.event === 'FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING') {
-        finalizarConexaoMeta(data.data)
+        signupRef.current = data.data || {}
+        tentarFinalizar()
       } else if (data.event === 'CANCEL') {
+        limparSignup()
         setConectandoCloudApi(false)
+        if (data.data?.error_message) {
+          setErroCloudApi(`A Meta retornou um erro: ${data.data.error_message}`)
+        }
       } else if (data.event === 'ERROR') {
+        limparSignup()
         setConectandoCloudApi(false)
         setErroCloudApi('A Meta retornou um erro durante a conexão. Tente novamente.')
+      } else if (data.event?.startsWith('FINISH')) {
+        // FINISH / FINISH_ONLY_WABA etc. = número novo, não Coexistência — exigiria /register
+        limparSignup()
+        setConectandoCloudApi(false)
+        setErroCloudApi('Escolha "Conectar meu WhatsApp Business existente" no fluxo da Meta.')
       }
     }
     window.addEventListener('message', onMessage)
     return () => window.removeEventListener('message', onMessage)
   }, [])
+
+  function limparSignup() {
+    codeRef.current = null
+    signupRef.current = null
+    clearTimeout(esperaRef.current)
+  }
+
+  // Chamado quando chega o code OU o evento FINISH; só segue com os dois em mãos.
+  function tentarFinalizar() {
+    if (enviandoRef.current) return
+    const code = codeRef.current
+    const signup = signupRef.current
+    if (!code || !signup) {
+      // Tem uma das metades — se a outra não vier a tempo (code vale 30s), avisa.
+      clearTimeout(esperaRef.current)
+      esperaRef.current = setTimeout(() => {
+        if (enviandoRef.current) return
+        console.warn('[embedded-signup] timeout', { temCode: !!codeRef.current, temSignup: !!signupRef.current })
+        limparSignup()
+        setErroCloudApi('Conexão incompleta — a Meta não retornou todos os dados. Tente novamente.')
+        setConectandoCloudApi(false)
+      }, 20000)
+      return
+    }
+    clearTimeout(esperaRef.current)
+    enviandoRef.current = true
+    finalizarConexaoMeta(code, signup)
+  }
 
   // ── Cloud API: abre o popup da Meta ───────────────────────────────────────
   async function handleConectarMeta() {
@@ -127,14 +173,19 @@ export default function ConectarWhatsApp() {
       setErroCloudApi('Conexão via Meta ainda não configurada — fale com o suporte.')
       return
     }
+    limparSignup()
+    enviandoRef.current = false
     setConectandoCloudApi(true)
     try {
       await carregarSdkMeta(statusCloudApi.appId)
       window.FB.login((response) => {
         if (response.authResponse?.code) {
           codeRef.current = response.authResponse.code
+          tentarFinalizar()
         } else {
           // popup fechado sem autorizar — não é erro, só cancelamento silencioso
+          console.info('[embedded-signup] FB.login sem code', response?.status)
+          limparSignup()
           setConectandoCloudApi(false)
         }
       }, {
@@ -150,10 +201,13 @@ export default function ConectarWhatsApp() {
   }
 
   // ── Cloud API: troca code + waba/phone number id pela conexão de fato ────────
-  async function finalizarConexaoMeta(dadosSignup) {
-    const code = codeRef.current
-    if (!code || !dadosSignup?.waba_id || !dadosSignup?.phone_number_id) {
+  // phone_number_id pode não vir no evento da Coexistência — o backend resolve pela WABA.
+  async function finalizarConexaoMeta(code, dadosSignup) {
+    if (!dadosSignup?.waba_id) {
+      console.warn('[embedded-signup] FINISH sem waba_id', dadosSignup)
       setErroCloudApi('Conexão incompleta — tente novamente.')
+      limparSignup()
+      enviandoRef.current = false
       setConectandoCloudApi(false)
       return
     }
@@ -170,7 +224,8 @@ export default function ConectarWhatsApp() {
     } catch (e) {
       setErroCloudApi(e.response?.data?.error || 'Erro ao concluir a conexão.')
     } finally {
-      codeRef.current = null
+      limparSignup()
+      enviandoRef.current = false
       setConectandoCloudApi(false)
     }
   }
