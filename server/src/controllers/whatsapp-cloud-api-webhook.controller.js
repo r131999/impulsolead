@@ -347,9 +347,15 @@ async function encerrarQualificacaoPorHumano(imobiliariaId, leadId, emQualificac
       status: 'em_andamento',
       respostas: { path: ['leadId'], equals: leadId },
     },
-    select: { id: true },
+    select: { id: true, respostas: true },
   });
   if (!sessao && !emQualificacaoAutomatica) return;
+
+  // Mesma lógica de finalizarQualificacao: as chaves de "coletado" (pergunta como a
+  // IA de fato formulou) são a fonte da verdade, não o array `perguntas` da config.
+  const respostasFormulario = Object.entries(sessao?.respostas?.coletado || {})
+    .filter(([, resposta]) => resposta)
+    .map(([pergunta, resposta]) => ({ pergunta, resposta }));
 
   const encerrou = await prisma.$transaction(async (tx) => {
     if (sessao) {
@@ -357,7 +363,10 @@ async function encerrarQualificacaoPorHumano(imobiliariaId, leadId, emQualificac
     }
     const guard = await tx.lead.updateMany({
       where: { id: leadId, emQualificacaoAutomatica: true },
-      data: { emQualificacaoAutomatica: false },
+      data: {
+        emQualificacaoAutomatica: false,
+        ...(respostasFormulario.length && { respostasFormulario }),
+      },
     });
     if (guard.count === 0) return false;
     await tx.historicoLead.create({
