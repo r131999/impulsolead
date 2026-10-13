@@ -18,6 +18,7 @@ const { processarTriagemCore, processarQualificacaoCore } = require('./agente.co
 const { receberLeadCore, buscarTelefonesBloqueados, buscarLeadAtivoCore, buscarConfigAtendimento } = require('./webhook.controller');
 const { salvarMensagemRecebidaCore } = require('./chat-lead.controller');
 const { enviarTextoLivre, marcarLidoComDigitando } = require('../services/whatsappCloudApi.service');
+const { emitirMensagem } = require('../services/socketio.service');
 
 // ── Estado em memória (melhor esforço — não sobrevive a restart/múltiplas instâncias,
 // mesma limitação que o manager.js já tem hoje como processo único) ────────────
@@ -241,6 +242,139 @@ async function processarMensagem({ imobiliariaId, phoneNumberId, accessToken }, 
   }
 }
 
+// ── Echo de mensagem enviada pelo app do celular (Coexistência) ─────────────────
+// smb_message_echoes = o que a própria empresa mandou pelo WhatsApp Business do
+// celular. É SAÍDA: nunca vai pro agente de IA (alimentar a Lia com mensagem da
+// própria empresa causaria laço) — só entra no chat do lead e, se a Lia ainda
+// estava qualificando, encerra a qualificação: um humano assumiu a conversa.
+
+const ECHO_REMETENTE_TIPO = 'corretor_celular';
+const ECHO_JANELA_ENVIO_CRM_MS = 2 * 60 * 1000;
+
+const ECHO_ROTULO_MIDIA = {
+  image: '📷 Imagem enviada pelo celular',
+  video: '🎥 Vídeo enviado pelo celular',
+  document: '📄 Documento enviado pelo celular',
+};
+
+// Mídia não é baixada (exigiria a Media API) — entra como texto com rótulo + legenda,
+// pra não renderizar bolha de mídia quebrada sem urlMidia.
+function extrairTextoEcho(echo) {
+  if (echo.type === 'text') return echo.text?.body?.trim() || '';
+  const rotulo = ECHO_ROTULO_MIDIA[echo.type];
+  if (!rotulo) return '';
+  const legenda = echo[echo.type]?.caption?.trim();
+  return `${rotulo}${legenda ? `: ${legenda}` : ''}`;
+}
+
+async function processarEcho({ imobiliariaId }, echo) {
+  const msgId = echo.id;
+  if (!msgId || seenMsgIds.has(msgId)) return;
+  seenMsgIds.set(msgId, Date.now());
+
+  if (echo.type === 'revoke' || echo.type === 'edit') return; // apagar/editar no celular — sem suporte por ora
+
+  const conteudo = extrairTextoEcho(echo);
+  if (!conteudo) return;
+
+  const phone = normalizarTelefone(String(echo.to || '').replace(/\D/g, ''));
+  if (!phone) return;
+
+  const leadAtivo = await buscarLeadAtivoCore({ imobiliariaId, telefone: phone, jid: `${phone}@s.whatsapp.net` });
+  if (!leadAtivo.existe || !leadAtivo.leadId) return; // conversa sem lead no CRM — ignora
+  const leadId = leadAtivo.leadId;
+
+  // Dedup por wamid (retry da Meta / echo já gravado)
+  const jaGravada = await prisma.mensagemLead.findFirst({ where: { whatsappMsgId: msgId }, select: { id: true } });
+  if (jaGravada) return;
+
+  // Mensagens que o CRM manda (Lia, chat do corretor) são gravadas SEM wamid. Se uma
+  // delas voltar como echo, casa pelo conteúdo recente e só preenche o wamid — sem
+  // duplicar e, principalmente, sem tratar como humano assumindo a conversa.
+  // (Pela doc da Meta, envio via API não gera echo; isto é só a rede de proteção.)
+  const enviadaPeloCrm = await prisma.mensagemLead.findFirst({
+    where: {
+      leadId,
+      whatsappMsgId: null,
+      remetenteTipo: { not: 'lead' },
+      conteudo,
+      criadoEm: { gte: new Date(Date.now() - ECHO_JANELA_ENVIO_CRM_MS) },
+    },
+    select: { id: true },
+    orderBy: { criadoEm: 'desc' },
+  });
+  if (enviadaPeloCrm) {
+    await prisma.mensagemLead.update({ where: { id: enviadaPeloCrm.id }, data: { whatsappMsgId: msgId } });
+    console.log(`[whatsapp-cloud-api] echo de mensagem do próprio CRM — lead=${leadId}, só vinculado o wamid`);
+    return;
+  }
+
+  const lead = await prisma.lead.findUnique({
+    where: { id: leadId },
+    select: { corretor: { select: { nome: true } } },
+  });
+
+  const mensagem = await prisma.mensagemLead.create({
+    data: {
+      leadId,
+      remetenteTipo: ECHO_REMETENTE_TIPO,
+      // Número é compartilhado pela empresa: não dá pra saber quem estava com o
+      // celular — usa o corretor do lead como melhor palpite, sem remetenteId.
+      remetenteNome: lead?.corretor?.nome ? `${lead.corretor.nome} (celular)` : 'Corretor (celular)',
+      conteudo,
+      tipoMidia: 'texto',
+      whatsappMsgId: msgId,
+      lida: true,
+      imobiliariaId,
+    },
+  });
+  emitirMensagem(leadId, mensagem);
+  console.log(`[whatsapp-cloud-api] echo gravado — lead=${leadId} tipo=${echo.type}`);
+
+  await encerrarQualificacaoPorHumano(imobiliariaId, leadId, leadAtivo.emQualificacaoAutomatica);
+}
+
+// Encerramento simples, de propósito SEM finalizarQualificacao: quem respondeu pelo
+// celular já está atendendo — não distribui, não sorteia corretor, não notifica.
+// O updateMany com where emQualificacaoAutomatica:true é a mesma trava atômica de
+// finalizarQualificacao: se colidir com o fim natural da Lia ou o timeout do cron,
+// só um dos caminhos registra.
+async function encerrarQualificacaoPorHumano(imobiliariaId, leadId, emQualificacaoAutomatica) {
+  const sessao = await prisma.sessaoAgente.findFirst({
+    where: {
+      imobiliariaId,
+      tipo: 'qualificacao_ia',
+      status: 'em_andamento',
+      respostas: { path: ['leadId'], equals: leadId },
+    },
+    select: { id: true },
+  });
+  if (!sessao && !emQualificacaoAutomatica) return;
+
+  const encerrou = await prisma.$transaction(async (tx) => {
+    if (sessao) {
+      await tx.sessaoAgente.update({ where: { id: sessao.id }, data: { status: 'finalizado' } });
+    }
+    const guard = await tx.lead.updateMany({
+      where: { id: leadId, emQualificacaoAutomatica: true },
+      data: { emQualificacaoAutomatica: false },
+    });
+    if (guard.count === 0) return false;
+    await tx.historicoLead.create({
+      data: {
+        leadId,
+        acao: 'Qualificação automática encerrada — um humano assumiu a conversa pelo WhatsApp do celular',
+      },
+    });
+    return true;
+  });
+
+  console.log(
+    `[whatsapp-cloud-api] humano assumiu pelo celular — lead=${leadId} sessao=${sessao?.id || '-'} `
+    + (encerrou ? 'qualificação encerrada' : 'lead já não estava em qualificação'),
+  );
+}
+
 // Encadeia o processamento por imobiliária — evita que duas mensagens do mesmo
 // lead, chegando próximas no tempo, rodem processarMensagem em paralelo e corram
 // na criação de sessão/lead (mesma razão da filaProcessamento em manager.js).
@@ -264,6 +398,17 @@ async function receberWebhookMensagens(req, res) {
     for (const entry of entradas) {
       for (const change of entry.changes || []) {
         const value = change.value || {};
+
+        // Echoes (smb_message_echoes) — saída pelo celular, nunca passa pelo agente
+        if (Array.isArray(value.message_echoes) && value.message_echoes.length > 0) {
+          const instanciaEcho = await resolverInstanciaCloudApi(value.metadata?.phone_number_id || '');
+          if (!instanciaEcho || !instanciaEcho.ativo) continue;
+          for (const echo of value.message_echoes) {
+            enfileirar(instanciaEcho.imobiliariaId, () => processarEcho(instanciaEcho, echo));
+          }
+          continue;
+        }
+
         if (!Array.isArray(value.messages) || value.messages.length === 0) continue;
 
         const phoneNumberId = value.metadata?.phone_number_id;
