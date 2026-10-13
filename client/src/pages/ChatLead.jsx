@@ -313,8 +313,8 @@ export default function ChatLead({ lead, onClose }) {
       await chatLeadApi.enviarMensagem(lead.id, { conteudo: texto.trim() })
       setTexto('')
       setSugestoes(null)
-    } catch {
-      setErro('Erro ao enviar mensagem')
+    } catch (e) {
+      setErro(e.response?.data?.error || 'Erro ao enviar mensagem')
     } finally {
       setEnviando(false)
       inputRef.current?.focus()
@@ -358,10 +358,11 @@ export default function ChatLead({ lead, onClose }) {
   const enviarArquivoSelecionado = async (arquivo) => {
     setModalArquivos(false)
     setEnviando(true)
+    setErro('')
     try {
       await chatLeadApi.enviarArquivo(lead.id, { arquivoImovelId: arquivo.id })
-    } catch {
-      setErro('Erro ao enviar arquivo')
+    } catch (e) {
+      setErro(e.response?.data?.error || 'Erro ao enviar arquivo')
     } finally {
       setEnviando(false)
     }

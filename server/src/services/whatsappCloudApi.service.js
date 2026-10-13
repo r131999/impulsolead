@@ -80,11 +80,47 @@ async function enviarTextoLivre(telefone, texto, { phoneNumberId, accessToken })
       body: JSON.stringify(body),
     });
     const json = await resp.json();
-    if (!resp.ok) throw new Error(json?.error?.message || `HTTP ${resp.status}`);
+    if (!resp.ok) throw erroMeta(json, resp.status);
     return { enviado: true, whatsappMsgId: json.messages?.[0]?.id };
   } catch (err) {
     console.error(`[whatsappCloudApi] Falha ao enviar texto livre para ${telefone}:`, err.message);
-    return { enviado: false, motivo: err.message };
+    return { enviado: false, motivo: err.message, codigo: err.codigo ?? null };
+  }
+}
+
+// Erro da Graph API com o código numérico preservado (ex: 131047 = fora da janela
+// de 24h) — quem chama decide a mensagem pro usuário a partir dele.
+function erroMeta(json, status) {
+  const err = new Error(json?.error?.message || `HTTP ${status}`);
+  err.codigo = json?.error?.code ?? null;
+  return err;
+}
+
+const TIPO_MIDIA_CLOUD_API = { imagem: 'image', video: 'video', pdf: 'document' };
+
+// Mídia por link público (a Meta baixa a URL) — mesma regra de janela de 24h do texto livre.
+async function enviarMidiaLink(telefone, { tipoMidia, url, caption, filename }, { phoneNumberId, accessToken }) {
+  const numero = formatarNumero(telefone);
+  const tipo = TIPO_MIDIA_CLOUD_API[tipoMidia] || 'document';
+  const midia = { link: url };
+  if (caption) midia.caption = caption;
+  if (tipo === 'document' && filename) midia.filename = filename;
+
+  try {
+    const resp = await fetch(`https://graph.facebook.com/${CLOUD_API_VERSION}/${phoneNumberId}/messages`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ messaging_product: 'whatsapp', to: numero, type: tipo, [tipo]: midia }),
+    });
+    const json = await resp.json();
+    if (!resp.ok) throw erroMeta(json, resp.status);
+    return { enviado: true, whatsappMsgId: json.messages?.[0]?.id };
+  } catch (err) {
+    console.error(`[whatsappCloudApi] Falha ao enviar mídia (${tipo}) para ${telefone}:`, err.message);
+    return { enviado: false, motivo: err.message, codigo: err.codigo ?? null };
   }
 }
 
@@ -123,4 +159,4 @@ async function marcarLidoComDigitando(msgId, { phoneNumberId, accessToken }) {
   }
 }
 
-module.exports = { enviarTemplate, enviarTextoLivre, marcarLidoComDigitando, CLOUD_API_VERSION };
+module.exports = { enviarTemplate, enviarTextoLivre, enviarMidiaLink, marcarLidoComDigitando, CLOUD_API_VERSION };

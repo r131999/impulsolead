@@ -4,8 +4,59 @@ const axios = require('axios');
 const { emitirMensagem } = require('../services/socketio.service');
 
 const prisma = require('../lib/prisma');
+const { enviarTextoLivre, enviarMidiaLink } = require('../services/whatsappCloudApi.service');
 
 const BAILEYS_URL = process.env.BAILEYS_URL || 'http://impulsolead-whatsapp:3010';
+
+// ── Canal Cloud API ────────────────────────────────────────────────────────────
+// Imobiliária com ConfigAgente.canalWhatsapp = 'cloud_api' envia pela Cloud API
+// (credenciais da WhatsappCloudApiInstancia dela); qualquer outro valor segue no
+// Baileys exatamente como antes. Diferente do Baileys (fire-and-forget), aqui o
+// envio é aguardado: a mensagem só é gravada depois que a Meta aceita, já com o
+// wamid — que também deduplica o echo, se ele voltar.
+
+const ERRO_JANELA_24H = 131047;
+const MSG_JANELA_24H = 'A janela de 24 horas para responder este lead expirou (a última mensagem dele foi há mais de 24h). '
+  + 'Pelo WhatsApp oficial, só é possível reabrir a conversa com um template aprovado pela Meta.';
+
+// null = Baileys (comportamento atual); objeto = Cloud API
+async function resolverCanalCloudApi(imobiliariaId) {
+  const config = await prisma.configAgente.findUnique({
+    where: { imobiliariaId },
+    select: { canalWhatsapp: true },
+  });
+  if (config?.canalWhatsapp !== 'cloud_api') return null;
+
+  const instancia = await prisma.whatsappCloudApiInstancia.findUnique({
+    where: { imobiliariaId },
+    select: { phoneNumberId: true, accessToken: true, ativo: true },
+  });
+  return { instancia: instancia?.ativo ? instancia : null };
+}
+
+function telefoneCloudApi(lead) {
+  const jid = lead.whatsappJid || '';
+  return String(lead.telefone || (jid.endsWith('@s.whatsapp.net') ? jid.split('@')[0] : '')).replace(/\D/g, '');
+}
+
+// Traduz a falha da Meta numa resposta HTTP com mensagem clara pra interface
+function respostaFalhaCloudApi(res, resultado, leadId) {
+  if (resultado.codigo === ERRO_JANELA_24H) {
+    console.warn(`[chat-lead] Cloud API: janela de 24h expirada — lead=${leadId}`);
+    return res.status(422).json({ error: MSG_JANELA_24H, codigo: 'janela_24h_expirada' });
+  }
+  console.error(`[chat-lead] Cloud API: envio falhou — lead=${leadId} codigo=${resultado.codigo} motivo=${resultado.motivo}`);
+  return res.status(502).json({ error: `O WhatsApp recusou o envio: ${resultado.motivo}` });
+}
+
+// Nome que o lead vê no documento: o nome amigável do arquivo, com a extensão real
+function nomeArquivoDocumento(arquivo) {
+  const ext = (arquivo.filename.match(/\.[a-z0-9]+$/i) || [''])[0];
+  if (!arquivo.nome) return arquivo.filename;
+  return arquivo.nome.toLowerCase().endsWith(ext.toLowerCase()) ? arquivo.nome : `${arquivo.nome}${ext}`;
+}
+
+const MSG_SEM_INSTANCIA = 'WhatsApp Cloud API não está conectado para esta imobiliária. Conecte em WhatsApp → Cloud API.';
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -75,6 +126,30 @@ async function enviarMensagem(req, res) {
     const remetenteNome = req.usuario?.nome || 'Corretor';
     const remetenteId = req.corretorId || req.usuario?.id || null;
 
+    const canalCloudApi = await resolverCanalCloudApi(lead.imobiliariaId);
+    if (canalCloudApi) {
+      if (!canalCloudApi.instancia) return res.status(409).json({ error: MSG_SEM_INSTANCIA });
+
+      const resultado = await enviarTextoLivre(telefoneCloudApi(lead), conteudo.trim(), canalCloudApi.instancia);
+      if (!resultado.enviado) return respostaFalhaCloudApi(res, resultado, leadId);
+
+      const mensagem = await prisma.mensagemLead.create({
+        data: {
+          leadId,
+          remetenteTipo: 'corretor',
+          remetenteNome,
+          remetenteId,
+          conteudo: conteudo.trim(),
+          tipoMidia: 'texto',
+          whatsappMsgId: resultado.whatsappMsgId || null,
+          lida: true,
+          imobiliariaId: req.imobiliariaId,
+        },
+      });
+      emitirMensagem(leadId, mensagem);
+      return res.status(201).json({ mensagem });
+    }
+
     const mensagem = await prisma.mensagemLead.create({
       data: {
         leadId,
@@ -132,6 +207,41 @@ async function enviarArquivo(req, res) {
 
     const remetenteNome = req.usuario?.nome || 'Corretor';
     const remetenteId = req.corretorId || req.usuario?.id || null;
+
+    const canalCloudApi = await resolverCanalCloudApi(lead.imobiliariaId);
+    if (canalCloudApi) {
+      if (!canalCloudApi.instancia) return res.status(409).json({ error: MSG_SEM_INSTANCIA });
+
+      const resultado = await enviarMidiaLink(
+        telefoneCloudApi(lead),
+        { tipoMidia, url: urlMidia, caption: conteudo?.trim() || '', filename: nomeArquivoDocumento(arquivo) },
+        canalCloudApi.instancia,
+      );
+      if (!resultado.enviado) return respostaFalhaCloudApi(res, resultado, leadId);
+
+      const mensagem = await prisma.mensagemLead.create({
+        data: {
+          leadId,
+          remetenteTipo: 'corretor',
+          remetenteNome,
+          remetenteId,
+          conteudo: conteudo?.trim() || null,
+          tipoMidia,
+          arquivoImovelId,
+          urlMidia,
+          whatsappMsgId: resultado.whatsappMsgId || null,
+          lida: true,
+          imobiliariaId: req.imobiliariaId,
+        },
+        include: {
+          arquivoImovel: {
+            select: { id: true, nome: true, tipo: true, filename: true, mimetype: true },
+          },
+        },
+      });
+      emitirMensagem(leadId, mensagem);
+      return res.status(201).json({ mensagem });
+    }
 
     const mensagem = await prisma.mensagemLead.create({
       data: {
