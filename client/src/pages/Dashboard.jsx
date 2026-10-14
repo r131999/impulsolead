@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom'
 import DesempenhoAnuncios from '../components/DesempenhoAnuncios'
 import { usePermissao } from '../hooks/usePermissao'
 import { useAuth } from '../context/AuthContext'
-import ConsumoAgenteCard from '../components/ConsumoAgenteCard'
+import ConsumoAgenteCard, { FaixaFranquia } from '../components/ConsumoAgenteCard'
 
 const STATUS_BADGE = {
   lead:        'text-[#60A5FA]',
@@ -151,6 +151,8 @@ export default function Dashboard() {
           Abrir Kanban
         </button>
       </div>
+
+      {isGestor && <FaixaFranquia consumo={consumoAgente} />}
 
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 gap-3 md:gap-4 mb-6">
         {metricas.map((m) => (

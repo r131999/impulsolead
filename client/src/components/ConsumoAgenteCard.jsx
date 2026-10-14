@@ -82,6 +82,45 @@ function CardSemTratativa({ consumo }) {
   )
 }
 
+// Faixa de aviso da franquia (gestor/admin). 80%: discreta. 100%: mais visível,
+// deixando claro que nada para — o medidor só conta e avisa, nunca bloqueia.
+export function FaixaFranquia({ consumo }) {
+  if (!consumo?.agenteIA || consumo.franquia == null || consumo.percentual < 80) return null
+
+  const { franquia, percentual, valorLeadExcedente, cicloFim } = consumo
+
+  if (percentual < 100) {
+    return (
+      <p
+        className="text-xs rounded-lg px-3 py-2 mb-4"
+        style={{ backgroundColor: 'rgba(245,158,11,0.08)', color: '#F59E0B' }}
+      >
+        O agente de IA já atendeu {percentual}% da franquia de {franquia} leads deste ciclo (renova em {formatarDia(cicloFim)}).
+      </p>
+    )
+  }
+
+  return (
+    <div
+      className="rounded-xl px-4 py-3 mb-4"
+      style={{ backgroundColor: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.35)' }}
+    >
+      <p className="text-sm font-semibold" style={{ color: '#F87171' }}>
+        Franquia de {franquia} leads do agente de IA atingida neste ciclo
+      </p>
+      <p className="text-xs mt-1" style={{ color: '#FCA5A5' }}>
+        O atendimento continua normalmente. Os leads acima da franquia entram na próxima fatura
+        {valorLeadExcedente != null ? ` a ${formatarMoeda(valorLeadExcedente)} por lead` : ''}.
+        O ciclo renova em {formatarDia(cicloFim)}.
+      </p>
+    </div>
+  )
+}
+
+function formatarMoeda(valor) {
+  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valor)
+}
+
 // cicloFim é o instante do reset (00:00 de Brasília do dia de renovação).
 function formatarDia(iso) {
   return new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', timeZone: 'America/Sao_Paulo' })
