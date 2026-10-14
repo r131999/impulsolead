@@ -446,6 +446,8 @@ model MensagemLead {
 
   imobiliariaId String
   imobiliaria   Imobiliaria @relation(fields: [imobiliariaId], references: [id])
+
+  @@index([imobiliariaId, criadoEm])
 }
 
 model PushSubscription {
