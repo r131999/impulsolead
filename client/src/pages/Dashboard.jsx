@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react'
-import { getDashboard, getFunil } from '../api/dashboard'
+import { getDashboard, getFunil, getConsumoAgente } from '../api/dashboard'
 import { pendentes as followUpsPendentes, atualizar as atualizarFollowUp } from '../api/followups'
 import { useNavigate } from 'react-router-dom'
 import DesempenhoAnuncios from '../components/DesempenhoAnuncios'
 import { usePermissao } from '../hooks/usePermissao'
+import { useAuth } from '../context/AuthContext'
+import ConsumoAgenteCard from '../components/ConsumoAgenteCard'
 
 const STATUS_BADGE = {
   lead:        'text-[#60A5FA]',
@@ -27,6 +29,8 @@ const STATUS_BADGE_BG = {
 
 export default function Dashboard() {
   const podePainelCampanhas = usePermissao('painelCampanhas')
+  const { isGestor } = useAuth()
+  const [consumoAgente, setConsumoAgente] = useState(null)
   const [dados, setDados] = useState(null)
   const [funil, setFunil] = useState(null)
   const [followUps, setFollowUps] = useState([])
@@ -52,6 +56,15 @@ export default function Dashboard() {
       .finally(() => setLoading(false))
     carregarFollowUps()
   }, [])
+
+  // Medidor do agente de IA: só gestor/admin, e fora do Promise.all acima pra
+  // uma falha aqui não derrubar o dashboard.
+  useEffect(() => {
+    if (!isGestor) return
+    getConsumoAgente()
+      .then((res) => setConsumoAgente(res.data))
+      .catch(() => {})
+  }, [isGestor])
 
   useEffect(() => {
     if (!dataInicio && !dataFim) return
@@ -144,6 +157,8 @@ export default function Dashboard() {
           <MetricCard key={m.titulo} {...m} />
         ))}
       </div>
+
+      {isGestor && <ConsumoAgenteCard consumo={consumoAgente} />}
 
       {leadsNaFila > 0 && (
         <div

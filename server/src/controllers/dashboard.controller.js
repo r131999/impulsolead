@@ -1,5 +1,7 @@
 
 const prisma = require('../lib/prisma');
+const { SELECT_CONSUMO, temAgenteIA, calcularConsumo } = require('../services/consumoAgente.service');
+const { JANELA_SEM_TRATATIVA_DIAS, criterioSemTratativa } = require('../services/leadsSemTratativa.service');
 
 // Brasília = UTC-3. Midnight Brasília = 03:00 UTC.
 // All day/month boundaries are calculated in UTC to avoid server timezone dependency.
@@ -329,4 +331,30 @@ async function getFunil(req, res) {
   }
 }
 
-module.exports = { getDashboard, getDashboardCorretor, getDashboardGerente, getFunil };
+// GET /api/dashboard/consumo-agente — só gestor/admin (ver dashboard.routes.js).
+// Com agenteIA: consumo do ciclo. Sem agenteIA: leads sem tratativa nos últimos
+// 30 dias. Rota separada de getDashboard pra uma falha aqui não derrubar o resto.
+async function getConsumoAgente(req, res) {
+  try {
+    const imob = await prisma.imobiliaria.findUnique({
+      where: { id: req.imobiliariaId },
+      select: SELECT_CONSUMO,
+    });
+    if (!imob) return res.status(404).json({ error: 'Imobiliária não encontrada' });
+
+    if (temAgenteIA(imob.permissoes)) {
+      const consumo = await calcularConsumo(imob);
+      return res.json({ agenteIA: true, ...consumo });
+    }
+
+    const leadsSemTratativa = await prisma.lead.count({
+      where: { imobiliariaId: imob.id, ...criterioSemTratativa() },
+    });
+    res.json({ agenteIA: false, leadsSemTratativa, janelaDias: JANELA_SEM_TRATATIVA_DIAS });
+  } catch (err) {
+    console.error('[dashboard] getConsumoAgente:', err.message);
+    res.status(500).json({ error: 'Erro ao calcular consumo do agente' });
+  }
+}
+
+module.exports = { getDashboard, getDashboardCorretor, getDashboardGerente, getFunil, getConsumoAgente };

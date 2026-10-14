@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import * as leadsApi from '../api/leads'
 import * as corretoresApi from '../api/corretores'
 import ContatosImportados from './ContatosImportados'
@@ -39,12 +40,16 @@ function formatarDataBrasilia(iso) {
 
 export default function Leads() {
   const { isGestor, isGerente } = useAuth()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [aba, setAba] = useState('leads')
   const [leads, setLeads] = useState([])
   const [total, setTotal] = useState(0)
   const [corretores, setCorretores] = useState([])
   const [loading, setLoading] = useState(true)
-  const [filtros, setFiltros] = useState({ status: '', temperatura: '', busca: '', page: 1 })
+  const [filtros, setFiltros] = useState({
+    status: '', temperatura: '', busca: '', page: 1,
+    semTratativa: searchParams.get('semTratativa') === '1', // link do card do dashboard
+  })
   const [modal, setModal] = useState(null)
   const [leadSelecionado, setLeadSelecionado] = useState(null)
   const [form, setForm] = useState(FORM_VAZIO)
@@ -64,6 +69,7 @@ export default function Leads() {
     if (filtros.status) params.status = filtros.status
     if (filtros.temperatura) params.temperatura = filtros.temperatura
     if (filtros.busca) params.busca = filtros.busca
+    if (filtros.semTratativa) params.semTratativa = '1'
     leadsApi
       .listar(params)
       .then((res) => {
@@ -95,6 +101,10 @@ export default function Leads() {
 
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
   const setFiltro = (k) => (e) => setFiltros((f) => ({ ...f, [k]: e.target.value, page: 1 }))
+  const limparSemTratativa = () => {
+    setFiltros((f) => ({ ...f, semTratativa: false, page: 1 }))
+    setSearchParams({})
+  }
 
   const abrirCriar = () => { setForm(FORM_VAZIO); setErro(''); setModal('criar') }
   const abrirStatus = (lead) => {
@@ -164,6 +174,7 @@ export default function Leads() {
       if (filtros.status) params.status = filtros.status
       if (filtros.temperatura) params.temperatura = filtros.temperatura
       if (filtros.busca) params.busca = filtros.busca
+      if (filtros.semTratativa) params.semTratativa = '1'
       const res = await leadsApi.exportarCsv(params)
 
       const disposition = res.headers['content-disposition'] || ''
@@ -362,6 +373,17 @@ export default function Leads() {
           ))}
           <option value="nenhuma">Sem temperatura definida</option>
         </select>
+        {filtros.semTratativa && (
+          <button
+            type="button"
+            onClick={limparSemTratativa}
+            className="text-xs font-medium px-3 py-1.5 rounded-lg self-start sm:self-center"
+            style={{ backgroundColor: 'rgba(245,158,11,0.15)', color: '#F59E0B' }}
+            title="Remover filtro"
+          >
+            Sem tratativa (últimos 30 dias) ✕
+          </button>
+        )}
       </div>
 
       {/* Tabela */}

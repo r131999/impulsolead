@@ -3,6 +3,7 @@ const { STATUS_VALIDOS, proximoCorretor } = require('../services/fila.service');
 const { notificarCorretorCloudApi } = require('../services/notificacao.service');
 const { enviarPushCorretor } = require('./push.controller');
 const { enviarEventoQualificacao } = require('../services/metaConversionsApi.service');
+const { criterioSemTratativa } = require('../services/leadsSemTratativa.service');
 
 const prisma = require('../lib/prisma');
 
@@ -16,7 +17,7 @@ const TEMPERATURAS_VALIDAS = ['quente', 'morno', 'frio'];
 const LIMITE_EXPORTACAO_CSV = 2000;
 
 async function montarWhereLeads(req, query) {
-  const { status, corretorId, dataInicio, dataFim, busca, temperatura } = query;
+  const { status, corretorId, dataInicio, dataFim, busca, temperatura, semTratativa } = query;
 
   const where = { imobiliariaId: req.imobiliariaId };
 
@@ -54,6 +55,11 @@ async function montarWhereLeads(req, query) {
       { nome: { contains: busca, ...(isPostgres && { mode: 'insensitive' }) } },
       { telefone: { contains: busca } },
     ];
+  }
+  // Link do card "sem tratativa" do dashboard. Vai em AND pra não colidir com
+  // o OR da busca nem com o filtro de período acima.
+  if (semTratativa === '1') {
+    where.AND = [criterioSemTratativa()];
   }
 
   return where;
