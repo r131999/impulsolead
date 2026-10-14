@@ -41,12 +41,14 @@ function CardConsumo({ consumo }) {
         <p className="text-xs mt-1" style={{ color: '#64748B' }}>Sem franquia definida</p>
       )}
 
-      <p className="text-xs mt-3" style={{ color: '#94A3B8' }}>
-        Projeção para o fim do ciclo: <span style={{ color: '#F1F5F9' }}>{projecaoFimCiclo} leads</span>
-        {temFranquia && projecaoFimCiclo > franquia && (
-          <span style={{ color: '#F59E0B' }}> · acima da franquia</span>
-        )}
-      </p>
+      {projecaoFimCiclo != null && (
+        <p className="text-xs mt-3" style={{ color: '#94A3B8' }}>
+          Projeção para o fim do ciclo: <span style={{ color: '#F1F5F9' }}>{projecaoFimCiclo} leads</span>
+          {temFranquia && projecaoFimCiclo > franquia && (
+            <span style={{ color: '#F59E0B' }}> · acima da franquia</span>
+          )}
+        </p>
+      )}
     </div>
   )
 }

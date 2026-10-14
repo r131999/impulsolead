@@ -81,10 +81,13 @@ async function contarLeadsAtendidosPeloAgente(imobiliariaId, inicio, fim) {
   return total;
 }
 
-// Projeção linear do consumo até o fim do ciclo. Piso de 1 dia decorrido pra
-// não explodir a projeção nas primeiras horas do ciclo.
+// Projeção linear do consumo até o fim do ciclo. Só a partir de 7 dias
+// decorridos — antes disso é ruído e assusta o gestor à toa; devolve null.
+const DIAS_MINIMOS_PROJECAO = 7;
+
 function projetarFimDoCiclo(consumido, inicio, fim, agora) {
-  const decorridos = Math.max(1, (agora - inicio) / MS_DIA);
+  const decorridos = (agora - inicio) / MS_DIA;
+  if (decorridos < DIAS_MINIMOS_PROJECAO) return null;
   const totais = (fim - inicio) / MS_DIA;
   return Math.round((consumido / decorridos) * totais);
 }
