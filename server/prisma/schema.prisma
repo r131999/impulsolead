@@ -19,6 +19,9 @@ model Imobiliaria {
   planoBloqueadoEm      DateTime?
   notificacaoVencimento Boolean   @default(false)
   valorCobrancaPersonalizado Decimal? @db.Decimal(10, 2)
+  franquiaLeadsAgente   Int?      // leads atendidos pelo agente de IA por ciclo; vazio = sem franquia definida
+  valorLeadExcedente    Decimal?  @db.Decimal(10, 2) // valor por lead acima da franquia; vazio = sem valor definido
+  diaCicloFaturamento   Int?      // 1–31, dia em que o ciclo de consumo reseta; vazio = deduzido de planoExpiraEm/criadoEm
   asaasCustomerId       String?   @unique
   asaasSubscriptionId   String?   @unique
   permissoes            Json      @default("{}")

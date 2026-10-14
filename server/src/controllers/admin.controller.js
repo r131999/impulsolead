@@ -256,6 +256,57 @@ async function atualizarValorCobranca(req, res) {
   });
 }
 
+// ── atualizarFranquiaAgente ───────────────────────────────────────────────────
+// Franquia de leads do agente de IA, valor do lead excedente e dia do ciclo de
+// faturamento. Os três são opcionais: null = sem definição. Só os campos
+// presentes no body são alterados.
+
+async function atualizarFranquiaAgente(req, res) {
+  const { id } = req.params;
+  const { franquiaLeadsAgente, valorLeadExcedente, diaCicloFaturamento } = req.body;
+  const data = {};
+
+  if (franquiaLeadsAgente !== undefined) {
+    if (franquiaLeadsAgente !== null && (!Number.isInteger(franquiaLeadsAgente) || franquiaLeadsAgente < 1)) {
+      return res.status(400).json({ error: 'franquiaLeadsAgente deve ser um inteiro >= 1 ou null' });
+    }
+    data.franquiaLeadsAgente = franquiaLeadsAgente;
+  }
+
+  if (valorLeadExcedente !== undefined) {
+    if (
+      valorLeadExcedente !== null &&
+      (typeof valorLeadExcedente !== 'number' || !Number.isFinite(valorLeadExcedente) || valorLeadExcedente < 0)
+    ) {
+      return res.status(400).json({ error: 'valorLeadExcedente deve ser um número >= 0 ou null' });
+    }
+    data.valorLeadExcedente = valorLeadExcedente;
+  }
+
+  if (diaCicloFaturamento !== undefined) {
+    if (
+      diaCicloFaturamento !== null &&
+      (!Number.isInteger(diaCicloFaturamento) || diaCicloFaturamento < 1 || diaCicloFaturamento > 31)
+    ) {
+      return res.status(400).json({ error: 'diaCicloFaturamento deve ser um inteiro entre 1 e 31 ou null' });
+    }
+    data.diaCicloFaturamento = diaCicloFaturamento;
+  }
+
+  const imobiliaria = await prisma.imobiliaria.findUnique({ where: { id }, select: { id: true } });
+  if (!imobiliaria) return res.status(404).json({ error: 'Imobiliária não encontrada' });
+
+  const atualizado = await prisma.imobiliaria.update({
+    where: { id },
+    data,
+    select: { id: true, franquiaLeadsAgente: true, valorLeadExcedente: true, diaCicloFaturamento: true },
+  });
+  res.json({
+    ...atualizado,
+    valorLeadExcedente: atualizado.valorLeadExcedente != null ? Number(atualizado.valorLeadExcedente) : null,
+  });
+}
+
 // ── listarCobrancas ───────────────────────────────────────────────────────────
 
 async function listarCobrancas(req, res) {
@@ -447,6 +498,7 @@ module.exports = {
   atualizarLimiteAcessos,
   atualizarAdAccount,
   atualizarValorCobranca,
+  atualizarFranquiaAgente,
   listarCobrancas,
   getPlanoCliente,
   criarCliente,
