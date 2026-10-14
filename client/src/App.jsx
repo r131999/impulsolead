@@ -22,6 +22,7 @@ import Imoveis from './pages/Imoveis'
 import AdminLogin from './pages/admin/AdminLogin'
 import AdminDashboard from './pages/admin/AdminDashboard'
 import AdminCobrancas from './pages/admin/AdminCobrancas'
+import AdminConsumoAgente from './pages/admin/AdminConsumoAgente'
 import ArquivosImovel from './pages/ArquivosImovel'
 import MateriaisCorretor from './pages/MateriaisCorretor'
 import Apresentacoes from './pages/Apresentacoes'
@@ -116,6 +117,14 @@ export default function App() {
               element={
                 <AdminProtectedRoute>
                   <AdminCobrancas />
+                </AdminProtectedRoute>
+              }
+            />
+            <Route
+              path="consumo-agente"
+              element={
+                <AdminProtectedRoute>
+                  <AdminConsumoAgente />
                 </AdminProtectedRoute>
               }
             />

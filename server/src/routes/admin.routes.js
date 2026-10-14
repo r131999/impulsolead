@@ -1,7 +1,7 @@
 const { Router } = require('express');
 const {
   listarClientes, atualizarPlano, atualizarPermissoes, atualizarLimiteAcessos,
-  atualizarAdAccount, atualizarValorCobranca, atualizarFranquiaAgente, listarCobrancas,
+  atualizarAdAccount, atualizarValorCobranca, atualizarFranquiaAgente, relatorioConsumoAgente, listarCobrancas,
   getPlanoCliente, criarCliente, getStats,
 } = require('../controllers/admin.controller');
 const { authMiddleware, requireRole } = require('../middleware/auth.middleware');
@@ -26,6 +26,7 @@ router.patch('/clientes/:id/valor-cobranca', atualizarValorCobranca);
 router.patch('/clientes/:id/franquia-agente', atualizarFranquiaAgente);
 router.get('/clientes/:id/plano', getPlanoCliente);
 router.get('/cobrancas', listarCobrancas);
+router.get('/consumo-agente', relatorioConsumoAgente);
 router.get('/stats', getStats);
 
 // WhatsApp multi-tenant (admin)

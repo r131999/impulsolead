@@ -4,6 +4,7 @@ const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const prisma = require('../lib/prisma');
 const { PERMISSOES_POR_PLANO } = require('../config/permissoes-planos');
+const { SELECT_CONSUMO, temAgenteIA, resolverDiaCiclo, calcularConsumo } = require('../services/consumoAgente.service');
 
 const PERGUNTAS_PADRAO = [
   'É o seu primeiro imóvel?',
@@ -307,6 +308,37 @@ async function atualizarFranquiaAgente(req, res) {
   });
 }
 
+// ── relatorioConsumoAgente ────────────────────────────────────────────────────
+// Relatório de faturamento do excedente: consumo do agente de IA de cada
+// imobiliária no ciclo atual dela (cada uma tem o seu dia de renovação).
+// Só leitura — mesmo cálculo do card do dashboard do gestor.
+
+async function relatorioConsumoAgente(req, res) {
+  const imobiliarias = await prisma.imobiliaria.findMany({
+    select: { ...SELECT_CONSUMO, nome: true },
+    orderBy: { nome: 'asc' },
+  });
+
+  const agora = new Date();
+  const linhas = await Promise.all(imobiliarias.map(async (imob) => ({
+    id: imob.id,
+    nome: imob.nome,
+    plano: imob.plano,
+    agenteIA: temAgenteIA(imob.permissoes),
+    diaCicloFaturamento: imob.diaCicloFaturamento,
+    diaCicloEfetivo: resolverDiaCiclo(imob),
+    ...(await calcularConsumo(imob, agora)),
+  })));
+
+  linhas.sort((a, b) =>
+    (b.valorExcedente ?? 0) - (a.valorExcedente ?? 0)
+    || b.excedente - a.excedente
+    || (b.percentual ?? -1) - (a.percentual ?? -1)
+    || b.consumido - a.consumido);
+
+  res.json(linhas);
+}
+
 // ── listarCobrancas ───────────────────────────────────────────────────────────
 
 async function listarCobrancas(req, res) {
@@ -499,6 +531,7 @@ module.exports = {
   atualizarAdAccount,
   atualizarValorCobranca,
   atualizarFranquiaAgente,
+  relatorioConsumoAgente,
   listarCobrancas,
   getPlanoCliente,
   criarCliente,

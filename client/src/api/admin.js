@@ -46,6 +46,11 @@ export const atualizarAdAccount = (id, pageId, data) =>
 export const atualizarValorCobranca = (id, data) =>
   adminApi.patch(`/admin/clientes/${id}/valor-cobranca`, data)
 
+export const atualizarFranquiaAgente = (id, data) =>
+  adminApi.patch(`/admin/clientes/${id}/franquia-agente`, data)
+
 export const getCobrancas = () => adminApi.get('/admin/cobrancas')
+
+export const getConsumoAgente = () => adminApi.get('/admin/consumo-agente')
 
 export const getPlanos = () => adminApi.get('/planos')

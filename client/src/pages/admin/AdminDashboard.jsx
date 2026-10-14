@@ -928,6 +928,7 @@ export function AdminTabs() {
     <nav className="flex items-center gap-1">
       <NavLink to="/admin/dashboard" style={tabStyle}>Clientes</NavLink>
       <NavLink to="/admin/cobrancas" style={tabStyle}>Cobranças</NavLink>
+      <NavLink to="/admin/consumo-agente" style={tabStyle}>Consumo IA</NavLink>
     </nav>
   )
 }
