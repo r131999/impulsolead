@@ -9,11 +9,16 @@
 
 const JANELA_SEM_TRATATIVA_DIAS = 30;
 
+// Terceiro sinal, também só daqui (o cron não tem): nenhuma mensagem em
+// MensagemLead na janela. Observação vazia mede ausência de registro, não de
+// atendimento — lead que trocou mensagem (com corretor ou com a Lia) não conta.
 function criterioSemTratativa(agora = new Date()) {
+  const desde = new Date(agora.getTime() - JANELA_SEM_TRATATIVA_DIAS * 24 * 60 * 60 * 1000);
   return {
     status: 'lead',
-    criadoEm: { gte: new Date(agora.getTime() - JANELA_SEM_TRATATIVA_DIAS * 24 * 60 * 60 * 1000) },
+    criadoEm: { gte: desde },
     OR: [{ observacoes: null }, { observacoes: '' }],
+    mensagens: { none: { criadoEm: { gte: desde } } },
   };
 }
 
