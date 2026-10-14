@@ -28,9 +28,13 @@ function diaBrasilia(data) {
 
 // Dia do ciclo: o campo explícito manda; vazio (imobiliária criada depois da
 // migration) cai na mesma regra do preenchimento inicial.
+// planoExpiraEm já guarda a data pretendida (o Prisma a devolve como UTC), então
+// é lida como está — converter pra Brasília jogaria pro dia anterior. criadoEm é
+// instante real e precisa da conversão.
 function resolverDiaCiclo(imob) {
   if (imob.diaCicloFaturamento) return imob.diaCicloFaturamento;
-  return diaBrasilia(imob.planoExpiraEm || imob.criadoEm);
+  if (imob.planoExpiraEm) return new Date(imob.planoExpiraEm).getUTCDate();
+  return diaBrasilia(imob.criadoEm);
 }
 
 function diasNoMes(ano, mes) {
