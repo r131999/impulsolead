@@ -25,7 +25,7 @@ function normalizarTelefone(telefone) {
 async function criarLeadEDistribuir({
   nome, telefone, origem, campanha, conjuntoName, anuncioName,
   adId, adsetId, campaignId, formId, imobiliariaId, imobiliaria,
-  respostasFormulario, leadgenId, email, telefoneInvalido = false,
+  respostasFormulario, leadgenId, email, telefoneInvalido = false, possivelDuplicataDe = null,
 }) {
   const configAgente = await prisma.configAgente.findUnique({ where: { imobiliariaId } });
   const modoManual = configAgente?.distribuicaoManual ?? false;
@@ -68,6 +68,7 @@ async function criarLeadEDistribuir({
         formId: formId || null,
         respostasFormulario: respostasFormulario || null,
         leadgenId: leadgenId || null,
+        possivelDuplicataDeId: possivelDuplicataDe?.id || null,
         email: email || null,
         imobiliariaId,
       },
@@ -89,6 +90,18 @@ async function criarLeadEDistribuir({
             detalhes: 'O formulário não trouxe nenhum campo de telefone identificável. '
               + 'Envios automáticos ao lead ficam bloqueados até um número ser informado.',
           },
+      });
+    }
+
+    if (possivelDuplicataDe) {
+      const quando = possivelDuplicataDe.criadoEm.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+      await tx.historicoLead.create({
+        data: {
+          leadId: lead.id,
+          acao: 'Possível duplicata — mesmo telefone e mesmo formulário de um lead anterior',
+          detalhes: `Lead anterior: ${possivelDuplicataDe.nome} (id ${possivelDuplicataDe.id}), criado em ${quando}. `
+            + 'Pode ser a mesma pessoa preenchendo de novo (sinal de interesse) ou reentrega da Meta — confira.',
+        },
       });
     }
 
@@ -307,12 +320,30 @@ async function receberLeadMeta(req, res) {
           console.warn(`[meta-webhook] Lead ${leadgenId} com telefone "${telefone}" fora do range de 10–15 dígitos — criado com telefoneInvalido=true`);
         }
 
+        // Mesmo telefone + mesmo formulário já existente na imobiliária: cria normalmente (a pessoa
+        // pode ter preenchido de novo — sinal de interesse), só marca como possível duplicata.
+        // Cobre também reentrega da Meta de lead antigo, criado antes da captura do leadgenId
+        // (23/08/2026), que por isso não bate na constraint única de leadgenId abaixo.
+        // Consulta-antes é aceitável aqui por ser só sinalização: numa rajada, duas cópias
+        // simultâneas podem sair sem a marca — a idempotência de verdade é a constraint.
+        const possivelDuplicataDe = (!telefoneInvalido && leadData.form_id)
+          ? await prisma.lead.findFirst({
+            where: { imobiliariaId, formId: leadData.form_id, telefone: digitos },
+            orderBy: { criadoEm: 'asc' },
+            select: { id: true, nome: true, criadoEm: true },
+          })
+          : null;
+        if (possivelDuplicataDe) {
+          console.warn(`[meta-webhook] Lead ${leadgenId} com mesmo telefone + formId do lead ${possivelDuplicataDe.id} — criado como possível duplicata`);
+        }
+
         let result;
         try {
           result = await criarLeadEDistribuir({
             nome: nomeSanitizado,
             telefone: telefoneInvalido ? (sanitizarTexto(telefone) ?? '') : digitos,
             telefoneInvalido,
+            possivelDuplicataDe,
             origem: 'Meta Ads',
             campanha,
             conjuntoName,

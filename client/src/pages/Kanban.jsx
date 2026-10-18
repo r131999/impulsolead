@@ -445,6 +445,17 @@ function LeadCard({ lead, atualizando, followUp, podeGerenciar, bloqueado, chatH
             ⚠️ conferir telefone
           </span>
         </div>
+      ) : lead.telefone && lead.possivelDuplicataDeId ? (
+        <div className="mt-0.5">
+          <p className="text-xs" style={{ color: '#64748B' }}>{lead.telefone}</p>
+          <span
+            className="inline-block text-xs font-medium px-1.5 py-0.5 rounded mt-0.5"
+            style={{ backgroundColor: 'rgba(168,85,247,0.15)', color: '#C084FC', fontSize: 10, lineHeight: '16px' }}
+            title="Já existe um lead com este telefone vindo do mesmo formulário. Pode ser a mesma pessoa preenchendo de novo — veja o histórico do lead."
+          >
+            👥 possível duplicata
+          </span>
+        </div>
       ) : lead.telefone ? (
         <p className="text-xs mt-0.5" style={{ color: '#64748B' }}>{lead.telefone}</p>
       ) : (

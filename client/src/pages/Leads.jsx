@@ -451,6 +451,15 @@ export default function Leads() {
                             ⚠️ conferir telefone
                           </span>
                         )}
+                        {lead.possivelDuplicataDeId && (
+                          <span
+                            className="block text-xs font-medium mt-0.5"
+                            style={{ color: '#C084FC' }}
+                            title="Já existe um lead com este telefone vindo do mesmo formulário. Pode ser a mesma pessoa preenchendo de novo — veja o histórico do lead."
+                          >
+                            👥 possível duplicata
+                          </span>
+                        )}
                       </td>
                       <td className="px-4 py-3">
                         <span className="badge" style={{ color: badge.color, backgroundColor: badge.bg }}>

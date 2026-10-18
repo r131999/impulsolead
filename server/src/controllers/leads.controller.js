@@ -80,7 +80,7 @@ async function listar(req, res) {
       take: Number(limit),
       orderBy: { criadoEm: 'desc' },
       select: {
-        id: true, nome: true, nomeEditado: true, telefone: true, telefoneInvalido: true, status: true, temperatura: true,
+        id: true, nome: true, nomeEditado: true, telefone: true, telefoneInvalido: true, possivelDuplicataDeId: true, status: true, temperatura: true,
         origem: true, campanha: true, conjuntoName: true, anuncioName: true, interesse: true,
         primeiroImovel: true, tipoRenda: true, rendaMensal: true,
         restricaoCpf: true, valorEntrada: true,
