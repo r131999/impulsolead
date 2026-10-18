@@ -80,7 +80,7 @@ async function listar(req, res) {
       take: Number(limit),
       orderBy: { criadoEm: 'desc' },
       select: {
-        id: true, nome: true, nomeEditado: true, telefone: true, status: true, temperatura: true,
+        id: true, nome: true, nomeEditado: true, telefone: true, telefoneInvalido: true, status: true, temperatura: true,
         origem: true, campanha: true, conjuntoName: true, anuncioName: true, interesse: true,
         primeiroImovel: true, tipoRenda: true, rendaMensal: true,
         restricaoCpf: true, valorEntrada: true,
@@ -351,6 +351,9 @@ async function atualizar(req, res) {
     if (qualificacao[campo] !== undefined) dadosQualificacao[campo] = qualificacao[campo];
   });
 
+  const digitosTelefone = telefone ? String(telefone).replace(/\D/g, '') : '';
+  const corrigeTelefoneInvalido = lead.telefoneInvalido && digitosTelefone.length >= 10 && digitosTelefone.length <= 15;
+
   const atualizado = await prisma.$transaction(async (tx) => {
     const result = await tx.lead.update({
       where: { id },
@@ -358,12 +361,26 @@ async function atualizar(req, res) {
         ...(nome && { nome }),
         ...(telefone && { telefone }),
         ...(whatsappJid && { whatsappJid }),
+        ...(corrigeTelefoneInvalido && {
+          telefoneInvalido: false,
+          ...(!whatsappJid && { whatsappJid: `${digitosTelefone}@s.whatsapp.net` }),
+        }),
         ...(observacoes !== undefined && { observacoes }),
         ...(corretorId !== undefined && { corretorId }),
         ...dadosQualificacao,
       },
       include: { corretor: { select: { id: true, nome: true } } },
     });
+
+    if (corrigeTelefoneInvalido) {
+      await tx.historicoLead.create({
+        data: {
+          leadId: id,
+          acao: 'Telefone corrigido manualmente',
+          detalhes: `De "${lead.telefone}" para "${telefone}" por ${req.usuario?.nome || 'usuário'} — envios ao lead liberados`,
+        },
+      });
+    }
 
     if (corretorId !== undefined && corretorId !== lead.corretorId) {
       const nomeCorretor = result.corretor?.nome || 'nenhum';
@@ -501,7 +518,7 @@ async function remover(req, res) {
 
 async function detalhes(req, res) {
   const { id } = req.params;
-  const { nome, origem, observacoes, campanha, interesse, temperatura } = req.body;
+  const { nome, telefone, origem, observacoes, campanha, interesse, temperatura } = req.body;
 
   if (temperatura !== undefined && temperatura && !TEMPERATURAS_VALIDAS.includes(temperatura)) {
     return res.status(400).json({
@@ -528,6 +545,21 @@ async function detalhes(req, res) {
   if (!lead) return res.status(404).json({ error: 'Lead não encontrado' });
 
   const data = {};
+
+  // Correção do telefone só é aceita aqui (inclusive pelo corretor) enquanto o lead está
+  // marcado com telefone inválido — quem confere o número é a pessoa, não o sistema.
+  let telefoneCorrigido = null;
+  if (telefone !== undefined && lead.telefoneInvalido) {
+    const digitos = String(telefone || '').replace(/\D/g, '');
+    if (digitos.length < 10 || digitos.length > 15) {
+      return res.status(400).json({ error: 'Telefone deve ter entre 10 e 15 dígitos (com DDD)' });
+    }
+    telefoneCorrigido = digitos;
+    data.telefone = digitos;
+    data.whatsappJid = `${digitos}@s.whatsapp.net`;
+    data.telefoneInvalido = false;
+  }
+
   const nomeTrimmed = nome ? nome.trim() : null;
   if (nome !== undefined && nomeTrimmed) {
     data.nome = nomeTrimmed;
@@ -566,6 +598,16 @@ async function detalhes(req, res) {
       data,
       include: { corretor: { select: { id: true, nome: true } } },
     });
+
+    if (telefoneCorrigido) {
+      await tx.historicoLead.create({
+        data: {
+          leadId: id,
+          acao: 'Telefone corrigido manualmente',
+          detalhes: `De "${lead.telefone}" para "${telefoneCorrigido}" por ${req.usuario?.nome || 'usuário'} — envios ao lead liberados`,
+        },
+      });
+    }
 
     if (temperaturaMudou) {
       await tx.historicoTemperaturaLead.create({

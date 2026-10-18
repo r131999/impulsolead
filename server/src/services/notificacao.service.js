@@ -19,7 +19,8 @@ async function notificarCorretorCloudApi(corretor, lead) {
   const numero = corretor.whatsapp || corretor.telefone;
   return enviarTemplate(numero, 'novo_lead_atribuido', {
     nome: lead.nome,
-    telefone: lead.telefone,
+    // Lead do Meta sem telefone chega com telefone vazio; a Meta rejeita parâmetro de template vazio
+    telefone: lead.telefone || 'não informado — conferir no CRM',
     origem: resolverOrigemLead(lead),
   });
 }

@@ -57,6 +57,8 @@ function nomeArquivoDocumento(arquivo) {
 }
 
 const MSG_SEM_INSTANCIA = 'WhatsApp Cloud API não está conectado para esta imobiliária. Conecte em WhatsApp → Cloud API.';
+const MSG_TELEFONE_INVALIDO = 'O telefone deste lead chegou fora do padrão e precisa de conferência manual. '
+  + 'Corrija o número no card do lead antes de enviar mensagens.';
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -79,7 +81,7 @@ async function resolverPermissaoLead(req, leadId) {
 
   return prisma.lead.findFirst({
     where,
-    select: { id: true, nome: true, telefone: true, whatsappJid: true, imobiliariaId: true, corretorId: true },
+    select: { id: true, nome: true, telefone: true, whatsappJid: true, telefoneInvalido: true, imobiliariaId: true, corretorId: true },
   });
 }
 
@@ -122,6 +124,7 @@ async function enviarMensagem(req, res) {
 
     const lead = await resolverPermissaoLead(req, leadId);
     if (!lead) return res.status(404).json({ error: 'Lead não encontrado' });
+    if (lead.telefoneInvalido) return res.status(409).json({ error: MSG_TELEFONE_INVALIDO, codigo: 'telefone_invalido' });
 
     const remetenteNome = req.usuario?.nome || 'Corretor';
     const remetenteId = req.corretorId || req.usuario?.id || null;
@@ -193,6 +196,7 @@ async function enviarArquivo(req, res) {
 
     const lead = await resolverPermissaoLead(req, leadId);
     if (!lead) return res.status(404).json({ error: 'Lead não encontrado' });
+    if (lead.telefoneInvalido) return res.status(409).json({ error: MSG_TELEFONE_INVALIDO, codigo: 'telefone_invalido' });
 
     const arquivo = await prisma.arquivoImovel.findFirst({
       where: { id: arquivoImovelId, imobiliariaId: req.imobiliariaId },

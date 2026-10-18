@@ -25,7 +25,7 @@ function normalizarTelefone(telefone) {
 async function criarLeadEDistribuir({
   nome, telefone, origem, campanha, conjuntoName, anuncioName,
   adId, adsetId, campaignId, formId, imobiliariaId, imobiliaria,
-  respostasFormulario, leadgenId, email,
+  respostasFormulario, leadgenId, email, telefoneInvalido = false,
 }) {
   const configAgente = await prisma.configAgente.findUnique({ where: { imobiliariaId } });
   const modoManual = configAgente?.distribuicaoManual ?? false;
@@ -55,7 +55,8 @@ async function criarLeadEDistribuir({
       data: {
         nome,
         telefone,
-        whatsappJid: `${telefone}@s.whatsapp.net`,
+        whatsappJid: `${String(telefone).replace(/\D/g, '')}@s.whatsapp.net`,
+        telefoneInvalido,
         status: 'lead',
         origem,
         campanha: campanha || null,
@@ -71,6 +72,25 @@ async function criarLeadEDistribuir({
         imobiliariaId,
       },
     });
+
+    if (telefoneInvalido) {
+      const qtdDigitos = String(telefone).replace(/\D/g, '').length;
+      await tx.historicoLead.create({
+        data: telefone
+          ? {
+            leadId: lead.id,
+            acao: `Lead chegou via ${origem} com telefone fora do padrão — precisa de conferência manual`,
+            detalhes: `Telefone recebido exatamente como digitado no formulário: "${telefone}" (${qtdDigitos} dígitos). `
+              + 'Envios automáticos ao lead ficam bloqueados até o número ser corrigido.',
+          }
+          : {
+            leadId: lead.id,
+            acao: `Lead chegou via ${origem} sem telefone — precisa de conferência manual`,
+            detalhes: 'O formulário não trouxe nenhum campo de telefone identificável. '
+              + 'Envios automáticos ao lead ficam bloqueados até um número ser informado.',
+          },
+      });
+    }
 
     if (modoManual) {
       await tx.historicoLead.create({
@@ -270,22 +290,29 @@ async function receberLeadMeta(req, res) {
 
         const nomeSanitizado = sanitizarTexto(nome);
 
+        // Sem telefone ou com telefone fora de 10–15 dígitos (ex.: digitado sem DDD): o lead é
+        // criado mesmo assim, com o número exatamente como veio (vazio, se não veio), e marcado
+        // pra conferência manual — lead pago nunca é descartado e o sistema não tenta adivinhar DDD.
+        //
+        // TODO(duplicata): o telefone fica guardado fora do padrão, então se essa mesma pessoa
+        // mandar mensagem no WhatsApp com o número completo, a busca por telefone dos webhooks de
+        // mensagem não casa com este lead e cria um lead novo. Aceito por ora (duplicata é menos
+        // grave que lead perdido); ao mexer na busca de lead por telefone, considerar este caso.
         if (!telefone) {
-          console.error('[meta-webhook] telefone nao identificado', { leadgen_id: leadgenId, field_data: fieldData });
-          continue;
+          console.error('[meta-webhook] telefone nao identificado — criado com telefoneInvalido=true', { leadgen_id: leadgenId, field_data: fieldData });
         }
-
         const digitos = normalizarTelefone(telefone);
-        if (!digitos) {
-          console.warn(`[meta-webhook] Lead ${leadgenId} descartado: telefone "${telefone}" fora do range de 10–15 dígitos`);
-          continue;
+        const telefoneInvalido = !digitos;
+        if (telefone && telefoneInvalido) {
+          console.warn(`[meta-webhook] Lead ${leadgenId} com telefone "${telefone}" fora do range de 10–15 dígitos — criado com telefoneInvalido=true`);
         }
 
         let result;
         try {
           result = await criarLeadEDistribuir({
             nome: nomeSanitizado,
-            telefone: digitos,
+            telefone: telefoneInvalido ? (sanitizarTexto(telefone) ?? '') : digitos,
+            telefoneInvalido,
             origem: 'Meta Ads',
             campanha,
             conjuntoName,

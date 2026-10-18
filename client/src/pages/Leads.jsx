@@ -440,7 +440,18 @@ export default function Leads() {
                           {lead.nome}
                         </button>
                       </td>
-                      <td className="px-4 py-3 hidden sm:table-cell" style={{ color: '#94A3B8' }}>{lead.telefone}</td>
+                      <td className="px-4 py-3 hidden sm:table-cell" style={{ color: '#94A3B8' }}>
+                        {lead.telefone}
+                        {lead.telefoneInvalido && (
+                          <span
+                            className="block text-xs font-medium mt-0.5"
+                            style={{ color: '#F87171' }}
+                            title="O número chegou fora do padrão (ex.: sem DDD). Confira e corrija — envios ao lead estão bloqueados até lá."
+                          >
+                            ⚠️ conferir telefone
+                          </span>
+                        )}
+                      </td>
                       <td className="px-4 py-3">
                         <span className="badge" style={{ color: badge.color, backgroundColor: badge.bg }}>
                           {lead.status}
@@ -611,7 +622,12 @@ export default function Leads() {
       {modal === 'detalhe' && leadSelecionado && (
         <Modal titulo={leadSelecionado.nome} onClose={() => setModal(null)} large>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-sm mb-4">
-            <Campo label="Telefone" valor={leadSelecionado.telefone} />
+            <Campo
+              label="Telefone"
+              valor={leadSelecionado.telefoneInvalido
+                ? `${leadSelecionado.telefone} — ⚠️ fora do padrão, conferir manualmente`
+                : leadSelecionado.telefone}
+            />
             <Campo label="Status" valor={leadSelecionado.status} />
             <Campo label="Corretor" valor={leadSelecionado.corretor?.nome} />
             <Campo label="Urgência" valor={leadSelecionado.urgencia} />

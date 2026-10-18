@@ -917,6 +917,13 @@ async function processarQualificacaoCore({ telefone, mensagem, instancia, pushNa
     return { status: 200, body: { ok: true, acao: 'ignorado' } };
   }
 
+  // Lead com telefone fora do padrão (Meta Lead Ads) não recebe nada da Lia até alguém corrigir o número.
+  const leadSessao = await prisma.lead.findUnique({ where: { id: leadId }, select: { telefoneInvalido: true } });
+  if (leadSessao?.telefoneInvalido) {
+    console.log(`[agente] qualificação ignorada (${telefoneLimpo}) — lead ${leadId} com telefone inválido aguardando correção`);
+    return { status: 200, body: { ok: true, acao: 'ignorado' } };
+  }
+
   // Retry do canal pra uma mensagem já processada — não reprocessa nem chama a IA de novo.
   if (whatsappMsgId) {
     const jaProcessada = await prisma.mensagemLead.findFirst({ where: { whatsappMsgId }, select: { id: true } });

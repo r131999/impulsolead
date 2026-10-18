@@ -434,7 +434,18 @@ function LeadCard({ lead, atualizando, followUp, podeGerenciar, bloqueado, chatH
           </button>
         </div>
       </div>
-      {lead.telefone ? (
+      {lead.telefone && lead.telefoneInvalido ? (
+        <div className="mt-0.5">
+          <p className="text-xs" style={{ color: '#64748B' }}>{lead.telefone}</p>
+          <span
+            className="inline-block text-xs font-medium px-1.5 py-0.5 rounded mt-0.5"
+            style={{ backgroundColor: 'rgba(239,68,68,0.15)', color: '#F87171', fontSize: 10, lineHeight: '16px' }}
+            title="O número chegou fora do padrão (ex.: sem DDD). Confira e corrija nos detalhes do lead — envios ao lead estão bloqueados até lá."
+          >
+            ⚠️ conferir telefone
+          </span>
+        </div>
+      ) : lead.telefone ? (
         <p className="text-xs mt-0.5" style={{ color: '#64748B' }}>{lead.telefone}</p>
       ) : (
         <span
@@ -561,7 +572,7 @@ function LeadCard({ lead, atualizando, followUp, podeGerenciar, bloqueado, chatH
           </div>
         )}
         <div className="flex gap-1.5">
-          {lead.telefone && (
+          {lead.telefone && !lead.telefoneInvalido && (
             <button
               onClick={() => {
                 const numero = lead.telefone.replace(/\D/g, '')
@@ -745,6 +756,7 @@ function ModalDetalhes({ lead, onClose, onSalvo }) {
   const [temperatura, setTemperatura] = useState(lead.temperatura || '')
   const [observacoes, setObservacoes] = useState(conteudoInicial)
   const [ultimaAtualizacao] = useState(tsInicial)
+  const [telefoneCorrigido, setTelefoneCorrigido] = useState(lead.telefoneInvalido ? lead.telefone : '')
   const [salvando, setSalvando] = useState(false)
   const [erro, setErro] = useState('')
   const [copiado, setCopiado] = useState(false)
@@ -772,6 +784,8 @@ function ModalDetalhes({ lead, onClose, onSalvo }) {
         interesse: interesse.trim() || null,
         observacoes: observacoes.trim() || null,
         temperatura: temperatura || null,
+        // Só enviado enquanto o lead está marcado; se o número continuar fora do padrão o backend recusa
+        ...(lead.telefoneInvalido && telefoneCorrigido.trim() !== lead.telefone && { telefone: telefoneCorrigido.trim() }),
       })
       onSalvo()
     } catch (e) {
@@ -838,6 +852,25 @@ function ModalDetalhes({ lead, onClose, onSalvo }) {
 
         {/* Corpo */}
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
+          {lead.telefoneInvalido && (
+            <div
+              className="rounded-lg px-3 py-3"
+              style={{ backgroundColor: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)' }}
+            >
+              <p className="text-xs font-semibold mb-1" style={{ color: '#F87171' }}>⚠️ Telefone precisa de conferência manual</p>
+              <p className="text-xs mb-2" style={{ color: '#94A3B8' }}>
+                O lead digitou o número fora do padrão (ex.: sem DDD) e ele foi salvo exatamente como veio.
+                Mensagens ao lead ficam bloqueadas até o número ser corrigido.
+              </p>
+              <input
+                value={telefoneCorrigido}
+                onChange={(e) => setTelefoneCorrigido(e.target.value)}
+                className="input w-full"
+                placeholder="Telefone completo com DDD, ex.: 98 98765-4321"
+              />
+            </div>
+          )}
+
           {/* Origem */}
           <div>
             <label className="text-xs font-semibold uppercase tracking-wide block mb-1.5" style={{ color: '#64748B' }}>

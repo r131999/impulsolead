@@ -114,6 +114,7 @@ model Lead {
   nome        String
   telefone    String
   whatsappJid String
+  telefoneInvalido Boolean @default(false) // chegou do Meta Lead Ads fora de 10–15 dígitos; envios ao lead bloqueados até correção manual
 
   primeiroImovel String?
   tipoRenda      String?

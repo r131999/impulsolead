@@ -227,9 +227,11 @@ export default function ChatLead({ lead, onClose }) {
   const socketRef = useRef(null)
 
   const podeEnviar =
-    isGestor ||
-    isGerente ||
-    (isCorretor && lead.corretor?.id === usuario?.id)
+    !lead.telefoneInvalido && (
+      isGestor ||
+      isGerente ||
+      (isCorretor && lead.corretor?.id === usuario?.id)
+    )
 
   const scrollParaBaixo = useCallback(() => {
     requestAnimationFrame(() => {
@@ -468,6 +470,15 @@ export default function ChatLead({ lead, onClose }) {
                   </button>
                 ))}
               </div>
+            </div>
+          )}
+
+          {lead.telefoneInvalido && (
+            <div className="flex-shrink-0 px-4 py-3" style={{ borderTop: '1px solid #1E293B' }}>
+              <p className="text-xs" style={{ color: '#F87171' }}>
+                ⚠️ O telefone deste lead chegou fora do padrão e precisa de conferência manual.
+                Corrija o número nos detalhes do lead para liberar o envio de mensagens.
+              </p>
             </div>
           )}
 
