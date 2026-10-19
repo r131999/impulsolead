@@ -6,6 +6,7 @@ const { enviarPushCorretor } = require('../controllers/push.controller');
 const { buscarPagamentoPendente, buscarPixCopiaECola } = require('./asaas.service');
 const { resolverValorCobranca, obterTelefoneGestorParaCobranca, elegivelParaCobranca } = require('./cobranca.service');
 const { finalizarQualificacao } = require('../controllers/agente.controller');
+const { sincronizarEventosMetaCapi } = require('./metaConversionsApi.service');
 
 const prisma = require('../lib/prisma');
 
@@ -788,7 +789,17 @@ function iniciarCrons() {
     }
   });
 
-  console.log('[cron] Jobs iniciados: relatorio-semanal (dom 8h) | plano-vencimento (diário 9h) | ad-spend (20min) | leads-sem-tratativa (15min) | leads-aguardando-distribuicao (diário 8h BRT) | followups-pendentes (5min) | qualificacoes-inativas (5min)');
+  // Job 8: eventos de estágio do lead para a API de Conversões da Meta (CRM) — a cada 15 minutos.
+  // A Meta exige no mínimo envio diário; o intervalo curto também serve de reenvio em caso de falha.
+  cron.schedule('*/15 * * * *', async () => {
+    try {
+      await sincronizarEventosMetaCapi();
+    } catch (err) {
+      console.error('[cron] Erro no job meta-capi:', err.message);
+    }
+  });
+
+  console.log('[cron] Jobs iniciados: relatorio-semanal (dom 8h) | plano-vencimento (diário 9h) | ad-spend (20min) | leads-sem-tratativa (15min) | leads-aguardando-distribuicao (diário 8h BRT) | followups-pendentes (5min) | qualificacoes-inativas (5min) | meta-capi (15min)');
 }
 
 module.exports = { iniciarCrons, enviarLembretesCobranca };

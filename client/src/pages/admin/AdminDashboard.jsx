@@ -4,7 +4,7 @@ import { useAdminAuth } from '../../context/AdminAuthContext'
 import {
   getStats, getClientes, criarCliente,
   atualizarPlano, atualizarPermissoes, atualizarLimiteAcessos, atualizarAdAccount,
-  atualizarValorCobranca, getPlanos,
+  atualizarConversoesMeta, atualizarValorCobranca, getPlanos,
 } from '../../api/admin'
 
 // ─── helpers ────────────────────────────────────────────────────────────────
@@ -24,6 +24,16 @@ function calcStatus(plano, trialExpiraEm) {
   }
   return plano // construcao | desenvolvimento | sucesso
 }
+
+// Etapas que podem contar como QualifiedLead na API de Conversões (mesma ordem do kanban)
+const ETAPAS_QUALIFICAVEIS = [
+  { value: 'atendimento', label: 'Atendimento' },
+  { value: 'em_espera',   label: 'Em Espera' },
+  { value: 'agendamento', label: 'Agendamento' },
+  { value: 'visita',      label: 'Visita' },
+  { value: 'proposta',    label: 'Proposta' },
+  { value: 'venda',       label: 'Venda' },
+]
 
 const STATUS_LABEL = {
   trial_ativo:     'Trial ativo',
@@ -181,6 +191,23 @@ function Toggle({ label, value, onChange, disabled }) {
   )
 }
 
+// Código de teste esquecido é falha silenciosa: os eventos param de contar pra otimização da Meta.
+function AvisoModoTeste({ modoTeste }) {
+  return (
+    <div
+      className="rounded-lg px-3 py-2.5 text-xs"
+      style={{ backgroundColor: 'rgba(245,158,11,0.15)', border: '1px solid rgba(245,158,11,0.6)', color: '#fbbf24' }}
+    >
+      <p className="font-semibold">⚠ API de Conversões em MODO DE TESTE</p>
+      <p className="mt-0.5">
+        Os eventos estão indo só para a aba Eventos de Teste do Gerenciador e não contam para otimização
+        (código {modoTeste.codigo}
+        {modoTeste.origem === 'variavel' ? ', definido pela variável META_CAPI_TEST_EVENT_CODE do servidor' : ''}).
+      </p>
+    </div>
+  )
+}
+
 function SaveButton({ onClick, loading, children }) {
   return (
     <button
@@ -228,6 +255,18 @@ function ModalGerenciar({ cliente, onClose, onAtualizado, precos }) {
   // ── ad accounts (Meta) — uma por página conectada ──
   const [contasAnuncio, setContasAnuncio] = useState(cliente.contasAnuncio ?? [])
   const [salvandoPageId, setSalvandoPageId] = useState(null)
+
+  // ── API de Conversões (CRM) — uma configuração por imobiliária ──
+  const [capi, setCapi] = useState({
+    pageId: cliente.conversoesMeta?.pageId ?? '',
+    metaDatasetId: cliente.conversoesMeta?.metaDatasetId ?? '',
+    metaDatasetToken: '',
+    metaEtapaQualificada: cliente.conversoesMeta?.metaEtapaQualificada ?? 'agendamento',
+    metaTestEventCode: cliente.conversoesMeta?.metaTestEventCode ?? '',
+  })
+  const [capiTokenConfigurado, setCapiTokenConfigurado] = useState(!!cliente.conversoesMeta?.metaDatasetTokenConfigurado)
+  const [capiModoTeste, setCapiModoTeste] = useState(cliente.conversoesMeta?.modoTeste ?? null)
+  const [salvandoCapi, setSalvandoCapi] = useState(false)
 
   // ── feedback ──
   const [msg, setMsg] = useState({ texto: '', erro: false })
@@ -320,6 +359,29 @@ function ModalGerenciar({ cliente, onClose, onAtualizado, precos }) {
     }
   }
 
+  const setCapiCampo = (campo) => (e) => setCapi((atual) => ({ ...atual, [campo]: e.target.value }))
+
+  const salvarConversoesMeta = async () => {
+    setSalvandoCapi(true)
+    try {
+      const res = await atualizarConversoesMeta(cliente.id, capi)
+      const salvo = res.data.conversoesMeta
+      setCapi((atual) => ({ ...atual, metaDatasetToken: '' }))
+      setCapiTokenConfigurado(!!salvo?.metaDatasetTokenConfigurado)
+      setCapiModoTeste(salvo?.modoTeste ?? null)
+      onAtualizado()
+      feedback(
+        !salvo ? 'API de Conversões desativada'
+          : salvo.modoTeste ? 'Salvo — API de Conversões em MODO DE TESTE'
+            : 'API de Conversões configurada em produção'
+      )
+    } catch (err) {
+      feedback(err.response?.data?.error || 'Erro ao salvar API de Conversões', true)
+    } finally {
+      setSalvandoCapi(false)
+    }
+  }
+
   const togglePerm = (key) => (val) => setPerms((p) => ({ ...p, [key]: val }))
 
   const isPago = ['construcao', 'desenvolvimento', 'sucesso'].includes(planoSel)
@@ -341,6 +403,12 @@ function ModalGerenciar({ cliente, onClose, onAtualizado, precos }) {
         <InfoRow label="Cadastrado em" value={fmtData(cliente.criadoEm)} />
         <InfoRow label="Total de leads" value={cliente.totalLeads} />
       </div>
+
+      {capiModoTeste && (
+        <div className="mb-4">
+          <AvisoModoTeste modoTeste={capiModoTeste} />
+        </div>
+      )}
 
       {msg.texto && (
         <p
@@ -493,6 +561,96 @@ function ModalGerenciar({ cliente, onClose, onAtualizado, precos }) {
                 </SaveButton>
               </div>
             ))
+          )}
+
+          {contasAnuncio.length > 0 && (
+            <>
+              <div className="my-2" style={{ borderTop: '1px solid #1e2d3d' }} />
+
+              <p className="text-xs font-semibold" style={{ color: '#94A3B8' }}>API de Conversões (CRM)</p>
+
+              {capiModoTeste && <AvisoModoTeste modoTeste={capiModoTeste} />}
+
+              <div>
+                <label className="block text-xs mb-1.5" style={{ color: '#64748B' }}>Página com o dataset</label>
+                <select
+                  value={capi.pageId}
+                  onChange={setCapiCampo('pageId')}
+                  className="w-full rounded-lg px-3 py-2.5 text-sm outline-none"
+                  style={inputStyle}
+                >
+                  <option value="">Desativado</option>
+                  {contasAnuncio.map((conta) => (
+                    <option key={conta.pageId} value={conta.pageId}>{conta.pageName || conta.pageId}</option>
+                  ))}
+                </select>
+              </div>
+
+              {capi.pageId && (
+                <>
+                  <div>
+                    <label className="block text-xs mb-1.5" style={{ color: '#64748B' }}>ID do dataset</label>
+                    <input
+                      type="text"
+                      value={capi.metaDatasetId}
+                      onChange={setCapiCampo('metaDatasetId')}
+                      placeholder="1234567890"
+                      className="w-full rounded-lg px-3 py-2.5 text-sm outline-none"
+                      style={inputStyle}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs mb-1.5" style={{ color: '#64748B' }}>Token do dataset</label>
+                    <input
+                      type="password"
+                      autoComplete="off"
+                      value={capi.metaDatasetToken}
+                      onChange={setCapiCampo('metaDatasetToken')}
+                      placeholder={capiTokenConfigurado ? 'Configurado — deixe vazio para manter' : 'Token de acesso da API de Conversões'}
+                      className="w-full rounded-lg px-3 py-2.5 text-sm outline-none"
+                      style={inputStyle}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs mb-1.5" style={{ color: '#64748B' }}>Etapa que conta como lead qualificado</label>
+                    <select
+                      value={capi.metaEtapaQualificada}
+                      onChange={setCapiCampo('metaEtapaQualificada')}
+                      className="w-full rounded-lg px-3 py-2.5 text-sm outline-none"
+                      style={inputStyle}
+                    >
+                      {ETAPAS_QUALIFICAVEIS.map((e) => (
+                        <option key={e.value} value={e.value}>{e.label}</option>
+                      ))}
+                    </select>
+                    <p className="text-xs mt-1" style={{ color: '#475569' }}>
+                      A Meta exige que entre 1% e 40% dos leads cheguem nessa etapa. Etapas mais adiante no funil também contam.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs mb-1.5" style={{ color: '#64748B' }}>Código de teste (test_event_code)</label>
+                    <input
+                      type="text"
+                      value={capi.metaTestEventCode}
+                      onChange={setCapiCampo('metaTestEventCode')}
+                      placeholder="Vazio = produção"
+                      className="w-full rounded-lg px-3 py-2.5 text-sm outline-none"
+                      style={inputStyle}
+                    />
+                    <p className="text-xs mt-1" style={{ color: '#475569' }}>
+                      Preenchido, os eventos vão só para a aba Eventos de Teste do Gerenciador. Ao limpar, os enviados em teste nos últimos 7 dias são reenviados como dado real.
+                    </p>
+                  </div>
+                </>
+              )}
+
+              <SaveButton onClick={salvarConversoesMeta} loading={salvandoCapi}>
+                Salvar API de Conversões
+              </SaveButton>
+            </>
           )}
         </Section>
 
@@ -705,6 +863,8 @@ export default function AdminDashboard() {
     navigate('/admin/login')
   }
 
+  const clientesEmTeste = clientes.filter((c) => c.conversoesMeta?.modoTeste)
+
   return (
     <div className="min-h-screen" style={{ background: '#0B1120' }}>
       {/* Navbar */}
@@ -758,6 +918,24 @@ export default function AdminDashboard() {
           />
           <StatCard label="Total de leads" value={stats?.totalLeads} accent="#818cf8" />
         </div>
+
+        {clientesEmTeste.length > 0 && (
+          <div
+            className="rounded-xl px-4 py-3 text-sm"
+            style={{ backgroundColor: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.6)', color: '#fbbf24' }}
+          >
+            <p className="font-semibold">
+              ⚠ API de Conversões em MODO DE TESTE para {clientesEmTeste.length} cliente{clientesEmTeste.length === 1 ? '' : 's'}:{' '}
+              {clientesEmTeste.map((c) => c.nome).join(', ')}
+            </p>
+            <p className="text-xs mt-1">
+              Os eventos desses clientes vão só para a aba Eventos de Teste do Gerenciador e não contam para otimização.
+              Limpe o código de teste em Gerenciar → Meta Ads quando terminar de validar.
+              {clientesEmTeste.some((c) => c.conversoesMeta.modoTeste.origem === 'variavel') &&
+                ' Atenção: a variável META_CAPI_TEST_EVENT_CODE está definida no servidor e põe todos em teste.'}
+            </p>
+          </div>
+        )}
 
         {/* Barra de ações */}
         <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
@@ -826,6 +1004,14 @@ export default function AdminDashboard() {
                           <div>
                             <p className="font-medium text-white">{c.nome}</p>
                             <p className="text-xs" style={{ color: '#475569' }}>{c.email}</p>
+                            {c.conversoesMeta?.modoTeste && (
+                              <span
+                                className="inline-block mt-1 text-[10px] font-semibold px-1.5 py-0.5 rounded"
+                                style={{ backgroundColor: 'rgba(245,158,11,0.15)', color: '#fbbf24', border: '1px solid rgba(245,158,11,0.6)' }}
+                              >
+                                ⚠ CAPI EM TESTE
+                              </span>
+                            )}
                           </div>
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap">

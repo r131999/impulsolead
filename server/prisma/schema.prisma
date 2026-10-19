@@ -502,6 +502,8 @@ model MetaIntegracao {
   paginasPendentes Json?
   metaDatasetId    String?
   metaDatasetToken String?
+  metaEtapaQualificada String  @default("agendamento") // etapa do kanban que conta como QualifiedLead na API de Conversões (CRM)
+  metaTestEventCode    String? // preenchido = envios vão só pra aba Eventos de Teste do Gerenciador, não valem pra otimização
   ativo            Boolean     @default(true)
   criadoEm         DateTime    @default(now())
   atualizadoEm     DateTime    @updatedAt
@@ -510,6 +512,33 @@ model MetaIntegracao {
   adStatuses AdStatus[]
 
   @@index([imobiliariaId])
+}
+
+// Um evento de estágio do lead devolvido à Meta pela API de Conversões (Conversion Leads).
+// Serve de fila (cron reenvia pendente/falha), idempotência (um eventName por lead) e auditoria.
+// Sem FK pro Lead de propósito: o registro de auditoria sobrevive à remoção do lead e não
+// bloqueia o delete dele.
+model EventoMetaCapi {
+  id            String    @id @default(uuid())
+  imobiliariaId String
+  leadId        String
+  leadgenId     String
+  eventName     String    // Lead | Contacted | QualifiedLead | ConvertedLead | DisqualifiedLead
+  etapa         String    // status do kanban que originou o evento
+  eventTime     DateTime  // hora da mudança de etapa, não do envio
+  status        String    @default("pendente") // pendente | enviando | enviado | enviado_teste | falha | expirado
+  tentativas    Int       @default(0)
+  ultimoErro    String?
+  respostaMeta  Json?
+  metaDatasetId String?
+  testEventCode String? // código usado no último envio; enviado_teste volta pra fila quando o modo de teste é desligado
+  enviadoEm     DateTime?
+  criadoEm      DateTime  @default(now())
+  atualizadoEm  DateTime  @updatedAt
+
+  @@unique([leadId, eventName])
+  @@index([status, eventTime])
+  @@index([imobiliariaId, criadoEm])
 }
 
 model MakeIntegracao {

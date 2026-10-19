@@ -5,6 +5,7 @@ const crypto = require('crypto');
 const prisma = require('../lib/prisma');
 const { PERMISSOES_POR_PLANO } = require('../config/permissoes-planos');
 const { SELECT_CONSUMO, temAgenteIA, resolverDiaCiclo, calcularConsumo } = require('../services/consumoAgente.service');
+const { ETAPAS_QUALIFICAVEIS, codigoTeste } = require('../services/metaConversionsApi.service');
 
 const PERGUNTAS_PADRAO = [
   'É o seu primeiro imóvel?',
@@ -56,7 +57,10 @@ async function listarClientes(req, res) {
       criadoEm: true,
       metaIntegracoes: {
         where: { ativo: true, pageId: { not: null } },
-        select: { pageId: true, pageName: true, adAccountId: true },
+        select: {
+          pageId: true, pageName: true, adAccountId: true,
+          metaDatasetId: true, metaDatasetToken: true, metaEtapaQualificada: true, metaTestEventCode: true,
+        },
       },
       _count: {
         select: {
@@ -78,6 +82,8 @@ async function listarClientes(req, res) {
       diasRestantes = Math.max(0, Math.ceil((new Date(imob.planoExpiraEm) - agora) / (1000 * 60 * 60 * 24)));
     }
 
+    const comDataset = imob.metaIntegracoes.find((m) => m.metaDatasetId);
+
     return {
       id: imob.id,
       nome: imob.nome,
@@ -95,6 +101,7 @@ async function listarClientes(req, res) {
         pageName: m.pageName,
         adAccountId: m.adAccountId,
       })),
+      conversoesMeta: resumoConversoesMeta(comDataset),
       totalLeads: imob._count.leads,
       totalCorretores: imob._count.corretores,
       totalUsuarios: imob._count.usuarios,
@@ -229,6 +236,86 @@ async function atualizarAdAccount(req, res) {
   });
 
   res.json({ id: atualizado.imobiliariaId, pageId: atualizado.pageId, adAccountId: atualizado.adAccountId });
+}
+
+// ── atualizarConversoesMeta ───────────────────────────────────────────────────
+
+// O token nunca sai do servidor — o painel só sabe se ele está configurado.
+// modoTeste vem resolvido (painel ou variável de ambiente, mesma precedência do envio): código de
+// teste esquecido é falha silenciosa, os eventos param de contar pra otimização, então o painel
+// precisa mostrar mesmo quando quem ligou foi a META_CAPI_TEST_EVENT_CODE.
+function resumoConversoesMeta(integracao) {
+  if (!integracao?.metaDatasetId) return null;
+  const codigo = codigoTeste(integracao);
+  return {
+    pageId: integracao.pageId,
+    metaDatasetId: integracao.metaDatasetId,
+    metaDatasetTokenConfigurado: !!integracao.metaDatasetToken,
+    metaEtapaQualificada: integracao.metaEtapaQualificada,
+    metaTestEventCode: integracao.metaTestEventCode,
+    modoTeste: codigo ? { codigo, origem: integracao.metaTestEventCode ? 'painel' : 'variavel' } : null,
+  };
+}
+
+// API de Conversões para CRM: configuração por imobiliária. Como o Lead não guarda a página de
+// origem, só uma integração da imobiliária pode ter dataset — salvar numa página limpa as demais.
+// pageId vazio desliga o envio. Token vazio mantém o já salvo. Código de teste vazio = produção.
+async function atualizarConversoesMeta(req, res) {
+  const { id } = req.params;
+  const { pageId, metaDatasetId, metaDatasetToken, metaEtapaQualificada, metaTestEventCode } = req.body;
+
+  const imobiliaria = await prisma.imobiliaria.findUnique({ where: { id } });
+  if (!imobiliaria) return res.status(404).json({ error: 'Imobiliária não encontrada' });
+
+  const integracoes = await prisma.metaIntegracao.findMany({ where: { imobiliariaId: id } });
+
+  if (!pageId) {
+    await prisma.metaIntegracao.updateMany({
+      where: { imobiliariaId: id },
+      data: { metaDatasetId: null, metaDatasetToken: null, metaTestEventCode: null },
+    });
+    console.log(`[admin] conversões Meta desativadas — imobiliaria=${id}`);
+    return res.json({ conversoesMeta: null });
+  }
+
+  const alvo = integracoes.find((m) => m.pageId === pageId);
+  if (!alvo) return res.status(400).json({ error: 'Página não encontrada para esta imobiliária' });
+
+  const datasetId = typeof metaDatasetId === 'string' ? metaDatasetId.trim() : '';
+  if (!/^\d+$/.test(datasetId)) return res.status(400).json({ error: 'ID do dataset inválido' });
+
+  if (!ETAPAS_QUALIFICAVEIS.includes(metaEtapaQualificada)) {
+    return res.status(400).json({
+      error: `Etapa qualificada inválida. Valores aceitos: ${ETAPAS_QUALIFICAVEIS.join(', ')}`,
+    });
+  }
+
+  const tokenNovo = typeof metaDatasetToken === 'string' ? metaDatasetToken.trim() : '';
+  const token = tokenNovo || integracoes.find((m) => m.metaDatasetToken)?.metaDatasetToken;
+  if (!token) return res.status(400).json({ error: 'Token do dataset obrigatório' });
+
+  const testEventCode = typeof metaTestEventCode === 'string' && metaTestEventCode.trim()
+    ? metaTestEventCode.trim()
+    : null;
+
+  const atualizado = await prisma.$transaction(async (tx) => {
+    await tx.metaIntegracao.updateMany({
+      where: { imobiliariaId: id, id: { not: alvo.id } },
+      data: { metaDatasetId: null, metaDatasetToken: null, metaTestEventCode: null },
+    });
+    return tx.metaIntegracao.update({
+      where: { id: alvo.id },
+      data: { metaDatasetId: datasetId, metaDatasetToken: token, metaEtapaQualificada, metaTestEventCode: testEventCode },
+    });
+  });
+
+  console.log(
+    `[admin] conversões Meta configuradas — imobiliaria=${id} page=${pageId} dataset=${datasetId} `
+    + `etapaQualificada=${metaEtapaQualificada} token=${tokenNovo ? 'novo' : 'mantido'} `
+    + `modo=${testEventCode ? `teste (${testEventCode})` : 'produção'}`,
+  );
+
+  res.json({ conversoesMeta: resumoConversoesMeta(atualizado) });
 }
 
 // ── atualizarValorCobranca ────────────────────────────────────────────────────
@@ -529,6 +616,7 @@ module.exports = {
   atualizarPermissoes,
   atualizarLimiteAcessos,
   atualizarAdAccount,
+  atualizarConversoesMeta,
   atualizarValorCobranca,
   atualizarFranquiaAgente,
   relatorioConsumoAgente,
