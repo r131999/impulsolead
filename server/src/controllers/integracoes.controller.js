@@ -25,7 +25,7 @@ function normalizarTelefone(telefone) {
 async function criarLeadEDistribuir({
   nome, telefone, origem, campanha, conjuntoName, anuncioName,
   adId, adsetId, campaignId, formId, imobiliariaId, imobiliaria,
-  respostasFormulario, leadgenId, email, telefoneInvalido = false, possivelDuplicataDe = null,
+  respostasFormulario, leadgenId, metaPageId, email, telefoneInvalido = false, possivelDuplicataDe = null,
 }) {
   const configAgente = await prisma.configAgente.findUnique({ where: { imobiliariaId } });
   const modoManual = configAgente?.distribuicaoManual ?? false;
@@ -68,6 +68,7 @@ async function criarLeadEDistribuir({
         formId: formId || null,
         respostasFormulario: respostasFormulario || null,
         leadgenId: leadgenId || null,
+        metaPageId: metaPageId || null,
         possivelDuplicataDeId: possivelDuplicataDe?.id || null,
         email: email || null,
         imobiliariaId,
@@ -354,6 +355,7 @@ async function receberLeadMeta(req, res) {
             formId: leadData.form_id,
             respostasFormulario,
             leadgenId,
+            metaPageId: pageId,
             email,
             imobiliariaId,
             imobiliaria,

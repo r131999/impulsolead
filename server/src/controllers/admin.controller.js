@@ -101,7 +101,7 @@ async function listarClientes(req, res) {
         pageName: m.pageName,
         adAccountId: m.adAccountId,
       })),
-      conversoesMeta: resumoConversoesMeta(comDataset, imob.metaIntegracoes.length),
+      conversoesMeta: resumoConversoesMeta(comDataset),
       totalLeads: imob._count.leads,
       totalCorretores: imob._count.corretores,
       totalUsuarios: imob._count.usuarios,
@@ -244,14 +244,10 @@ async function atualizarAdAccount(req, res) {
 // modoTeste vem resolvido (painel ou variável de ambiente, mesma precedência do envio): código de
 // teste esquecido é falha silenciosa, os eventos param de contar pra otimização, então o painel
 // precisa mostrar mesmo quando quem ligou foi a META_CAPI_TEST_EVENT_CODE.
-// envioBloqueado: com mais de uma página Meta ativa o serviço não envia nada (o lead não guarda a
-// página de origem) — o painel avisa em vez de parecer configurado.
-function resumoConversoesMeta(integracao, totalPaginas) {
+function resumoConversoesMeta(integracao) {
   if (!integracao?.metaDatasetId) return null;
   const codigo = codigoTeste(integracao);
   return {
-    envioBloqueado: totalPaginas > 1,
-    totalPaginas,
     pageId: integracao.pageId,
     metaDatasetId: integracao.metaDatasetId,
     metaDatasetTokenConfigurado: !!integracao.metaDatasetToken,
@@ -261,8 +257,8 @@ function resumoConversoesMeta(integracao, totalPaginas) {
   };
 }
 
-// API de Conversões para CRM: configuração por imobiliária. Como o Lead não guarda a página de
-// origem, só uma integração da imobiliária pode ter dataset — salvar numa página limpa as demais.
+// API de Conversões para CRM: configuração por imobiliária. Só uma integração da imobiliária pode ter
+// dataset — salvar numa página limpa as demais. Só os leads dessa página (Lead.metaPageId) são enviados.
 // pageId vazio desliga o envio. Token vazio mantém o já salvo. Código de teste vazio = produção.
 async function atualizarConversoesMeta(req, res) {
   const { id } = req.params;
@@ -319,8 +315,7 @@ async function atualizarConversoesMeta(req, res) {
     + `modo=${testEventCode ? `teste (${testEventCode})` : 'produção'}`,
   );
 
-  const totalPaginas = integracoes.filter((m) => m.ativo && m.pageId).length;
-  res.json({ conversoesMeta: resumoConversoesMeta(atualizado, totalPaginas) });
+  res.json({ conversoesMeta: resumoConversoesMeta(atualizado) });
 }
 
 // ── atualizarValorCobranca ────────────────────────────────────────────────────

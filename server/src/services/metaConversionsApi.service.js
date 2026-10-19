@@ -18,7 +18,7 @@ const MAX_TENTATIVAS = 5;
 const ENVIO_TRAVADO_MS = 10 * 60 * 1000;
 const LEAD_EVENT_SOURCE = 'ImpulsoLead';
 
-const SELECT_LEAD = { id: true, imobiliariaId: true, leadgenId: true, criadoEm: true };
+const SELECT_LEAD = { id: true, imobiliariaId: true, leadgenId: true, metaPageId: true, criadoEm: true };
 
 function hash(valor) {
   if (!valor) return null;
@@ -46,23 +46,22 @@ function codigoTeste(integracao) {
   return integracao.metaTestEventCode || process.env.META_CAPI_TEST_EVENT_CODE || null;
 }
 
-// O vínculo certo é lead → página Meta de origem → dataset daquela página, mas o Lead não guarda
-// a página. Então só dá pra atribuir os leads ao dataset com segurança quando a imobiliária tem uma
-// única página Meta ativa. Com duas ou mais (ex.: Souza: Souzaandradeslz com dataset e Flávio dos
-// Santos deliberadamente sem), os leads da outra página iriam pro dataset errado — a imobiliária
-// fica de fora do envio e o log avisa a cada rodada.
+// Integração Meta da imobiliária que tem dataset + token. O vínculo é lead → página Meta de origem
+// (Lead.metaPageId) → dataset daquela página: com duas páginas (ex.: Souza: Souzaandradeslz com
+// dataset e Flávio dos Santos deliberadamente sem), só os leads da página com dataset são enviados.
+// Mais de uma integração com dataset não deveria existir (o admin impede); se existir, não envia.
 async function obterIntegracaoCapi(imobiliariaId) {
-  const paginas = await prisma.metaIntegracao.findMany({
-    where: { imobiliariaId, ativo: true, pageId: { not: null } },
+  const comDataset = await prisma.metaIntegracao.findMany({
+    where: {
+      imobiliariaId, ativo: true, pageId: { not: null }, metaDatasetId: { not: null }, metaDatasetToken: { not: null },
+    },
   });
-  const comDataset = paginas.filter((m) => m.metaDatasetId && m.metaDatasetToken);
   if (comDataset.length === 0) return null;
 
-  if (paginas.length > 1) {
+  if (comDataset.length > 1) {
     console.warn(
-      `[metaCapi] imobiliaria=${imobiliariaId} NÃO ENVIADA — ${paginas.length} páginas Meta ativas `
-      + `(${paginas.map((m) => m.pageName || m.pageId).join(', ')}) e o lead não guarda a página de origem; `
-      + 'enviar misturaria leads de outra página no dataset',
+      `[metaCapi] imobiliaria=${imobiliariaId} NÃO ENVIADA — ${comDataset.length} integrações Meta com dataset `
+      + `(${comDataset.map((m) => m.pageName || m.pageId).join(', ')}); deixe o dataset em só uma`,
     );
     return null;
   }
@@ -108,8 +107,9 @@ function derivarEventos(lead, historico, etapaQualificada) {
 // Materializa em EventoMetaCapi os eventos ainda não registrados dos leads, dentro da janela de 7 dias.
 async function registrarEventos(leads, integracao) {
   // A query já exclui leadgenId nulo (WhatsApp, manual, Make); aqui sai também o que não for um
-  // leadgen_id numérico, que a Meta rejeitaria.
-  const comLeadgen = leads.filter((l) => /^\d+$/.test(l.leadgenId || ''));
+  // leadgen_id numérico, que a Meta rejeitaria, e o lead de outra página (ou de página nula, criado
+  // antes da coluna metaPageId) — vale também pro disparo inline, que não passa pela query do cron.
+  const comLeadgen = leads.filter((l) => /^\d+$/.test(l.leadgenId || '') && l.metaPageId === integracao.pageId);
   if (comLeadgen.length === 0) return 0;
 
   const etapaQualificada = ETAPAS_QUALIFICAVEIS.includes(integracao.metaEtapaQualificada)
@@ -313,6 +313,7 @@ async function sincronizarEventosMetaCapi() {
         where: {
           imobiliariaId,
           leadgenId: { not: null },
+          metaPageId: integracao.pageId, // só a página que tem o dataset; página nula fica de fora
           OR: [
             { criadoEm: { gte: limite } },
             { historicoEtapaLead: { some: { alteradoEm: { gte: limite } } } },

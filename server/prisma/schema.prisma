@@ -135,6 +135,7 @@ model Lead {
   ctwaClid     String? // referral.ctwa_clid do Click-to-WhatsApp — id do clique, pra reportar conversão à Meta
   formId       String?
   leadgenId    String? @unique
+  metaPageId   String? // entry[].id do webhook leadgen; liga o lead à MetaIntegracao (e ao dataset da API de Conversões)
   possivelDuplicataDeId String? // lead anterior com mesmo telefone + formId na imobiliária; só sinalização pro corretor, sem FK
   email        String?
   valorVenda   Decimal? @db.Decimal(12, 2)
