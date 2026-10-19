@@ -208,6 +208,21 @@ function AvisoModoTeste({ modoTeste }) {
   )
 }
 
+function AvisoEnvioBloqueado() {
+  return (
+    <div
+      className="rounded-lg px-3 py-2.5 text-xs"
+      style={{ backgroundColor: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.6)', color: '#f87171' }}
+    >
+      <p className="font-semibold">⛔ API de Conversões NÃO ESTÁ ENVIANDO</p>
+      <p className="mt-0.5">
+        Este cliente tem mais de uma página Meta ativa e o lead não guarda a página de origem. Para não misturar
+        leads de outra página no dataset, nenhum evento é enviado.
+      </p>
+    </div>
+  )
+}
+
 function SaveButton({ onClick, loading, children }) {
   return (
     <button
@@ -266,6 +281,7 @@ function ModalGerenciar({ cliente, onClose, onAtualizado, precos }) {
   })
   const [capiTokenConfigurado, setCapiTokenConfigurado] = useState(!!cliente.conversoesMeta?.metaDatasetTokenConfigurado)
   const [capiModoTeste, setCapiModoTeste] = useState(cliente.conversoesMeta?.modoTeste ?? null)
+  const [capiBloqueado, setCapiBloqueado] = useState(!!cliente.conversoesMeta?.envioBloqueado)
   const [salvandoCapi, setSalvandoCapi] = useState(false)
 
   // ── feedback ──
@@ -369,6 +385,7 @@ function ModalGerenciar({ cliente, onClose, onAtualizado, precos }) {
       setCapi((atual) => ({ ...atual, metaDatasetToken: '' }))
       setCapiTokenConfigurado(!!salvo?.metaDatasetTokenConfigurado)
       setCapiModoTeste(salvo?.modoTeste ?? null)
+      setCapiBloqueado(!!salvo?.envioBloqueado)
       onAtualizado()
       feedback(
         !salvo ? 'API de Conversões desativada'
@@ -404,9 +421,10 @@ function ModalGerenciar({ cliente, onClose, onAtualizado, precos }) {
         <InfoRow label="Total de leads" value={cliente.totalLeads} />
       </div>
 
-      {capiModoTeste && (
-        <div className="mb-4">
-          <AvisoModoTeste modoTeste={capiModoTeste} />
+      {(capiBloqueado || capiModoTeste) && (
+        <div className="mb-4 space-y-2">
+          {capiBloqueado && <AvisoEnvioBloqueado />}
+          {capiModoTeste && <AvisoModoTeste modoTeste={capiModoTeste} />}
         </div>
       )}
 
@@ -569,6 +587,7 @@ function ModalGerenciar({ cliente, onClose, onAtualizado, precos }) {
 
               <p className="text-xs font-semibold" style={{ color: '#94A3B8' }}>API de Conversões (CRM)</p>
 
+              {capiBloqueado && <AvisoEnvioBloqueado />}
               {capiModoTeste && <AvisoModoTeste modoTeste={capiModoTeste} />}
 
               <div>
@@ -1004,6 +1023,14 @@ export default function AdminDashboard() {
                           <div>
                             <p className="font-medium text-white">{c.nome}</p>
                             <p className="text-xs" style={{ color: '#475569' }}>{c.email}</p>
+                            {c.conversoesMeta?.envioBloqueado && (
+                              <span
+                                className="inline-block mt-1 mr-1 text-[10px] font-semibold px-1.5 py-0.5 rounded"
+                                style={{ backgroundColor: 'rgba(239,68,68,0.12)', color: '#f87171', border: '1px solid rgba(239,68,68,0.6)' }}
+                              >
+                                ⛔ CAPI BLOQUEADA
+                              </span>
+                            )}
                             {c.conversoesMeta?.modoTeste && (
                               <span
                                 className="inline-block mt-1 text-[10px] font-semibold px-1.5 py-0.5 rounded"

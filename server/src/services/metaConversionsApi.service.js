@@ -46,21 +46,27 @@ function codigoTeste(integracao) {
   return integracao.metaTestEventCode || process.env.META_CAPI_TEST_EVENT_CODE || null;
 }
 
-// Configuração é por imobiliária: como o Lead não guarda a página de origem, só uma integração
-// dela pode ter dataset. O admin garante isso ao salvar; se mesmo assim houver mais de uma, avisa
-// e usa a atualizada por último.
+// O vínculo certo é lead → página Meta de origem → dataset daquela página, mas o Lead não guarda
+// a página. Então só dá pra atribuir os leads ao dataset com segurança quando a imobiliária tem uma
+// única página Meta ativa. Com duas ou mais (ex.: Souza: Souzaandradeslz com dataset e Flávio dos
+// Santos deliberadamente sem), os leads da outra página iriam pro dataset errado — a imobiliária
+// fica de fora do envio e o log avisa a cada rodada.
 async function obterIntegracaoCapi(imobiliariaId) {
-  const integracoes = await prisma.metaIntegracao.findMany({
-    where: { imobiliariaId, ativo: true, metaDatasetId: { not: null }, metaDatasetToken: { not: null } },
-    orderBy: { atualizadoEm: 'desc' },
+  const paginas = await prisma.metaIntegracao.findMany({
+    where: { imobiliariaId, ativo: true, pageId: { not: null } },
   });
-  if (integracoes.length > 1) {
+  const comDataset = paginas.filter((m) => m.metaDatasetId && m.metaDatasetToken);
+  if (comDataset.length === 0) return null;
+
+  if (paginas.length > 1) {
     console.warn(
-      `[metaCapi] imobiliaria=${imobiliariaId} tem ${integracoes.length} integrações com dataset — `
-      + `usando a mais recente (integracao=${integracoes[0].id} dataset=${integracoes[0].metaDatasetId})`,
+      `[metaCapi] imobiliaria=${imobiliariaId} NÃO ENVIADA — ${paginas.length} páginas Meta ativas `
+      + `(${paginas.map((m) => m.pageName || m.pageId).join(', ')}) e o lead não guarda a página de origem; `
+      + 'enviar misturaria leads de outra página no dataset',
     );
+    return null;
   }
-  return integracoes[0] || null;
+  return comDataset[0];
 }
 
 // Um evento por avanço de etapa, lido do histórico — nunca um retrato do status atual.
@@ -101,7 +107,9 @@ function derivarEventos(lead, historico, etapaQualificada) {
 
 // Materializa em EventoMetaCapi os eventos ainda não registrados dos leads, dentro da janela de 7 dias.
 async function registrarEventos(leads, integracao) {
-  const comLeadgen = leads.filter((l) => l.leadgenId);
+  // A query já exclui leadgenId nulo (WhatsApp, manual, Make); aqui sai também o que não for um
+  // leadgen_id numérico, que a Meta rejeitaria.
+  const comLeadgen = leads.filter((l) => /^\d+$/.test(l.leadgenId || ''));
   if (comLeadgen.length === 0) return 0;
 
   const etapaQualificada = ETAPAS_QUALIFICAVEIS.includes(integracao.metaEtapaQualificada)
@@ -168,6 +176,9 @@ async function enviarEvento(evento, integracao) {
     data: [{
       action_source: 'system_generated',
       event_name: evento.eventName,
+      // Determinístico: a Meta deduplica por event_id + event_name, então reenvio (cron duas vezes,
+      // redeploy, falha após a Meta já ter recebido, enviado_teste voltando pra fila) não duplica.
+      event_id: `${evento.leadId}:${evento.eventName}`,
       event_time: Math.floor(new Date(evento.eventTime).getTime() / 1000),
       custom_data: { event_source: 'crm', lead_event_source: LEAD_EVENT_SOURCE },
       user_data: userData,
@@ -180,9 +191,17 @@ async function enviarEvento(evento, integracao) {
       headers: { 'Content-Type': 'application/json' },
       body,
     });
-    const json = await resp.json().catch(() => null);
-    if (!resp.ok || json?.error) {
-      throw Object.assign(new Error(json?.error?.message || `HTTP ${resp.status}`), { resposta: json });
+    const texto = await resp.text();
+    let json = null;
+    try { json = JSON.parse(texto); } catch { /* corpo não-JSON: vai cru pro log */ }
+    // Um evento por requisição: 200 sem events_received: 1 também é recusa.
+    if (!resp.ok || json?.error || json?.events_received !== 1) {
+      const motivo = json?.error?.message
+        || (resp.ok && json ? `events_received=${json.events_received ?? 'ausente'}` : `HTTP ${resp.status}`);
+      throw Object.assign(new Error(motivo), {
+        httpStatus: resp.status,
+        resposta: json ?? { corpo: texto.slice(0, 2000) },
+      });
     }
 
     await prisma.eventoMetaCapi.update({
@@ -191,7 +210,12 @@ async function enviarEvento(evento, integracao) {
     });
     console.log(`[metaCapi] ${testEventCode ? 'enviado em teste' : 'enviado'} ${ref} tentativa=${tentativa} events_received=${json?.events_received} fbtrace_id=${json?.fbtrace_id}`);
   } catch (err) {
-    console.error(`[metaCapi] falha ${ref} tentativa=${tentativa}/${MAX_TENTATIVAS}:`, err.message);
+    // Corpo inteiro da resposta (code, error_subcode, error_user_msg, fbtrace_id): rejeição sem o
+    // motivo da Meta é tão silenciosa quanto não enviar.
+    console.error(
+      `[metaCapi] falha ${ref} tentativa=${tentativa}/${MAX_TENTATIVAS} http=${err.httpStatus ?? '-'}: ${err.message}`
+      + (err.resposta ? ` | resposta Meta: ${JSON.stringify(err.resposta)}` : ''),
+    );
     await prisma.eventoMetaCapi.update({
       where: { id: evento.id },
       data: {

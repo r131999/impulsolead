@@ -101,7 +101,7 @@ async function listarClientes(req, res) {
         pageName: m.pageName,
         adAccountId: m.adAccountId,
       })),
-      conversoesMeta: resumoConversoesMeta(comDataset),
+      conversoesMeta: resumoConversoesMeta(comDataset, imob.metaIntegracoes.length),
       totalLeads: imob._count.leads,
       totalCorretores: imob._count.corretores,
       totalUsuarios: imob._count.usuarios,
@@ -244,10 +244,14 @@ async function atualizarAdAccount(req, res) {
 // modoTeste vem resolvido (painel ou variável de ambiente, mesma precedência do envio): código de
 // teste esquecido é falha silenciosa, os eventos param de contar pra otimização, então o painel
 // precisa mostrar mesmo quando quem ligou foi a META_CAPI_TEST_EVENT_CODE.
-function resumoConversoesMeta(integracao) {
+// envioBloqueado: com mais de uma página Meta ativa o serviço não envia nada (o lead não guarda a
+// página de origem) — o painel avisa em vez de parecer configurado.
+function resumoConversoesMeta(integracao, totalPaginas) {
   if (!integracao?.metaDatasetId) return null;
   const codigo = codigoTeste(integracao);
   return {
+    envioBloqueado: totalPaginas > 1,
+    totalPaginas,
     pageId: integracao.pageId,
     metaDatasetId: integracao.metaDatasetId,
     metaDatasetTokenConfigurado: !!integracao.metaDatasetToken,
@@ -315,7 +319,8 @@ async function atualizarConversoesMeta(req, res) {
     + `modo=${testEventCode ? `teste (${testEventCode})` : 'produção'}`,
   );
 
-  res.json({ conversoesMeta: resumoConversoesMeta(atualizado) });
+  const totalPaginas = integracoes.filter((m) => m.ativo && m.pageId).length;
+  res.json({ conversoesMeta: resumoConversoesMeta(atualizado, totalPaginas) });
 }
 
 // ── atualizarValorCobranca ────────────────────────────────────────────────────
